@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --board: #16332a;
+    --board-line: #244539;
+    --paper: #f4efdd;
+    --paper-line: #ddd3ad;
+    --ink: #22281f;
+    --ink-muted: #5a5f4f;
+    --chalk-amber: #f2c14e;
+    --pen-red: #d9503a;
+    --pen-green: #4f8f5e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--board);
+    background-image:
+      linear-gradient(var(--board-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--board-line) 1px, transparent 1px);
+    background-size: 28px 28px;
+    font-family: 'Source Sans 3', sans-serif;
+    color: var(--ink);
+    display: flex;
+    justify-content: center;
+    padding: 32px 16px;
+  }
+  .sheet {
+    background: var(--paper);
+    background-image: repeating-linear-gradient(var(--paper) 0px, var(--paper) 27px, var(--paper-line) 28px);
+    width: 100%;
+    max-width: 440px;
+    border-radius: 4px;
+    padding: 32px 28px;
+    box-shadow: 0 12px 0 rgba(0,0,0,0.15);
+    align-self: flex-start;
+  }
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 26px;
+    margin: 0 0 4px;
+  }
+  .subtitle { color: var(--ink-muted); font-size: 14px; margin: 0 0 24px; }
+  label { display: block; font-size: 13px; color: var(--ink-muted); margin: 14px 0 4px; }
+  input[type="email"], input[type="password"] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1.5px solid var(--paper-line);
+    border-radius: 4px;
+    background: #fff;
+    font-size: 15px;
+    font-family: inherit;
+  }
+  button {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    border: none;
+    border-radius: 4px;
+    padding: 11px 18px;
+  }
+  .btn-primary {
+    background: var(--ink);
+    color: var(--paper);
+    width: 100%;
+    margin-top: 20px;
+  }
+  .btn-link {
+    background: none;
+    color: var(--ink-muted);
+    font-family: 'Source Sans 3', sans-serif;
+    text-decoration: underline;
+    padding: 8px 0;
+    font-size: 13px;
+  }
+  .error { color: var(--pen-red); font-size: 13px; margin-top: 10px; min-height: 16px; }
+  .quiz-item {
+    border: 1.5px solid var(--paper-line);
+    border-radius: 4px;
+    padding: 14px 16px;
+    margin-top: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .quiz-item .meta { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
+  .btn-small {
+    background: var(--chalk-amber);
+    color: var(--ink);
+    font-size: 13px;
+    padding: 8px 14px;
+    white-space: nowrap;
+  }
+  .progress { font-size: 13px; color: var(--ink-muted); margin-bottom: 6px; }
+  .question-text { font-family: 'Fraunces', serif; font-size: 19px; font-weight: 600; margin: 6px 0 20px; }
+  .option {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: #fff;
+    border: 1.5px solid var(--paper-line);
+    border-radius: 4px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 15px;
+  }
+  .option.selected { border-color: var(--ink); }
+  .option.correct { border-color: var(--pen-green); background: #ecf5ed; }
+  .option.incorrect { border-color: var(--pen-red); background: #fbecea; }
+  .option:disabled { cursor: default; }
+  .feedback { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+  .feedback.correct { color: var(--pen-green); }
+  .feedback.incorrect { color: var(--pen-red); }
+  .score-stamp {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 42px;
+    color: var(--pen-red);
+    border: 3px solid var(--pen-red);
+    border-radius: 8px;
+    display: inline-block;
+    padding: 8px 20px;
+    transform: rotate(-4deg);
+    margin: 12px 0 20px;
+  }
+  .hidden { display: none; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+<div class="sheet" id="app"></div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+// ------------------------------------------------------------------
+// CONFIGURA ESTO con los datos de tu proyecto Supabase
+// (Settings -> API en tu panel de Supabase)
+// ------------------------------------------------------------------
+const SUPABASE_URL = 'https://qiawcxkmszgwvxlbbcdw.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpYXdjeGttc3pnd3Z4bGJiY2R3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyNDU2NjgsImV4cCI6MjEwNDgyMTY2OH0.Yw57xGupEs2f7s1lYIw9Gx1UUP2gg18FbgKj8LVzMfY';
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const app = document.getElementById('app');
+
+let state = { estudiante: null, quiz: null, intentoId: null, preguntas: [], index: 0, puntosTotales: 0, sumaPuntos: 0 };
+
+async function init() {
+  if (SUPABASE_URL.includes('TU_SUPABASE')) {
+    app.innerHTML = `<h1>Falta configurar</h1><p class="subtitle">Reemplaza SUPABASE_URL y SUPABASE_ANON_KEY al inicio del archivo con los datos de tu proyecto (Settings → API en Supabase).</p>`;
+    return;
+  }
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) loadDashboard();
+  else renderLogin();
+}
+
+function renderLogin(mode = 'login') {
+  const isSignup = mode === 'signup';
+  app.innerHTML = `
+    <h1>Quiz</h1>
+    <p class="subtitle">${isSignup ? 'Crea tu cuenta de estudiante' : 'Inicia sesión para ver tus quizzes'}</p>
+    <label>Correo</label>
+    <input type="email" id="email">
+    <label>Contraseña</label>
+    <input type="password" id="password">
+    <button class="btn-primary" id="submitBtn">${isSignup ? 'Crear cuenta' : 'Entrar'}</button>
+    <button class="btn-link" id="toggleBtn">${isSignup ? 'Ya tengo cuenta' : 'Crear una cuenta nueva'}</button>
+    <div class="error" id="err"></div>
+  `;
+  document.getElementById('toggleBtn').onclick = () => renderLogin(isSignup ? 'login' : 'signup');
+  document.getElementById('submitBtn').onclick = async () => {
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const errEl = document.getElementById('err');
+    errEl.textContent = '';
+    if (!email || !password) { errEl.textContent = 'Completa correo y contraseña.'; return; }
+    const { error } = isSignup
+      ? await supabase.auth.signUp({ email, password })
+      : await supabase.auth.signInWithPassword({ email, password });
+    if (error) { errEl.textContent = error.message; return; }
+    if (isSignup) { errEl.style.color = 'var(--pen-green)'; errEl.textContent = 'Cuenta creada. Ahora inicia sesión.'; renderLogin('login'); return; }
+    loadDashboard();
+  };
+}
+
+async function loadDashboard() {
+  app.innerHTML = `<p class="subtitle">Cargando...</p>`;
+  const { data: { user } } = await supabase.auth.getUser();
+
+  const { data: estudiante } = await supabase
+    .from('estudiantes').select('id, grupo_id, nombre').eq('perfil_id', user.id).maybeSingle();
+
+  if (!estudiante) {
+    app.innerHTML = `
+      <div class="topbar"><h1>Quiz</h1><button class="btn-link" id="logout">Salir</button></div>
+      <p class="subtitle">Tu cuenta aún no está asignada a un grupo. Avísale a tu profesor.</p>`;
+    document.getElementById('logout').onclick = async () => { await supabase.auth.signOut(); renderLogin(); };
+    return;
+  }
+  state.estudiante = estudiante;
+
+  const { data: quizzes } = await supabase
+    .from('quizzes').select('id, titulo, modo, activo').eq('grupo_id', estudiante.grupo_id).eq('activo', true);
+
+  app.innerHTML = `
+    <div class="topbar"><h1>Hola, ${estudiante.nombre}</h1><button class="btn-link" id="logout">Salir</button></div>
+    <p class="subtitle">Tus quizzes disponibles</p>
+    <div id="list">${(quizzes || []).length ? '' : '<p class="subtitle">No hay quizzes activos por ahora.</p>'}</div>
+  `;
+  document.getElementById('logout').onclick = async () => { await supabase.auth.signOut(); renderLogin(); };
+
+  const list = document.getElementById('list');
+  (quizzes || []).forEach(q => {
+    const item = document.createElement('div');
+    item.className = 'quiz-item';
+    item.innerHTML = `<div><div>${q.titulo}</div><div class="meta">Modo ${q.modo === 'practica' ? 'práctica' : 'examen'}</div></div>
+      <button class="btn-small">Comenzar</button>`;
+    item.querySelector('button').onclick = () => startQuiz(q);
+    list.appendChild(item);
+  });
+}
+
+async function startQuiz(quiz) {
+  state.quiz = quiz;
+  const { data: intento } = await supabase
+    .from('intentos').insert({ quiz_id: quiz.id, estudiante_id: state.estudiante.id }).select('id').single();
+  state.intentoId = intento.id;
+
+  const { data: qp } = await supabase
+    .from('quiz_preguntas')
+    .select('orden, preguntas(id, enunciado, puntos)')
+    .eq('quiz_id', quiz.id)
+    .order('orden');
+
+  state.preguntas = qp.map(r => r.preguntas);
+  state.sumaPuntos = state.preguntas.reduce((a, p) => a + Number(p.puntos), 0);
+  state.index = 0;
+  renderQuestion();
+}
+
+async function renderQuestion() {
+  const pregunta = state.preguntas[state.index];
+  const { data: opciones } = await supabase.rpc('obtener_opciones', { p_pregunta_id: pregunta.id });
+
+  app.innerHTML = `
+    <p class="progress">Pregunta ${state.index + 1} de ${state.preguntas.length}</p>
+    <p class="question-text">${pregunta.enunciado}</p>
+    <div id="opts"></div>
+    <div class="feedback hidden" id="feedback"></div>
+    <button class="btn-primary hidden" id="nextBtn">${state.index + 1 === state.preguntas.length ? 'Finalizar' : 'Siguiente'}</button>
+  `;
+
+  const opts = document.getElementById('opts');
+  opciones.forEach(o => {
+    const b = document.createElement('button');
+    b.className = 'option';
+    b.textContent = o.texto;
+    b.onclick = async () => {
+      opts.querySelectorAll('button').forEach(btn => btn.disabled = true);
+      b.classList.add('selected');
+      const { data: esCorrecta } = await supabase.rpc('responder_pregunta', {
+        p_intento_id: state.intentoId, p_pregunta_id: pregunta.id, p_opcion_id: o.id
+      });
+      if (state.quiz.modo === 'practica') {
+        b.classList.add(esCorrecta ? 'correct' : 'incorrect');
+        const fb = document.getElementById('feedback');
+        fb.classList.remove('hidden');
+        fb.classList.add(esCorrecta ? 'correct' : 'incorrect');
+        fb.textContent = esCorrecta ? '¡Correcto!' : 'Incorrecto.';
+      }
+      document.getElementById('nextBtn').classList.remove('hidden');
+    };
+    opts.appendChild(b);
+  });
+
+  document.getElementById('nextBtn').onclick = () => {
+    state.index++;
+    if (state.index < state.preguntas.length) renderQuestion();
+    else finishQuiz();
+  };
+}
+
+async function finishQuiz() {
+  const { data: total } = await supabase.rpc('finalizar_intento', { p_intento_id: state.intentoId });
+  app.innerHTML = `
+    <h1>Quiz terminado</h1>
+    <p class="subtitle">${state.quiz.titulo}</p>
+    <div class="score-stamp">${total} / ${state.sumaPuntos}</div>
+    <button class="btn-primary" id="backBtn">Volver a mis quizzes</button>
+  `;
+  document.getElementById('backBtn').onclick = loadDashboard;
+}
+
+init();
+</script>
+</body>
+</html>
