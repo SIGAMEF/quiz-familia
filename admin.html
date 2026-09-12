@@ -69,6 +69,11 @@ const SUPABASE_URL = 'https://qiawcxkmszgwvxlbbcdw.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpYXdjeGttc3pnd3Z4bGJiY2R3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyNDU2NjgsImV4cCI6MjEwNDgyMTY2OH0.Yw57xGupEs2f7s1lYIw9Gx1UUP2gg18FbgKj8LVzMfY';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Cliente aparte, con sesión propia aislada, solo para crear cuentas nuevas
+// sin cerrar la sesión del admin que está usando el panel.
+const clienteCreacion = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false, storageKey: 'temp-creacion-cuentas' }
+});
 const app = document.getElementById('app');
 let me = { id: null, rol: null };
 let grupoActivo = null;
@@ -150,8 +155,19 @@ function renderAdminSection() {
       <div class="error" id="gErr"></div>
     </div>
     <div class="card">
-      <h2>Asignar profesor a un grupo</h2>
-      <label>Correo del profesor (ya debe tener cuenta creada)</label>
+      <h2>Crear profesor</h2>
+      <p class="subtitle">Tú le asignas correo y clave directamente; el profesor no se registra solo.</p>
+      <div class="row">
+        <div><label>Correo</label><input id="profEmail" placeholder="profesor@correo.com"></div>
+        <div><label>Contraseña</label><input id="profPassword" type="password"></div>
+        <div><label>Grupo</label><select id="profGrupo"></select></div>
+      </div>
+      <button class="btn-primary" id="profCrear">Crear profesor</button>
+      <div class="error" id="profErr"></div>
+    </div>
+    <div class="card">
+      <h2>Asignar un grupo adicional a un profesor existente</h2>
+      <label>Correo del profesor</label>
       <input id="pEmail" placeholder="profesor@correo.com">
       <button class="btn-outline" id="pBuscar" style="margin-top:8px">Buscar</button>
       <div id="pResultado"></div>
@@ -171,23 +187,48 @@ function renderAdminSection() {
     const email = document.getElementById('pEmail').value.trim();
     const { data: perfil } = await supabase.from('perfiles').select('id, email, rol').eq('email', email).maybeSingle();
     const box = document.getElementById('pResultado');
-    if (!perfil) { box.innerHTML = `<p class="error">No se encontró ninguna cuenta con ese correo. Primero debe registrarse en la página de estudiante.</p>`; return; }
+    if (!perfil) { box.innerHTML = `<p class="error">No se encontró ninguna cuenta con ese correo.</p>`; return; }
+    if (perfil.rol !== 'profesor') { box.innerHTML = `<p class="error">Esa cuenta no es profesor (rol actual: ${perfil.rol}). Créala primero con "Crear profesor".</p>`; return; }
     const { data: grupos } = await supabase.from('grupos').select('id, nombre');
     box.innerHTML = `
-      <p class="ok-msg">Encontrado: ${perfil.email} (rol actual: ${perfil.rol})</p>
+      <p class="ok-msg">Encontrado: ${perfil.email}</p>
       <div class="row">
         <div><select id="pGrupo">${(grupos||[]).map(g=>`<option value="${g.id}">${g.nombre}</option>`).join('')}</select></div>
-        <div><button class="btn-small" id="pAsignar">Hacer profesor y asignar</button></div>
+        <div><button class="btn-small" id="pAsignar">Asignar grupo</button></div>
       </div>
       <div class="error" id="pErr"></div>
     `;
     document.getElementById('pAsignar').onclick = async () => {
       const grupoId = document.getElementById('pGrupo').value;
-      const { error: e1 } = await supabase.from('perfiles').update({ rol: 'profesor' }).eq('id', perfil.id);
-      const { error: e2 } = await supabase.from('profesor_grupos').insert({ profesor_id: perfil.id, grupo_id: grupoId });
-      if (e1 || e2) { document.getElementById('pErr').textContent = (e1 || e2).message; return; }
-      document.getElementById('pErr').innerHTML = '<span class="ok-msg">Listo, profesor asignado.</span>';
+      const { error } = await supabase.from('profesor_grupos').insert({ profesor_id: perfil.id, grupo_id: grupoId });
+      if (error) { document.getElementById('pErr').textContent = error.message; return; }
+      document.getElementById('pErr').innerHTML = '<span class="ok-msg">Listo, grupo asignado.</span>';
     };
+  };
+
+  supabase.from('grupos').select('id, nombre').then(({ data: grupos }) => {
+    document.getElementById('profGrupo').innerHTML = (grupos || []).map(g => `<option value="${g.id}">${g.nombre}</option>`).join('') || '<option value="">Crea un grupo primero</option>';
+  });
+
+  document.getElementById('profCrear').onclick = async () => {
+    const email = document.getElementById('profEmail').value.trim();
+    const password = document.getElementById('profPassword').value;
+    const grupoId = document.getElementById('profGrupo').value;
+    const errEl = document.getElementById('profErr');
+    errEl.textContent = '';
+    if (!email || !password || !grupoId) { errEl.textContent = 'Completa correo, contraseña y grupo.'; return; }
+
+    const { data, error } = await clienteCreacion.auth.signUp({ email, password });
+    if (error) { errEl.textContent = error.message; return; }
+
+    const nuevoId = data.user.id;
+    const { error: errRol } = await supabase.from('perfiles').update({ rol: 'profesor' }).eq('id', nuevoId);
+    const { error: errGrupo } = await supabase.from('profesor_grupos').insert({ profesor_id: nuevoId, grupo_id: grupoId });
+    if (errRol || errGrupo) { errEl.textContent = (errRol || errGrupo).message; return; }
+
+    errEl.innerHTML = '<span class="ok-msg">Profesor creado y asignado.</span>';
+    document.getElementById('profEmail').value = '';
+    document.getElementById('profPassword').value = '';
   };
 }
 

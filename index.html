@@ -149,8 +149,8 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 // CONFIGURA ESTO con los datos de tu proyecto Supabase
 // (Settings -> API en tu panel de Supabase)
 // ------------------------------------------------------------------
-const SUPABASE_URL = 'https://qiawcxkmszgwvxlbbcdw.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpYXdjeGttc3pnd3Z4bGJiY2R3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyNDU2NjgsImV4cCI6MjEwNDgyMTY2OH0.Yw57xGupEs2f7s1lYIw9Gx1UUP2gg18FbgKj8LVzMfY';
+const SUPABASE_URL = 'TU_SUPABASE_URL_AQUI';
+const SUPABASE_ANON_KEY = 'TU_SUPABASE_ANON_KEY_AQUI';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const app = document.getElementById('app');
@@ -167,11 +167,22 @@ async function init() {
   else renderLogin();
 }
 
-function renderLogin(mode = 'login') {
+async function renderLogin(mode = 'login') {
   const isSignup = mode === 'signup';
+  let grupos = [];
+  if (isSignup) {
+    const { data } = await supabase.from('grupos').select('id, nombre').order('nombre');
+    grupos = data || [];
+  }
   app.innerHTML = `
     <h1>Quiz</h1>
     <p class="subtitle">${isSignup ? 'Crea tu cuenta de estudiante' : 'Inicia sesión para ver tus quizzes'}</p>
+    ${isSignup ? `
+    <label>Nombre completo</label>
+    <input type="text" id="nombre">
+    <label>Grupo</label>
+    <select id="grupoSel">${grupos.map(g => `<option value="${g.id}">${g.nombre}</option>`).join('') || '<option value="">No hay grupos creados todavía</option>'}</select>
+    ` : ''}
     <label>Correo</label>
     <input type="email" id="email">
     <label>Contraseña</label>
@@ -186,12 +197,25 @@ function renderLogin(mode = 'login') {
     const password = document.getElementById('password').value;
     const errEl = document.getElementById('err');
     errEl.textContent = '';
+
+    if (isSignup) {
+      const nombre = document.getElementById('nombre').value.trim();
+      const grupoId = document.getElementById('grupoSel').value;
+      if (!email || !password || !nombre || !grupoId) { errEl.textContent = 'Completa todos los campos.'; return; }
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) { errEl.textContent = error.message; return; }
+      const { error: errEst } = await supabase.from('estudiantes').insert({
+        perfil_id: data.user.id, grupo_id: grupoId, nombre
+      });
+      if (errEst) { errEl.textContent = 'Cuenta creada, pero no se pudo enlazar al grupo: ' + errEst.message; return; }
+      errEl.style.color = 'var(--pen-green)'; errEl.textContent = 'Cuenta creada. Ahora inicia sesión.';
+      renderLogin('login');
+      return;
+    }
+
     if (!email || !password) { errEl.textContent = 'Completa correo y contraseña.'; return; }
-    const { error } = isSignup
-      ? await supabase.auth.signUp({ email, password })
-      : await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) { errEl.textContent = error.message; return; }
-    if (isSignup) { errEl.style.color = 'var(--pen-green)'; errEl.textContent = 'Cuenta creada. Ahora inicia sesión.'; renderLogin('login'); return; }
     loadDashboard();
   };
 }
@@ -215,12 +239,25 @@ async function loadDashboard() {
   const { data: quizzes } = await supabase
     .from('quizzes').select('id, titulo, modo, activo').eq('grupo_id', estudiante.grupo_id).eq('activo', true);
 
+  const { data: grupos } = await supabase.from('grupos').select('id, nombre').order('nombre');
+
   app.innerHTML = `
     <div class="topbar"><h1>Hola, ${estudiante.nombre}</h1><button class="btn-link" id="logout">Salir</button></div>
     <p class="subtitle">Tus quizzes disponibles</p>
     <div id="list">${(quizzes || []).length ? '' : '<p class="subtitle">No hay quizzes activos por ahora.</p>'}</div>
+    <label>Cambiar de grupo</label>
+    <select id="grupoCambio">${(grupos || []).map(g => `<option value="${g.id}" ${g.id === estudiante.grupo_id ? 'selected' : ''}>${g.nombre}</option>`).join('')}</select>
+    <button class="btn-link" id="cambiarGrupoBtn">Guardar grupo</button>
+    <div class="error" id="grupoErr"></div>
   `;
   document.getElementById('logout').onclick = async () => { await supabase.auth.signOut(); renderLogin(); };
+  document.getElementById('cambiarGrupoBtn').onclick = async () => {
+    const nuevoGrupo = document.getElementById('grupoCambio').value;
+    const { error } = await supabase.from('estudiantes').update({ grupo_id: nuevoGrupo }).eq('id', estudiante.id);
+    const msgEl = document.getElementById('grupoErr');
+    if (error) { msgEl.textContent = error.message; return; }
+    loadDashboard();
+  };
 
   const list = document.getElementById('list');
   (quizzes || []).forEach(q => {
