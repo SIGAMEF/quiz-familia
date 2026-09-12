@@ -79,6 +79,11 @@ let me = { id: null, rol: null };
 let grupoActivo = null;
 let cortesCache = [];
 
+const DOMINIO_INTERNO = 'quizapp.local';
+function sanitizarUsuario(u) {
+  return (u || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
+}
+
 async function init() {
   const { data: { session } } = await supabase.auth.getSession();
   if (session) loadDashboard(); else renderLogin();
@@ -89,23 +94,26 @@ function renderLogin() {
     <div class="card">
       <h1>Panel del profesor</h1>
       <p class="subtitle">Inicia sesión con tu cuenta de administrador o profesor</p>
-      <label>Correo</label><input type="email" id="email">
-      <label>Contraseña</label><input type="password" id="password">
+      <label>Usuario</label><input type="text" id="usuario" autocomplete="username">
+      <label>Contraseña</label><input type="password" id="password" autocomplete="current-password">
       <button class="btn-primary" id="loginBtn">Entrar</button>
       <div class="error" id="err"></div>
     </div>`;
   document.getElementById('loginBtn').onclick = async () => {
-    const email = document.getElementById('email').value.trim();
+    const usuario = sanitizarUsuario(document.getElementById('usuario').value);
     const password = document.getElementById('password').value;
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) { document.getElementById('err').textContent = error.message; return; }
+    const errEl = document.getElementById('err');
+    const { data: emailReal } = await supabase.rpc('obtener_email_por_usuario', { p_usuario: usuario });
+    if (!emailReal) { errEl.textContent = 'Usuario o contraseña incorrectos.'; return; }
+    const { error } = await supabase.auth.signInWithPassword({ email: emailReal, password });
+    if (error) { errEl.textContent = 'Usuario o contraseña incorrectos.'; return; }
     loadDashboard();
   };
 }
 
 async function loadDashboard() {
   const { data: { user } } = await supabase.auth.getUser();
-  const { data: perfil } = await supabase.from('perfiles').select('id, rol, email').eq('id', user.id).single();
+  const { data: perfil } = await supabase.from('perfiles').select('id, rol, usuario').eq('id', user.id).single();
   me = perfil;
 
   if (me.rol === 'estudiante') {
@@ -121,7 +129,7 @@ async function loadDashboard() {
   app.innerHTML = `
     <div class="card">
       <div class="topbar"><h1>Panel del profesor</h1><button class="btn-link" id="logout">Salir</button></div>
-      <p class="subtitle">${me.email} · rol: ${me.rol}</p>
+      <p class="subtitle">${me.usuario} · rol: ${me.rol}</p>
     </div>
     <div id="adminSection"></div>
     <div class="card">
@@ -156,10 +164,10 @@ function renderAdminSection() {
     </div>
     <div class="card">
       <h2>Crear profesor</h2>
-      <p class="subtitle">Tú le asignas correo y clave directamente; el profesor no se registra solo.</p>
+      <p class="subtitle">Tú le asignas usuario y clave directamente; el profesor no se registra solo.</p>
       <div class="row">
-        <div><label>Correo</label><input id="profEmail" placeholder="profesor@correo.com"></div>
-        <div><label>Contraseña</label><input id="profPassword" type="password"></div>
+        <div><label>Usuario</label><input id="profUsuario" placeholder="jperez" autocomplete="off"></div>
+        <div><label>Contraseña</label><input id="profPassword" type="password" autocomplete="new-password"></div>
         <div><label>Grupo</label><select id="profGrupo"></select></div>
       </div>
       <button class="btn-primary" id="profCrear">Crear profesor</button>
@@ -167,8 +175,8 @@ function renderAdminSection() {
     </div>
     <div class="card">
       <h2>Asignar un grupo adicional a un profesor existente</h2>
-      <label>Correo del profesor</label>
-      <input id="pEmail" placeholder="profesor@correo.com">
+      <label>Usuario del profesor</label>
+      <input id="pUsuario" placeholder="jperez">
       <button class="btn-outline" id="pBuscar" style="margin-top:8px">Buscar</button>
       <div id="pResultado"></div>
     </div>
@@ -184,14 +192,14 @@ function renderAdminSection() {
     await renderGrupoSelect();
   };
   document.getElementById('pBuscar').onclick = async () => {
-    const email = document.getElementById('pEmail').value.trim();
-    const { data: perfil } = await supabase.from('perfiles').select('id, email, rol').eq('email', email).maybeSingle();
+    const usuario = sanitizarUsuario(document.getElementById('pUsuario').value);
+    const { data: perfil } = await supabase.from('perfiles').select('id, usuario, rol').eq('usuario', usuario).maybeSingle();
     const box = document.getElementById('pResultado');
-    if (!perfil) { box.innerHTML = `<p class="error">No se encontró ninguna cuenta con ese correo.</p>`; return; }
+    if (!perfil) { box.innerHTML = `<p class="error">No se encontró ninguna cuenta con ese usuario.</p>`; return; }
     if (perfil.rol !== 'profesor') { box.innerHTML = `<p class="error">Esa cuenta no es profesor (rol actual: ${perfil.rol}). Créala primero con "Crear profesor".</p>`; return; }
     const { data: grupos } = await supabase.from('grupos').select('id, nombre');
     box.innerHTML = `
-      <p class="ok-msg">Encontrado: ${perfil.email}</p>
+      <p class="ok-msg">Encontrado: ${perfil.usuario}</p>
       <div class="row">
         <div><select id="pGrupo">${(grupos||[]).map(g=>`<option value="${g.id}">${g.nombre}</option>`).join('')}</select></div>
         <div><button class="btn-small" id="pAsignar">Asignar grupo</button></div>
@@ -211,13 +219,17 @@ function renderAdminSection() {
   });
 
   document.getElementById('profCrear').onclick = async () => {
-    const email = document.getElementById('profEmail').value.trim();
+    const usuario = sanitizarUsuario(document.getElementById('profUsuario').value);
     const password = document.getElementById('profPassword').value;
     const grupoId = document.getElementById('profGrupo').value;
     const errEl = document.getElementById('profErr');
     errEl.textContent = '';
-    if (!email || !password || !grupoId) { errEl.textContent = 'Completa correo, contraseña y grupo.'; return; }
+    if (!usuario || !password || !grupoId) { errEl.textContent = 'Completa usuario, contraseña y grupo.'; return; }
 
+    const { data: existente } = await supabase.rpc('obtener_email_por_usuario', { p_usuario: usuario });
+    if (existente) { errEl.textContent = 'Ese usuario ya existe. Prueba con otro.'; return; }
+
+    const email = `${usuario}@${DOMINIO_INTERNO}`;
     const { data, error } = await clienteCreacion.auth.signUp({ email, password });
     if (error) { errEl.textContent = error.message; return; }
 
@@ -227,7 +239,7 @@ function renderAdminSection() {
     if (errRol || errGrupo) { errEl.textContent = (errRol || errGrupo).message; return; }
 
     errEl.innerHTML = '<span class="ok-msg">Profesor creado y asignado.</span>';
-    document.getElementById('profEmail').value = '';
+    document.getElementById('profUsuario').value = '';
     document.getElementById('profPassword').value = '';
   };
 }

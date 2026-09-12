@@ -52,7 +52,7 @@
   }
   .subtitle { color: var(--ink-muted); font-size: 14px; margin: 0 0 24px; }
   label { display: block; font-size: 13px; color: var(--ink-muted); margin: 14px 0 4px; }
-  input[type="email"], input[type="password"] {
+  input[type="email"], input[type="password"], input[type="text"] {
     width: 100%;
     padding: 10px 12px;
     border: 1.5px solid var(--paper-line);
@@ -154,6 +154,11 @@ const SUPABASE_ANON_KEY = 'TU_SUPABASE_ANON_KEY_AQUI';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const app = document.getElementById('app');
+const DOMINIO_INTERNO = 'quizapp.local'; // dominio ficticio, nunca se le muestra al usuario
+
+function sanitizarUsuario(u) {
+  return (u || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
+}
 
 let state = { estudiante: null, quiz: null, intentoId: null, preguntas: [], index: 0, puntosTotales: 0, sumaPuntos: 0 };
 
@@ -183,25 +188,30 @@ async function renderLogin(mode = 'login') {
     <label>Grupo</label>
     <select id="grupoSel">${grupos.map(g => `<option value="${g.id}">${g.nombre}</option>`).join('') || '<option value="">No hay grupos creados todavía</option>'}</select>
     ` : ''}
-    <label>Correo</label>
-    <input type="email" id="email">
+    <label>Usuario</label>
+    <input type="text" id="usuario" autocomplete="username">
     <label>Contraseña</label>
-    <input type="password" id="password">
+    <input type="password" id="password" autocomplete="${isSignup ? 'new-password' : 'current-password'}">
     <button class="btn-primary" id="submitBtn">${isSignup ? 'Crear cuenta' : 'Entrar'}</button>
     <button class="btn-link" id="toggleBtn">${isSignup ? 'Ya tengo cuenta' : 'Crear una cuenta nueva'}</button>
     <div class="error" id="err"></div>
   `;
   document.getElementById('toggleBtn').onclick = () => renderLogin(isSignup ? 'login' : 'signup');
   document.getElementById('submitBtn').onclick = async () => {
-    const email = document.getElementById('email').value.trim();
+    const usuario = sanitizarUsuario(document.getElementById('usuario').value);
     const password = document.getElementById('password').value;
     const errEl = document.getElementById('err');
-    errEl.textContent = '';
+    errEl.style.color = ''; errEl.textContent = '';
 
     if (isSignup) {
       const nombre = document.getElementById('nombre').value.trim();
       const grupoId = document.getElementById('grupoSel').value;
-      if (!email || !password || !nombre || !grupoId) { errEl.textContent = 'Completa todos los campos.'; return; }
+      if (!usuario || !password || !nombre || !grupoId) { errEl.textContent = 'Completa todos los campos.'; return; }
+
+      const { data: existente } = await supabase.rpc('obtener_email_por_usuario', { p_usuario: usuario });
+      if (existente) { errEl.textContent = 'Ese usuario ya existe. Prueba con otro.'; return; }
+
+      const email = `${usuario}@${DOMINIO_INTERNO}`;
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) { errEl.textContent = error.message; return; }
       const { error: errEst } = await supabase.from('estudiantes').insert({
@@ -213,9 +223,11 @@ async function renderLogin(mode = 'login') {
       return;
     }
 
-    if (!email || !password) { errEl.textContent = 'Completa correo y contraseña.'; return; }
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) { errEl.textContent = error.message; return; }
+    if (!usuario || !password) { errEl.textContent = 'Completa usuario y contraseña.'; return; }
+    const { data: emailReal } = await supabase.rpc('obtener_email_por_usuario', { p_usuario: usuario });
+    if (!emailReal) { errEl.textContent = 'Usuario o contraseña incorrectos.'; return; }
+    const { error } = await supabase.auth.signInWithPassword({ email: emailReal, password });
+    if (error) { errEl.textContent = 'Usuario o contraseña incorrectos.'; return; }
     loadDashboard();
   };
 }
