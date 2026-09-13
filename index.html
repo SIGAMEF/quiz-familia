@@ -220,7 +220,7 @@
         if (session) {
             const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', session.user.id).single();
             if (perfil && (perfil.rol === 'admin' || perfil.rol === 'profesor')) {
-                window.location.href = 'admin.html';
+                detenerMusica(); window.location.href = 'admin.html';
                 return;
             }
             loadDashboard();
@@ -297,7 +297,7 @@
             const { data: { user } } = await supabase.auth.getUser();
             const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).single();
             if (perfil && (perfil.rol === 'admin' || perfil.rol === 'profesor')) {
-                window.location.href = 'admin.html';
+                detenerMusica(); window.location.href = 'admin.html';
                 return;
             }
             loadDashboard();
@@ -318,7 +318,7 @@
                     <button class="icon-btn" id="logout">🚪</button>
                 </div>
                 <p class="subtitle">Tu cuenta aún no está asignada a un grupo. Avísale a tu profesor.</p>`;
-            document.getElementById('logout').onclick = async () => { await supabase.auth.signOut(); renderLogin(); };
+            document.getElementById('logout').onclick = async () => { detenerMusica(); await supabase.auth.signOut(); renderLogin(); };
             return;
         }
         state.estudiante = estudiante;
@@ -357,7 +357,7 @@
         app.innerHTML = `
             <div class="dashboard-header">
                 <div class="user-info">
-                    <div class="user-avatar">${estudiante.avatar || '🙂'}</div>
+                    <button class="user-avatar" id="avatarBtn" title="Cambiar avatar" style="border:none; cursor:pointer;">${estudiante.avatar || '🙂'}</button>
                     <div class="user-greeting">
                         <h2>¡Hola, ${estudiante.nombre.split(' ')[0]}!</h2>
                         <p>¿Listo para aprender?</p>
@@ -380,9 +380,10 @@
             <div id="list">${(quizzes || []).length ? '' : '<p class="subtitle" style="text-align:center; padding:20px;">No hay quizzes activos por ahora.</p>'}</div>
         `;
 
-        document.getElementById('logout').onclick = async () => { await supabase.auth.signOut(); renderLogin(); };
+        document.getElementById('logout').onclick = async () => { detenerMusica(); await supabase.auth.signOut(); renderLogin(); };
         document.getElementById('musicaBtn').onclick = (e) => toggleMusica(e.currentTarget);
         document.getElementById('configBtn').onclick = () => abrirConfigModal();
+        document.getElementById('avatarBtn').onclick = () => abrirAvatarModal();
 
         const list = document.getElementById('list');
         (quizzes || []).forEach(q => {
@@ -405,17 +406,80 @@
 
             const card = document.createElement('div');
             card.className = 'quiz-card';
-            card.innerHTML = `
-                ${lastScoreHtml}
-                <div class="quiz-icon" style="background:${colores[q.modo].bg}; color:${colores[q.modo].color};">${iconos[q.modo] || '📝'}</div>
-                <div class="quiz-info">
-                    <div class="quiz-title">${q.titulo}</div>
-                    <div class="quiz-meta"><span class="quiz-badge ${q.modo}">${nombreModo}</span><span class="quiz-questions">${numPreguntas} preguntas</span></div>
-                </div>
-                <div class="quiz-arrow">›</div>
-            `;
-            card.onclick = () => { if (q.modo === 'estudio') pedirCantidadEstudio(q); else startQuiz(q); };
+            if (q.modo === 'estudio') {
+                const maxCant = Math.max(numPreguntas, 10);
+                card.style.cursor = 'default';
+                card.innerHTML = `
+                    ${lastScoreHtml}
+                    <div class="quiz-icon" style="background:${colores[q.modo].bg}; color:${colores[q.modo].color};">${iconos[q.modo] || '📝'}</div>
+                    <div class="quiz-info">
+                        <div class="quiz-title">${q.titulo}</div>
+                        <div class="quiz-meta" style="margin-bottom:6px;"><span class="quiz-badge ${q.modo}">${nombreModo}</span><span class="quiz-questions">${numPreguntas} preguntas</span></div>
+                        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                            <input type="number" class="cantidadInline" min="10" max="${maxCant}" value="10" title="Cantidad de preguntas" style="width:56px; padding:6px 4px; border:2px solid var(--border); border-radius:8px; font-size:12px; font-weight:700; text-align:center;">
+                            <span style="font-size:11px; color:var(--text-muted); font-weight:700;">preg.</span>
+                            <input type="number" class="segundosInline" min="5" value="20" title="Segundos por pregunta" style="width:50px; padding:6px 4px; border:2px solid var(--border); border-radius:8px; font-size:12px; font-weight:700; text-align:center;">
+                            <span style="font-size:11px; color:var(--text-muted); font-weight:700;">seg/preg.</span>
+                            <button type="button" class="empezarEstudioInlineBtn" style="background:var(--primary); color:#fff; border:none; border-radius:8px; padding:6px 12px; font-size:12px; font-family:'Baloo 2',sans-serif; font-weight:700; cursor:pointer;">▶ Ir</button>
+                        </div>
+                    </div>
+                `;
+                card.querySelector('.empezarEstudioInlineBtn').onclick = (e) => {
+                    e.stopPropagation();
+                    const cantidad = parseInt(card.querySelector('.cantidadInline').value, 10) || 10;
+                    const segundos = parseInt(card.querySelector('.segundosInline').value, 10) || 20;
+                    if (cantidad < 10) { mostrarErrorRapido('Mínimo 10 preguntas.'); return; }
+                    if (numPreguntas < 10) { mostrarErrorRapido('Este quiz todavía no tiene 10 preguntas.'); return; }
+                    if (segundos < 5) { mostrarErrorRapido('Mínimo 5 segundos por pregunta.'); return; }
+                    iniciarMusica();
+                    startQuizEstudio(q, Math.min(cantidad, numPreguntas), segundos);
+                };
+            } else {
+                card.innerHTML = `
+                    ${lastScoreHtml}
+                    <div class="quiz-icon" style="background:${colores[q.modo].bg}; color:${colores[q.modo].color};">${iconos[q.modo] || '📝'}</div>
+                    <div class="quiz-info">
+                        <div class="quiz-title">${q.titulo}</div>
+                        <div class="quiz-meta"><span class="quiz-badge ${q.modo}">${nombreModo}</span><span class="quiz-questions">${numPreguntas} preguntas</span></div>
+                    </div>
+                    <div class="quiz-arrow">›</div>
+                `;
+                card.onclick = () => startQuiz(q);
+            }
             list.appendChild(card);
+        });
+    }
+
+    function mostrarErrorRapido(msg) {
+        const div = document.createElement('div');
+        div.className = 'error';
+        div.style.marginTop = '4px';
+        div.textContent = msg;
+        setTimeout(() => div.remove(), 3000);
+        document.getElementById('list').prepend(div);
+    }
+
+    async function abrirAvatarModal() {
+        const avatarActual = state.estudiante.avatar || '🙂';
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.innerHTML = `
+            <div class="modal">
+                <h3>🧑‍🎤 Elige tu avatar</h3>
+                <div class="avatar-grid" id="avatarGridModal">${AVATARES.map(a => `<button type="button" class="avatar-option ${a === avatarActual ? 'selected' : ''}" data-emoji="${a}">${a}</button>`).join('')}</div>
+                <button class="btn-link" id="cerrarAvatarBtn" style="margin-top:14px;">Cerrar</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('#cerrarAvatarBtn').onclick = () => overlay.remove();
+        overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+        overlay.querySelectorAll('.avatar-option').forEach(btn => {
+            btn.onclick = async () => {
+                await supabase.from('estudiantes').update({ avatar: btn.dataset.emoji }).eq('id', state.estudiante.id);
+                state.estudiante.avatar = btn.dataset.emoji;
+                overlay.remove();
+                loadDashboard();
+            };
         });
     }
 
@@ -447,90 +511,6 @@
 
     const AVATARES = ['😀','😎','🤓','🥳','🦁','🐱','🐶','🦊','🐼','🐸','🦄','🐵','👑','⭐','🚀','🎮','⚽','🎨','📚','🧠','💡','🔥','🌟','🍀','🎯','🐨','🐯','🦋','🐢','🌈'];
 
-    async function pedirCantidadEstudio(quiz) {
-        const { data: qp } = await supabase.from('quiz_preguntas').select('pregunta_id').eq('quiz_id', quiz.id);
-        const totalDisponibles = (qp || []).length;
-        const avatarActual = state.estudiante.avatar || '🙂';
-
-        app.innerHTML = `
-            <div class="dashboard-header">
-                <h1 style="font-size:22px;">🧠 ${quiz.titulo}</h1>
-                <button class="icon-btn" id="volverBtn">←</button>
-            </div>
-            <p class="subtitle">Modo estudio: preguntas al azar, con la respuesta correcta si te equivocas.</p>
-
-            <div class="setup-card">
-                <div class="setup-icon" style="background:var(--primary-light); color:var(--primary);">🧑‍🎤</div>
-                <div class="setup-content">
-                    <h3>Elige tu avatar</h3>
-                    <div class="avatar-grid" id="avatarGrid">${AVATARES.map(a => `<button type="button" class="avatar-option ${a === avatarActual ? 'selected' : ''}" data-emoji="${a}">${a}</button>`).join('')}</div>
-                </div>
-            </div>
-
-            <div class="setup-card">
-                <div class="setup-icon" style="background:#E0F2FE; color:#3B82F6;">💬</div>
-                <div class="setup-content">
-                    <h3>¿Cuántas preguntas?</h3>
-                    <p class="setup-subtitle">Mínimo 10, hay ${totalDisponibles} en total</p>
-                    <div class="counter-input">
-                        <button type="button" class="counter-btn" id="menosCantidad">−</button>
-                        <input type="number" id="cantidadInput" class="counter-value" min="10" max="${Math.max(totalDisponibles, 10)}" value="10">
-                        <button type="button" class="counter-btn" id="masCantidad">+</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="setup-card">
-                <div class="setup-icon" style="background:#F3E8FF; color:#A855F7;">⏱️</div>
-                <div class="setup-content">
-                    <h3>Segundos por pregunta</h3>
-                    <div class="counter-input">
-                        <button type="button" class="counter-btn" id="menosSegundos">−</button>
-                        <input type="number" id="segundosInput" class="counter-value" min="5" value="20">
-                        <button type="button" class="counter-btn" id="masSegundos">+</button>
-                    </div>
-                </div>
-            </div>
-
-            <button class="btn-primary" id="empezarEstudioBtn">▶ Empezar</button>
-            <div class="error" id="cantErr"></div>
-        `;
-
-        let avatarElegido = avatarActual;
-        document.querySelectorAll('.avatar-option').forEach(btn => {
-            btn.onclick = () => {
-                avatarElegido = btn.dataset.emoji;
-                document.querySelectorAll('.avatar-option').forEach(b => b.classList.remove('selected'));
-                btn.classList.add('selected');
-            };
-        });
-
-        function setupCounter(menosId, masId, inputId, min, max) {
-            const input = document.getElementById(inputId);
-            document.getElementById(menosId).onclick = () => { const v = parseInt(input.value) || min; if (v > min) input.value = v - 1; };
-            document.getElementById(masId).onclick = () => { const v = parseInt(input.value) || min; if (v < max) input.value = v + 1; };
-        }
-        setupCounter('menosCantidad', 'masCantidad', 'cantidadInput', 10, Math.max(totalDisponibles, 10));
-        setupCounter('menosSegundos', 'masSegundos', 'segundosInput', 5, 120);
-
-        document.getElementById('volverBtn').onclick = loadDashboard;
-        document.getElementById('empezarEstudioBtn').onclick = async () => {
-            const cantidad = parseInt(document.getElementById('cantidadInput').value, 10);
-            const segundos = parseInt(document.getElementById('segundosInput').value, 10);
-            const errEl = document.getElementById('cantErr');
-            if (!cantidad || cantidad < 10) { errEl.textContent = 'Mínimo 10 preguntas.'; return; }
-            if (totalDisponibles < 10) { errEl.textContent = 'Este quiz todavía no tiene al menos 10 preguntas.'; return; }
-            if (!segundos || segundos < 5) { errEl.textContent = 'Mínimo 5 segundos por pregunta.'; return; }
-
-            if (avatarElegido !== avatarActual) {
-                await supabase.from('estudiantes').update({ avatar: avatarElegido }).eq('id', state.estudiante.id);
-                state.estudiante.avatar = avatarElegido;
-            }
-            iniciarMusica();
-            startQuizEstudio(quiz, Math.min(cantidad, totalDisponibles), segundos);
-        };
-    }
-
     async function startQuiz(quiz) {
         state.quiz = quiz;
         const { data: intento } = await supabase
@@ -539,7 +519,7 @@
 
         const { data: qp } = await supabase
             .from('quiz_preguntas')
-            .select('orden, preguntas(id, enunciado, puntos, tipo, imagen_url)')
+            .select('orden, preguntas(id, enunciado, puntos, tipo, imagen_url, tema)')
             .eq('quiz_id', quiz.id)
             .order('orden');
 
@@ -586,7 +566,7 @@
             .from('intentos').insert({ quiz_id: quiz.id, estudiante_id: state.estudiante.id }).select('id').single();
         state.intentoId = intento.id;
 
-        const { data: preguntas } = await supabase.from('preguntas').select('id, enunciado, puntos, tipo, imagen_url').in('id', seleccionIds);
+        const { data: preguntas } = await supabase.from('preguntas').select('id, enunciado, puntos, tipo, imagen_url, tema').in('id', seleccionIds);
         const orden = {}; seleccionIds.forEach((id, i) => orden[id] = i);
         state.preguntas = preguntas.sort((a, b) => orden[a.id] - orden[b.id]);
         state.sumaPuntos = state.preguntas.reduce((a, p) => a + Number(p.puntos || 1), 0);
@@ -609,14 +589,32 @@
     function reproducirTono(tipo) {
         try {
             const ctx = getAudioCtx();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain); gain.connect(ctx.destination);
-            osc.frequency.value = tipo === 'correcto' ? 880 : 220;
-            gain.gain.value = 0.15;
-            osc.start();
-            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-            osc.stop(ctx.currentTime + 0.35);
+            if (tipo === 'correcto') {
+                [523, 659, 784].forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.frequency.value = freq;
+                    gain.gain.value = 0.13;
+                    const inicio = ctx.currentTime + i * 0.08;
+                    osc.start(inicio);
+                    gain.gain.exponentialRampToValueAtTime(0.001, inicio + 0.3);
+                    osc.stop(inicio + 0.3);
+                });
+            } else {
+                [300, 180].forEach((freq, i) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain); gain.connect(ctx.destination);
+                    osc.type = 'sawtooth';
+                    osc.frequency.value = freq;
+                    gain.gain.value = 0.1;
+                    const inicio = ctx.currentTime + i * 0.12;
+                    osc.start(inicio);
+                    gain.gain.exponentialRampToValueAtTime(0.001, inicio + 0.25);
+                    osc.stop(inicio + 0.25);
+                });
+            }
         } catch (e) { }
     }
 
@@ -681,7 +679,10 @@
                     <div class="quiz-avatar">${state.estudiante.avatar || '🙂'}</div>
                     <span class="quiz-username">${state.estudiante.nombre}</span>
                 </div>
-                <div class="score-badge">✅ ${state.correctas} / ${state.index}</div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div class="score-badge">✅ ${state.correctas} / ${state.index}</div>
+                    <button class="icon-btn" id="salirQuizBtn" title="Salir del quiz" style="width:34px; height:34px; font-size:15px;">✕</button>
+                </div>
             </div>
             <div class="status-bar">
                 <span class="progress-text">Pregunta ${state.index + 1} de ${state.preguntas.length}</span>
@@ -694,12 +695,19 @@
                     <span class="timer-text" id="tiempoRestante">${state.segundosPorPregunta}</span>
                 </div>` : ''}
             </div>
+            ${pregunta.tema ? `<div style="display:inline-block; background:var(--primary-light); color:var(--primary); font-size:11px; font-weight:800; padding:4px 10px; border-radius:8px; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.3px;">${pregunta.tema}</div>` : ''}
             ${imagenHtml}
             <p class="question-text">${pregunta.enunciado}</p>
             <div id="opts"></div>
             <div class="feedback hidden" id="feedback"></div>
             <button class="btn-primary hidden" id="nextBtn">${state.index + 1 === state.preguntas.length ? '🎉 Finalizar' : 'Siguiente →'}</button>
         `;
+
+        document.getElementById('salirQuizBtn').onclick = () => {
+            if (!confirm('¿Salir del quiz? Se perderá tu progreso en este intento.')) return;
+            if (intervaloTiempo) clearInterval(intervaloTiempo);
+            loadDashboard();
+        };
 
         const opts = document.getElementById('opts');
 

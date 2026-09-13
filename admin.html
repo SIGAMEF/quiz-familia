@@ -128,6 +128,20 @@
   .empty-state { text-align: center; padding: 32px 16px; color: var(--text-muted); }
   .empty-state p { font-weight: 700; font-size: 14px; }
 
+  .modal-overlay { position: fixed; inset: 0; background: rgba(45,42,69,0.5); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; overflow-y: auto; }
+  .modal-box { background: #fff; border-radius: 20px; padding: 26px; max-width: 520px; width: 100%; max-height: 90vh; overflow-y: auto; }
+  .modal-box h3 { font-family: 'Baloo 2', sans-serif; font-size: 19px; margin-bottom: 14px; color: var(--primary); }
+
+  .carga-overlay { position: fixed; inset: 0; background: rgba(45,42,69,0.55); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+  .carga-box { background: #fff; border-radius: 20px; padding: 32px 36px; text-align: center; min-width: 280px; box-shadow: 0 20px 50px rgba(0,0,0,0.25); }
+  .carga-spinner { width: 44px; height: 44px; border: 5px solid var(--primary-light); border-top-color: var(--primary); border-radius: 50%; margin: 0 auto 16px; animation: girar 0.8s linear infinite; }
+  @keyframes girar { to { transform: rotate(360deg); } }
+  .carga-box p.carga-titulo { font-family: 'Baloo 2', sans-serif; font-weight: 700; font-size: 16px; margin-bottom: 4px; }
+  .carga-box p.carga-sub { font-size: 12.5px; color: var(--text-muted); font-weight: 600; margin-bottom: 14px; }
+  .carga-barra-fondo { width: 100%; height: 10px; background: var(--border); border-radius: 6px; overflow: hidden; }
+  .carga-barra-relleno { height: 100%; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); width: 0%; transition: width 0.2s ease; }
+  .carga-box p.carga-aviso { font-size: 11.5px; color: var(--error); font-weight: 700; margin-top: 14px; }
+
   .pwd-wrap { position: relative; }
   .pwd-wrap button { position: absolute; right: 5px; top: 5px; padding: 4px 10px; font-size: 11.5px; }
   .hidden { display: none; }
@@ -171,6 +185,15 @@ const root = document.getElementById('root');
 function sanitizarUsuario(u) { return (u || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, ''); }
 function esVerdadero(v) { return ['v', '1', 'si', 'sí', 'true', 'x'].includes(String(v ?? '').trim().toLowerCase()); }
 
+async function subirImagenABucket(archivo) {
+  const extension = (archivo.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+  const nombreArchivo = `preg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${extension}`;
+  const { error } = await supabase.storage.from('preguntas-imagenes').upload(nombreArchivo, archivo, { upsert: true });
+  if (error) { mostrarToast('Error al subir imagen: ' + error.message, 'error'); return null; }
+  const { data: urlData } = supabase.storage.from('preguntas-imagenes').getPublicUrl(nombreArchivo);
+  return urlData.publicUrl;
+}
+
 function mostrarToast(mensaje, tipo = 'success') {
   const container = document.getElementById('toastContainer');
   const toast = document.createElement('div');
@@ -181,11 +204,11 @@ function mostrarToast(mensaje, tipo = 'success') {
 }
 
 function descargarPlantilla(nombreArchivo = 'plantilla_preguntas.xlsx') {
-  const encabezados = ['tipo','corte_numero','enunciado','imagen_url','opcion_1','correcta_1','opcion_2','correcta_2','opcion_3','correcta_3','opcion_4','correcta_4','respuesta_correcta'];
+  const encabezados = ['tipo','corte_numero','enunciado','imagen_url','opcion_1','correcta_1','opcion_2','correcta_2','opcion_3','correcta_3','opcion_4','correcta_4','respuesta_correcta','tema_curso'];
   const filas = [
     encabezados,
-    ['opcion_unica', 1, '¿La capital de Perú es Lima?', '', 'Verdadero', 'V', 'Falso', 'F', '', '', '', '', ''],
-    ['completar', 1, 'El símbolo químico del oro es ___', '', '', '', '', '', '', '', '', '', 'Au']
+    ['opcion_unica', 1, '¿La capital de Perú es Lima?', '', 'Verdadero', 'V', 'Falso', 'F', '', '', '', '', '', 'Geografía - Perú'],
+    ['completar', 1, 'El símbolo químico del oro es ___', '', '', '', '', '', '', '', '', '', 'Au', 'Química - Elementos']
   ];
   const hoja = XLSX.utils.aoa_to_sheet(filas);
   const libro = XLSX.utils.book_new();
@@ -201,13 +224,14 @@ function instruccionesCargaHtml() {
         <code>tipo</code>, <code>corte_numero</code>, <code>enunciado</code>, <code>imagen_url</code>,
         <code>opcion_1</code>, <code>correcta_1</code>, <code>opcion_2</code>, <code>correcta_2</code>,
         <code>opcion_3</code>, <code>correcta_3</code>, <code>opcion_4</code>, <code>correcta_4</code>,
-        <code>respuesta_correcta</code>
+        <code>respuesta_correcta</code>, <code>tema_curso</code>
       </p>
       <ul style="font-size:11.5px; margin-top:6px; padding-left:18px; line-height:1.7;">
         <li><code>tipo</code>: <code>opcion_unica</code> o <code>completar</code></li>
         <li>En <code>correcta_N</code> escribe <code>V</code> o <code>F</code></li>
         <li>Deja vacías las columnas de opciones si el tipo es <code>completar</code></li>
         <li><code>imagen_url</code> es opcional</li>
+        <li><code>tema_curso</code> es el título que verá el alumno arriba de la pregunta (ej. "Física - Movimiento"); si lo dejas vacío, queda como "Repaso"</li>
         <li>La primera fila de encabezados se ignora automáticamente</li>
       </ul>
     </div>`;
@@ -262,6 +286,7 @@ function renderAdminApp() {
       <button class="nav-item active" data-tab="resumen">📊 <span class="nav-text">Resumen</span></button>
       <button class="nav-item" data-tab="grupos">👥 <span class="nav-text">Grupos</span></button>
       <button class="nav-item" data-tab="profesores">👨‍🏫 <span class="nav-text">Profesores</span></button>
+      <button class="nav-item" data-tab="alumnos">🎓 <span class="nav-text">Alumnos</span></button>
       <button class="nav-item" data-tab="cortes">📅 <span class="nav-text">Cortes</span></button>
       <button class="nav-item" data-tab="quizzes">📝 <span class="nav-text">Quizzes</span></button>
     </aside>
@@ -330,7 +355,19 @@ function renderAdminApp() {
         </div>
         <div class="card">
           <h2>Profesores registrados</h2>
-          <div class="table-container"><table id="profesoresTabla"><tr><th>Usuario</th><th>Grupos a cargo</th><th></th><th></th></tr></table></div>
+          <div class="table-container"><table id="profesoresTabla"><tr><th>Usuario</th><th>Grupos a cargo</th><th></th><th></th><th></th></tr></table></div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="admtab-alumnos">
+        <div class="card">
+          <h2>Alumnos</h2>
+          <p class="subtitle">Todos los estudiantes registrados, con su grupo actual.</p>
+          <div class="search-bar">
+            <input type="text" id="buscadorAlumnos" class="form-control" placeholder="🔍 Buscar por nombre...">
+            <select id="filtroGrupoAlumnos" class="form-control"><option value="">Todos los grupos</option></select>
+          </div>
+          <div class="table-container preguntas-scroll"><table id="alumnosTabla"><tr><th>Nombre</th><th>Usuario</th><th>Grupo</th><th></th></tr></table></div>
         </div>
       </div>
 
@@ -353,7 +390,8 @@ function renderAdminApp() {
           <h2>Ver quizzes por grupo</h2>
           <p class="subtitle">Marca quizzes (de uno o varios grupos) para combinarlos en un quiz nuevo. El contenido de preguntas lo maneja el profesor; aquí solo combinas lo que ya existe.</p>
           <div class="form-group"><label>Grupo</label><select class="form-control" id="verGrupoSelect"></select></div>
-          <div class="table-container"><table id="quizzesPorGrupoTabla"><tr><th></th><th>Título</th><th>Modo</th><th>Estado</th></tr></table></div>
+          <button class="btn btn-danger" id="btnVaciarBancoAdmin" style="margin-bottom:14px;">🗑️ Eliminar todas las preguntas de este grupo</button>
+          <div class="table-container"><table id="quizzesPorGrupoTabla"><tr><th></th><th>Título</th><th>Modo</th><th>Estado</th><th></th></tr></table></div>
           <p class="subtitle" style="margin-top:12px;">Seleccionados: <span id="contadorSeleccion" style="font-weight:800; color:var(--primary);">0</span></p>
           <div id="combinarForm" class="hidden" style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
             <div class="form-group"><label>Título del nuevo quiz</label><input class="form-control" id="combTitulo" placeholder="Repaso general"></div>
@@ -371,11 +409,12 @@ function renderAdminApp() {
   `;
   document.getElementById('logout').onclick = async () => { await supabase.auth.signOut(); window.location.href = 'index.html'; };
   root.querySelectorAll('[data-goto]').forEach(btn => btn.onclick = () => document.querySelector(`.nav-item[data-tab="${btn.dataset.goto}"]`).click());
-  activarTabs('.nav-item', 'admtab', { resumen: 'Resumen', grupos: 'Gestión de grupos', profesores: 'Gestión de profesores', cortes: 'Cortes y bimestres', quizzes: 'Administración de quizzes' });
+  activarTabs('.nav-item', 'admtab', { resumen: 'Resumen', grupos: 'Gestión de grupos', profesores: 'Gestión de profesores', alumnos: 'Alumnos', cortes: 'Cortes y bimestres', quizzes: 'Administración de quizzes' });
 
   renderVerClaveToggle();
   renderGruposAdmin();
   renderProfesoresAdmin();
+  renderAlumnosAdmin();
   renderCortesAdmin();
   renderQuizzesAdminTab();
   actualizarStatsAdmin();
@@ -422,7 +461,7 @@ async function renderTablaGrupos() {
     (grupos || []).map(g => `<tr><td>${g.nombre}</td><td>${g.nivel || '-'}</td><td><button class="btn btn-sm btn-danger borrarGrupoBtn" data-id="${g.id}">Borrar</button></td></tr>`).join('');
   tabla.querySelectorAll('.borrarGrupoBtn').forEach(btn => {
     btn.onclick = async () => {
-      if (!confirm('¿Borrar este grupo? Falla si todavía tiene preguntas, quizzes o estudiantes enlazados.')) return;
+      if (!confirm('¿Borrar este grupo? Se borran también todas sus preguntas y quizzes. Los alumnos de este grupo quedan sin grupo asignado (no se borran).')) return;
       const { error } = await supabase.from('grupos').delete().eq('id', btn.dataset.id);
       if (error) { mostrarToast('No se pudo borrar: ' + error.message, 'error'); return; }
       mostrarToast('Grupo borrado.');
@@ -480,7 +519,7 @@ async function renderTablaProfesores() {
   const { data: asignaciones } = await supabase.from('profesor_grupos').select('id, profesor_id, grupo_id, grupos(nombre)');
   const { data: grupos } = await supabase.from('grupos').select('id, nombre').order('nombre');
 
-  tabla.innerHTML = '<tr><th>Usuario</th><th>Grupos a cargo</th><th></th><th></th></tr>' +
+  tabla.innerHTML = '<tr><th>Usuario</th><th>Grupos a cargo</th><th></th><th></th><th></th></tr>' +
     (profesores || []).map(p => {
       const asignados = (asignaciones || []).filter(a => a.profesor_id === p.id);
       const nombres = asignados.map(a => a.grupos ? a.grupos.nombre : '').filter(Boolean).join(', ') || '—';
@@ -488,8 +527,20 @@ async function renderTablaProfesores() {
         <td>${p.usuario}</td><td>${nombres}</td>
         <td><button class="btn btn-sm btn-secondary editarBtn" data-id="${p.id}">Editar grupos</button></td>
         <td><button class="btn btn-sm btn-secondary resetBtn" data-id="${p.id}">Restablecer clave</button></td>
+        <td><button class="btn btn-sm btn-danger eliminarProfesorBtn" data-id="${p.id}" data-usuario="${p.usuario}">Eliminar</button></td>
       </tr>`;
-    }).join('') || '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Todavía no hay profesores.</td></tr>';
+    }).join('') || '<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Todavía no hay profesores.</td></tr>';
+
+  tabla.querySelectorAll('.eliminarProfesorBtn').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm(`¿Eliminar al profesor "${btn.dataset.usuario}"? Se borra su cuenta y sus asignaciones de grupo. Los quizzes y preguntas que haya creado NO se borran.`)) return;
+      const { data, error } = await supabase.functions.invoke('eliminar-usuario', { body: { usuario_id: btn.dataset.id } });
+      if (error || (data && data.error)) { mostrarToast('No se pudo eliminar: ' + ((data && data.error) || error.message), 'error'); return; }
+      mostrarToast('Profesor eliminado.');
+      renderTablaProfesores();
+      actualizarStatsAdmin();
+    };
+  });
 
   tabla.querySelectorAll('.resetBtn').forEach(btn => {
     btn.onclick = () => {
@@ -523,6 +574,52 @@ async function renderTablaProfesores() {
         mostrarToast('Grupos actualizados.');
         renderTablaProfesores();
       };
+    };
+  });
+}
+
+// ---------------- Alumnos (admin) ----------------
+let alumnosCache = [];
+
+async function renderAlumnosAdmin() {
+  const { data: alumnos } = await supabase
+    .from('estudiantes')
+    .select('id, nombre, grupo_id, perfil_id, grupos(nombre), perfiles(usuario)')
+    .order('nombre');
+  alumnosCache = alumnos || [];
+
+  const { data: grupos } = await supabase.from('grupos').select('id, nombre').order('nombre');
+  const filtroGrupo = document.getElementById('filtroGrupoAlumnos');
+  filtroGrupo.innerHTML = '<option value="">Todos los grupos</option>' + (grupos || []).map(g => `<option value="${g.id}">${g.nombre}</option>`).join('');
+
+  document.getElementById('buscadorAlumnos').oninput = renderTablaAlumnos;
+  filtroGrupo.onchange = renderTablaAlumnos;
+  renderTablaAlumnos();
+}
+
+function renderTablaAlumnos() {
+  const buscador = (document.getElementById('buscadorAlumnos').value || '').toLowerCase();
+  const filtroGrupo = document.getElementById('filtroGrupoAlumnos').value;
+  const filtrados = alumnosCache.filter(a => {
+    const matchTexto = a.nombre.toLowerCase().includes(buscador);
+    const matchGrupo = !filtroGrupo || a.grupo_id === filtroGrupo;
+    return matchTexto && matchGrupo;
+  });
+  const tabla = document.getElementById('alumnosTabla');
+  tabla.innerHTML = '<tr><th>Nombre</th><th>Usuario</th><th>Grupo</th><th></th></tr>' +
+    (filtrados.length ? filtrados.map(a => `<tr>
+      <td>${a.nombre}</td><td>${a.perfiles ? a.perfiles.usuario : '-'}</td><td>${a.grupos ? a.grupos.nombre : 'Sin grupo'}</td>
+      <td><button class="btn btn-sm btn-danger eliminarAlumnoBtn" data-id="${a.perfil_id}" data-nombre="${a.nombre}">Eliminar</button></td>
+    </tr>`).join('') : '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">No hay alumnos que coincidan.</td></tr>');
+
+  tabla.querySelectorAll('.eliminarAlumnoBtn').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm(`¿Eliminar a "${btn.dataset.nombre}"? Se borra su cuenta junto con todo su historial: intentos, respuestas y resultados. Esto no se puede deshacer.`)) return;
+      const { data, error } = await supabase.functions.invoke('eliminar-usuario', { body: { usuario_id: btn.dataset.id } });
+      if (error || (data && data.error)) { mostrarToast('No se pudo eliminar: ' + ((data && data.error) || error.message), 'error'); return; }
+      mostrarToast('Alumno eliminado.');
+      renderAlumnosAdmin();
+      actualizarStatsAdmin();
     };
   });
 }
@@ -577,6 +674,19 @@ async function renderQuizzesAdminTab() {
   await poblarSelectsQuizAdmin();
   document.getElementById('verGrupoSelect').onchange = renderQuizzesPorGrupoAdmin;
   document.getElementById('combCrear').onclick = crearQuizCombinadoAdmin;
+  document.getElementById('btnVaciarBancoAdmin').onclick = async () => {
+    const grupoId = document.getElementById('verGrupoSelect').value;
+    if (!grupoId) { mostrarToast('Selecciona un grupo primero.', 'error'); return; }
+    const nombreGrupo = document.getElementById('verGrupoSelect').options[document.getElementById('verGrupoSelect').selectedIndex].text;
+    const { count } = await supabase.from('preguntas').select('*', { count: 'exact', head: true }).eq('grupo_id', grupoId);
+    if (!count) { mostrarToast('Este grupo ya no tiene preguntas.', 'error'); return; }
+    if (!confirm(`¿Eliminar las ${count} preguntas de "${nombreGrupo}"? Esto también las quita de cualquier quiz que las tenga asignadas (los quizzes se quedan vacíos, no se borran). Esto no se puede deshacer.`)) return;
+    if (!confirm('Confirma una vez más: esto deja el banco de preguntas de ese grupo completamente en blanco. ¿Continuar?')) return;
+    const { error } = await supabase.from('preguntas').delete().eq('grupo_id', grupoId);
+    if (error) { mostrarToast('No se pudo vaciar el banco: ' + error.message, 'error'); return; }
+    mostrarToast('Banco de preguntas vaciado.');
+    renderQuizzesPorGrupoAdmin();
+  };
   if (document.getElementById('verGrupoSelect').value) renderQuizzesPorGrupoAdmin();
 }
 
@@ -584,15 +694,30 @@ async function renderQuizzesPorGrupoAdmin() {
   const grupoId = document.getElementById('verGrupoSelect').value;
   const { data: quizzes } = await supabase.from('quizzes').select('id, titulo, modo, activo').eq('grupo_id', grupoId).order('created_at', { ascending: false });
   const tabla = document.getElementById('quizzesPorGrupoTabla');
-  tabla.innerHTML = '<tr><th></th><th>Título</th><th>Modo</th><th>Estado</th></tr>' +
+  tabla.innerHTML = '<tr><th></th><th>Título</th><th>Modo</th><th>Estado</th><th></th></tr>' +
     (quizzes || []).map(q => `<tr>
       <td><input type="checkbox" class="seleccionQuizChk" value="${q.id}" ${seleccionQuizzesAdmin.has(q.id) ? 'checked' : ''}></td>
       <td>${q.titulo}</td><td>${q.modo}</td>
       <td><span class="pill ${q.activo ? 'on' : 'off'}">${q.activo ? 'activo' : 'inactivo'}</span></td>
-    </tr>`).join('') || '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Este grupo todavía no tiene quizzes.</td></tr>';
+      <td><button class="btn btn-sm btn-danger eliminarQuizAdminBtn" data-id="${q.id}" data-titulo="${q.titulo}">🗑️</button></td>
+    </tr>`).join('') || '<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Este grupo todavía no tiene quizzes.</td></tr>';
 
   tabla.querySelectorAll('.seleccionQuizChk').forEach(chk => {
     chk.onchange = () => { chk.checked ? seleccionQuizzesAdmin.add(chk.value) : seleccionQuizzesAdmin.delete(chk.value); actualizarContadorSeleccionAdmin(); };
+  });
+  tabla.querySelectorAll('.eliminarQuizAdminBtn').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm(`¿Eliminar el quiz "${btn.dataset.titulo}"? Esto borra también todas las preguntas cargadas en él (si alguna se reutilizó en otro quiz combinado, desaparecerá de ahí también). Los resultados de los alumnos en este quiz se pierden. Esto no se puede deshacer.`)) return;
+      const { data: qp } = await supabase.from('quiz_preguntas').select('pregunta_id').eq('quiz_id', btn.dataset.id);
+      const preguntaIds = (qp || []).map(r => r.pregunta_id);
+      const { error } = await supabase.from('quizzes').delete().eq('id', btn.dataset.id);
+      if (error) { mostrarToast('No se pudo borrar: ' + error.message, 'error'); return; }
+      if (preguntaIds.length) await supabase.from('preguntas').delete().in('id', preguntaIds);
+      seleccionQuizzesAdmin.delete(btn.dataset.id);
+      mostrarToast(`Quiz eliminado junto con ${preguntaIds.length} pregunta${preguntaIds.length === 1 ? '' : 's'}.`);
+      renderQuizzesPorGrupoAdmin();
+      actualizarStatsAdmin();
+    };
   });
   actualizarContadorSeleccionAdmin();
 }
@@ -635,6 +760,7 @@ async function crearQuizCombinadoAdmin() {
 let grupoActivo = null;
 let preguntasCache = [];
 let listaTemporal = [];
+let mapaPreguntaQuizzes = {};
 
 function renderProfesorApp() {
   root.innerHTML = `
@@ -691,6 +817,7 @@ function renderProfesorApp() {
           <div class="form-group"><label>¿A dónde cargar estas preguntas?</label>
             <select id="destinoCarga" class="form-control"><option value="banco">📚 Al banco general del grupo (sin asignar a un quiz)</option></select>
           </div>
+          <p style="font-size:12px; color:var(--primary); font-weight:800; margin:-10px 0 14px;">📌 Se cargará a: <span class="destinoLabel">Al banco general del grupo</span></p>
 
           <div class="sub-tabs">
             <button class="sub-tab active" data-subtab-cargar="constructor">✍️ Constructor manual</button>
@@ -715,6 +842,7 @@ function renderProfesorApp() {
                 </div>
               </div>
               <div class="form-group"><label>Corte (bimestre)</label><select id="manualCorte" class="form-control"></select></div>
+              <div class="form-group"><label>Tema / curso (aparece como título arriba de la pregunta)</label><input type="text" id="manualTema" class="form-control" placeholder="Ej: Física - Movimiento Mecánico"></div>
               <div class="form-group"><label>Enunciado de la pregunta</label><textarea id="manualEnunciado" class="form-control" placeholder="Escribe aquí la pregunta..."></textarea></div>
               <div class="form-group"><label>Imagen (opcional)</label>
                 <input type="text" id="manualImagen" class="form-control" placeholder="Pega una URL, sube un archivo, o pega una imagen (Ctrl+V) aquí abajo">
@@ -741,9 +869,10 @@ function renderProfesorApp() {
             <div class="lista-temporal hidden" id="listaTemporalCont">
               <h3>📋 Preguntas listas para guardar (<span id="contadorTemporal">0</span>)</h3>
               <div id="itemsTemporales"></div>
-              <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
+              <p style="font-size:11.5px; color:var(--primary); font-weight:800; margin-bottom:6px;">📌 Se guardarán a: <span class="destinoLabel">Al banco general del grupo</span></p>
+              <div style="display:flex; gap:10px; margin-top:8px; flex-wrap:wrap;">
                 <button class="btn btn-success" id="btnGuardarTodas">💾 Guardar todas las preguntas</button>
-                <button class="btn btn-danger" id="btnVaciarLista">🗑️ Vaciar lista</button>
+                <button class="btn btn-danger" id="btnVaciarLista">🗑️ Cancelar / vaciar lista</button>
               </div>
             </div>
           </div>
@@ -752,12 +881,17 @@ function renderProfesorApp() {
             ${instruccionesCargaHtml()}
             <button class="btn btn-secondary" id="plantillaBtn" style="margin-bottom:16px;">📄 Descargar plantilla de Excel</button>
             <div class="form-group"><label>Subir archivo Excel (.xlsx, .xls, .csv)</label><input type="file" id="excelInput" accept=".xlsx,.xls,.csv" class="form-control" style="padding:9px;"></div>
+            <p style="font-size:11.5px; color:var(--primary); font-weight:800;">📌 Se cargará a: <span class="destinoLabel">Al banco general del grupo</span></p>
+            <div id="previewCargaExcelCont" style="margin-top:10px;"></div>
           </div>
 
           <div class="sub-tab-content" id="cargasub-pegar">
             ${instruccionesCargaHtml()}
-            <textarea id="csvInput" class="form-control" placeholder="opcion_unica,1,¿La capital de Perú es Lima?,,Verdadero,V,Falso,F,,,,,&#10;completar,1,El símbolo químico del oro es ___,,,,,,,,,,Au" style="min-height:130px;"></textarea>
-            <button class="btn btn-primary" id="cargarBtn" style="margin-top:10px; width:100%;">📥 Cargar preguntas pegadas</button>
+            <p style="font-size:11.5px; color:var(--text-muted); font-weight:600; margin-bottom:6px;">También acepta filas separadas por <code>|</code> (por ejemplo si las copias de un CSV con ese formato).</p>
+            <textarea id="csvInput" class="form-control" placeholder="opcion_unica,1,¿La capital de Perú es Lima?,,Verdadero,V,Falso,F,,,,,,Geografía&#10;completar,1,El símbolo químico del oro es ___,,,,,,,,,,Au,Química" style="min-height:130px;"></textarea>
+            <button class="btn btn-secondary" id="previsualizarBtn" style="margin-top:10px; width:100%;">👁️ Previsualizar</button>
+            <p style="font-size:11.5px; color:var(--primary); font-weight:800; margin-top:8px;">📌 Se cargará a: <span class="destinoLabel">Al banco general del grupo</span></p>
+            <div id="previewCargaCont" style="margin-top:14px;"></div>
           </div>
 
           <div class="error-msg" id="cargaErr"></div>
@@ -766,14 +900,17 @@ function renderProfesorApp() {
 
       <div class="tab-content" id="proftab-preguntas">
         <div class="card">
-          <h2>Banco de preguntas</h2>
-          <p class="subtitle" id="preguntasCount">Cargando...</p>
+          <div class="topbar">
+            <div><h2>Banco de preguntas</h2><p class="subtitle" id="preguntasCount">Cargando...</p></div>
+            <button class="btn btn-danger" id="btnVaciarBanco">🗑️ Eliminar todas las preguntas</button>
+          </div>
           <div class="search-bar">
             <input type="text" id="buscadorPreguntas" class="form-control" placeholder="🔍 Buscar por enunciado...">
             <select id="filtroCorte" class="form-control"><option value="">Todos los cortes</option></select>
             <select id="filtroTipo" class="form-control"><option value="">Todos los tipos</option><option value="opcion_unica">Opción única</option><option value="completar">Completar</option></select>
+            <select id="filtroQuiz" class="form-control"><option value="">Todos los quizzes</option></select>
           </div>
-          <div class="preguntas-scroll"><table id="tablaPreguntas"><tr><th>Corte</th><th>Tipo</th><th>Enunciado</th></tr></table></div>
+          <div class="preguntas-scroll"><table id="tablaPreguntas"><tr><th>Corte</th><th>Tema</th><th>Tipo</th><th>Enunciado</th><th></th></tr></table></div>
         </div>
       </div>
 
@@ -812,9 +949,17 @@ function renderProfesorApp() {
       </div>
 
       <div class="tab-content" id="proftab-resultados">
-        <div class="card" id="resultadosSection">
-          <h2>Resultados</h2>
-          <p class="subtitle">Ve a la pestaña <strong>Quizzes</strong> y haz clic en "Ver resultados" de cualquier quiz.</p>
+        <div class="card">
+          <h2>Resultados por quiz</h2>
+          <p class="subtitle">Elige un quiz para ver quién lo tomó y con qué puntaje (incluye práctica, examen y estudio — todos los intentos se guardan).</p>
+          <select id="resultadosQuizSelect" class="form-control"></select>
+          <div id="resultadosSection" style="margin-top:14px;"></div>
+        </div>
+        <div class="card">
+          <h2>Resultados por alumno</h2>
+          <p class="subtitle">Elige un alumno para ver todos sus intentos en este grupo, de cualquier quiz y modo.</p>
+          <select id="resultadosAlumnoSelect" class="form-control"></select>
+          <div id="resultadosAlumnoSection" style="margin-top:14px;"></div>
         </div>
       </div>
     </main>
@@ -835,19 +980,34 @@ function renderProfesorApp() {
     const libro = XLSX.read(buffer, { type: 'array' });
     const hoja = libro.Sheets[libro.SheetNames[0]];
     const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
-    await procesarFilas(filas, document.getElementById('destinoCarga').value);
+    mostrarPreviewCarga(filas, 'previewCargaExcelCont');
     e.target.value = '';
   };
-  document.getElementById('cargarBtn').onclick = async () => {
+  document.getElementById('destinoCarga').onchange = actualizarEtiquetasDestino;
+  actualizarEtiquetasDestino();
+  document.getElementById('previsualizarBtn').onclick = () => {
     const raw = document.getElementById('csvInput').value.trim();
     if (!raw) { mostrarToast('Pega al menos una fila.', 'error'); return; }
     if (!grupoActivo) { mostrarToast('Selecciona un grupo primero.', 'error'); return; }
-    const filas = raw.split('\n').map(linea => { const d = linea.includes('\t') ? '\t' : ','; return linea.split(d).map(c => c.trim()); });
-    await procesarFilas(filas, document.getElementById('destinoCarga').value);
+    const filas = raw.split('\n').map(linea => { const d = linea.includes('\t') ? '\t' : linea.includes('|') ? '|' : ','; return linea.split(d).map(c => c.trim()); });
+    mostrarPreviewCarga(filas, 'previewCargaCont', 'csvInput');
   };
   document.getElementById('buscadorPreguntas').oninput = renderTablaPreguntasProfesor;
   document.getElementById('filtroCorte').onchange = renderTablaPreguntasProfesor;
   document.getElementById('filtroTipo').onchange = renderTablaPreguntasProfesor;
+  document.getElementById('filtroQuiz').onchange = renderTablaPreguntasProfesor;
+  document.getElementById('btnVaciarBanco').onclick = async () => {
+    if (!grupoActivo) return;
+    if (!preguntasCache.length) { mostrarToast('El banco ya está vacío.', 'error'); return; }
+    if (!confirm(`¿Eliminar TODAS las ${preguntasCache.length} preguntas de este grupo? Esto también las quita de cualquier quiz que las tenga asignadas (los quizzes se quedan vacíos, no se borran). Esto no se puede deshacer.`)) return;
+    if (!confirm('Confirma una vez más: esto deja el banco de preguntas completamente en blanco. ¿Continuar?')) return;
+    const { error } = await supabase.from('preguntas').delete().eq('grupo_id', grupoActivo);
+    if (error) { mostrarToast('No se pudo vaciar el banco: ' + error.message, 'error'); return; }
+    mostrarToast('Banco de preguntas vaciado.');
+    renderPreguntasSectionProfesor();
+    renderListaQuizzesProfesor();
+    actualizarStatsProfesor();
+  };
   document.getElementById('qAlcance').onchange = (e) => document.getElementById('qCorteWrap').classList.toggle('hidden', e.target.value !== 'un_corte');
   document.getElementById('qCrear').onclick = crearQuizProfesor;
 
@@ -925,14 +1085,11 @@ function inicializarConstructor() {
   async function subirImagenYUsar(archivo) {
     const msg = document.getElementById('subiendoImagenMsg');
     msg.classList.remove('hidden');
-    const extension = (archivo.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
-    const nombreArchivo = `preg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${extension}`;
-    const { error } = await supabase.storage.from('preguntas-imagenes').upload(nombreArchivo, archivo, { upsert: true });
+    const url = await subirImagenABucket(archivo);
     msg.classList.add('hidden');
-    if (error) { mostrarToast('Error al subir imagen: ' + error.message, 'error'); return; }
-    const { data: urlData } = supabase.storage.from('preguntas-imagenes').getPublicUrl(nombreArchivo);
-    manualImagen.value = urlData.publicUrl;
-    previewImagen.src = urlData.publicUrl;
+    if (!url) return;
+    manualImagen.value = url;
+    previewImagen.src = url;
     previewImagen.classList.remove('hidden');
     mostrarToast('Imagen subida.');
   }
@@ -970,9 +1127,10 @@ function inicializarConstructor() {
     }
 
     const corteObj = cortesCache.find(c => c.id === corteId);
+    const tema = document.getElementById('manualTema').value.trim() || 'Repaso';
     listaTemporal.push({
       tipo, corte_id: corteId, corte_numero: corteObj ? corteObj.numero : '-',
-      enunciado, imagen_url: imagenUrl || null,
+      enunciado, imagen_url: imagenUrl || null, tema,
       opciones: tipo === 'opcion_unica' ? opciones : [],
       respuesta_correcta: tipo === 'completar' ? respuestaCorrecta : null
     });
@@ -1015,7 +1173,7 @@ function renderListaTemporal() {
     <div class="pregunta-temporal-item">
       <div>
         <div class="enunciado">${i + 1}. ${p.enunciado}</div>
-        <div class="meta"><span>Corte ${p.corte_numero}</span><span>${p.tipo === 'opcion_unica' ? `🔘 ${p.opciones.length} opciones` : '✏️ Completar'}</span>${p.imagen_url ? '<span>🖼️ Con imagen</span>' : ''}</div>
+        <div class="meta"><span>${p.tema}</span><span>Corte ${p.corte_numero}</span><span>${p.tipo === 'opcion_unica' ? `🔘 ${p.opciones.length} opciones` : '✏️ Completar'}</span>${p.imagen_url ? '<span>🖼️ Con imagen</span>' : ''}</div>
       </div>
       <button class="btn btn-sm btn-danger" data-idx="${i}">✕</button>
     </div>`).join('');
@@ -1028,13 +1186,22 @@ async function guardarListaTemporal() {
   if (!listaTemporal.length) return;
   if (!grupoActivo) { mostrarToast('Selecciona un grupo primero.', 'error'); return; }
   const destino = document.getElementById('destinoCarga').value;
-  let cargadas = 0;
+  const enunciadosExistentes = new Set(preguntasCache.map(p => normalizarEnunciado(p.enunciado)));
+  const vistos = new Set();
+  let cargadas = 0, duplicadas = 0;
   const idsCreados = [];
 
+  mostrarCargaProgreso('Guardando preguntas...');
+  let procesadas = 0;
   for (const p of listaTemporal) {
+    procesadas++;
+    actualizarCargaProgreso(procesadas, listaTemporal.length);
+    const key = normalizarEnunciado(p.enunciado);
+    if (enunciadosExistentes.has(key) || vistos.has(key)) { duplicadas++; continue; }
+    vistos.add(key);
     const { data: pregunta, error: errP } = await supabase.from('preguntas').insert({
       grupo_id: grupoActivo, corte_id: p.corte_id, enunciado: p.enunciado, tipo: p.tipo,
-      imagen_url: p.imagen_url, respuesta_correcta: p.respuesta_correcta
+      imagen_url: p.imagen_url, respuesta_correcta: p.respuesta_correcta, tema: p.tema || 'Repaso'
     }).select('id').single();
     if (errP) continue;
     if (p.tipo === 'opcion_unica' && p.opciones.length) {
@@ -1043,14 +1210,15 @@ async function guardarListaTemporal() {
     idsCreados.push(pregunta.id);
     cargadas++;
   }
+  ocultarCargaProgreso();
 
   if (destino !== 'banco' && idsCreados.length) {
     const { data: existentes } = await supabase.from('quiz_preguntas').select('orden').eq('quiz_id', destino).order('orden', { ascending: false }).limit(1);
     const ordenInicial = existentes && existentes.length ? existentes[0].orden : 0;
     const { error: errAsig } = await supabase.from('quiz_preguntas').insert(idsCreados.map((pid, i) => ({ quiz_id: destino, pregunta_id: pid, orden: ordenInicial + i + 1 })));
-    mostrarToast(errAsig ? 'Preguntas creadas pero error al asignar al quiz.' : `¡${cargadas} preguntas guardadas y asignadas al quiz!`, errAsig ? 'error' : 'success');
+    mostrarToast(errAsig ? 'Preguntas creadas pero error al asignar al quiz.' : `Nuevas: ${cargadas} (asignadas al quiz). Ya existían: ${duplicadas}.`, errAsig ? 'error' : 'success');
   } else {
-    mostrarToast(`¡${cargadas} preguntas guardadas en el banco!`);
+    mostrarToast(`Nuevas: ${cargadas}. Ya existían (omitidas): ${duplicadas}.`);
   }
 
   listaTemporal = [];
@@ -1059,6 +1227,147 @@ async function guardarListaTemporal() {
   renderListaQuizzesProfesor();
   actualizarStatsProfesor();
   actualizarDestinoCarga();
+}
+
+async function abrirEditorPregunta(preguntaId) {
+  const pregunta = preguntasCache.find(p => p.id === preguntaId);
+  if (!pregunta) return;
+  const { data: opciones } = await supabase.from('opciones').select('id, texto, es_correcta, orden').eq('pregunta_id', preguntaId).order('orden');
+  const opts = opciones || [];
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <h3>✏️ Editar pregunta</h3>
+      <div class="form-group"><label>Tipo</label>
+        <select id="editTipo" class="form-control">
+          <option value="opcion_unica" ${pregunta.tipo === 'opcion_unica' ? 'selected' : ''}>Opción única</option>
+          <option value="completar" ${pregunta.tipo === 'completar' ? 'selected' : ''}>Completar</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Corte</label><select id="editCorte" class="form-control">${cortesCache.map(c => `<option value="${c.id}" ${c.id === pregunta.corte_id ? 'selected' : ''}>${c.nombre}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Tema / curso</label><input type="text" id="editTema" class="form-control" value="${pregunta.tema || 'Repaso'}"></div>
+      <div class="form-group"><label>Enunciado</label><textarea id="editEnunciado" class="form-control">${pregunta.enunciado}</textarea></div>
+      <div class="form-group"><label>Imagen (URL, subir archivo, o pegar con Ctrl+V)</label>
+        <input type="text" id="editImagen" class="form-control" value="${pregunta.imagen_url || ''}" placeholder="URL de imagen">
+        <input type="file" id="editImagenArchivo" accept="image/*" class="form-control" style="margin-top:8px; padding:8px;">
+        <div id="editZonaPegarImagen" tabindex="0" style="margin-top:8px; border:2px dashed var(--border); border-radius:12px; padding:12px; text-align:center; font-size:12px; color:var(--text-muted); font-weight:700; cursor:text;">📋 Haz clic aquí y pega una imagen (Ctrl+V)</div>
+        <img id="editPreviewImagen" class="preview-imagen ${pregunta.imagen_url ? '' : 'hidden'}" src="${pregunta.imagen_url || ''}">
+      </div>
+      <div id="editSeccionOpciones" class="${pregunta.tipo === 'opcion_unica' ? '' : 'hidden'}">
+        <label style="display:block; font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase;">Opciones</label>
+        <div id="editListaOpciones"></div>
+        <button type="button" class="btn-add-opcion" id="editBtnAddOpcion">+ Añadir otra opción</button>
+      </div>
+      <div id="editSeccionCompletar" class="form-group ${pregunta.tipo === 'completar' ? '' : 'hidden'}">
+        <label>Respuesta correcta</label><input type="text" id="editRespuestaCompletar" class="form-control" value="${pregunta.tipo === 'completar' ? (pregunta.respuesta_correcta || '') : ''}">
+      </div>
+      <div class="error-msg" id="editErr"></div>
+      <div style="display:flex; gap:10px; margin-top:16px;">
+        <button class="btn btn-primary" id="editGuardarBtn" style="flex:1;">💾 Guardar cambios</button>
+        <button class="btn btn-secondary" id="editCancelarBtn">Cancelar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  overlay.querySelector('#editCancelarBtn').onclick = () => overlay.remove();
+
+  const listaOpcionesEdit = overlay.querySelector('#editListaOpciones');
+  function crearFilaOpcionEdit(texto = '', correcta = false) {
+    const div = document.createElement('div');
+    div.className = 'opcion-row' + (correcta ? ' correcta' : '');
+    div.innerHTML = `<input type="radio" name="editOpcionCorrecta" ${correcta ? 'checked' : ''}><input type="text" value="${texto}" placeholder="Texto de la opción"><button type="button" class="btn-eliminar-opcion">✕</button>`;
+    div.querySelector('.btn-eliminar-opcion').onclick = () => { if (listaOpcionesEdit.children.length <= 2) { mostrarToast('Debe haber al menos 2 opciones.', 'error'); return; } div.remove(); };
+    div.querySelector('input[type="radio"]').onchange = () => { listaOpcionesEdit.querySelectorAll('.opcion-row').forEach(r => r.classList.remove('correcta')); div.classList.add('correcta'); };
+    return div;
+  }
+  if (opts.length) opts.forEach(o => listaOpcionesEdit.appendChild(crearFilaOpcionEdit(o.texto, o.es_correcta)));
+  else { listaOpcionesEdit.appendChild(crearFilaOpcionEdit()); listaOpcionesEdit.appendChild(crearFilaOpcionEdit()); }
+
+  overlay.querySelector('#editBtnAddOpcion').onclick = () => {
+    if (listaOpcionesEdit.children.length >= 6) { mostrarToast('Máximo 6 opciones.', 'error'); return; }
+    listaOpcionesEdit.appendChild(crearFilaOpcionEdit());
+  };
+
+  overlay.querySelector('#editTipo').onchange = (e) => {
+    overlay.querySelector('#editSeccionOpciones').classList.toggle('hidden', e.target.value !== 'opcion_unica');
+    overlay.querySelector('#editSeccionCompletar').classList.toggle('hidden', e.target.value !== 'completar');
+  };
+
+  const editImagen = overlay.querySelector('#editImagen');
+  const editPreview = overlay.querySelector('#editPreviewImagen');
+  editImagen.oninput = () => {
+    if (editImagen.value.trim()) { editPreview.src = editImagen.value.trim(); editPreview.classList.remove('hidden'); editPreview.onerror = () => editPreview.classList.add('hidden'); }
+    else editPreview.classList.add('hidden');
+  };
+  overlay.querySelector('#editImagenArchivo').onchange = async (e) => {
+    const archivo = e.target.files[0];
+    if (!archivo) return;
+    const url = await subirImagenABucket(archivo);
+    if (!url) return;
+    editImagen.value = url;
+    editPreview.src = url;
+    editPreview.classList.remove('hidden');
+    mostrarToast('Imagen subida.');
+  };
+  overlay.querySelector('#editZonaPegarImagen').onpaste = async (e) => {
+    const item = Array.from(e.clipboardData.items).find(it => it.type.startsWith('image/'));
+    if (!item) { mostrarToast('No se encontró ninguna imagen en el portapapeles.', 'error'); return; }
+    const url = await subirImagenABucket(item.getAsFile());
+    if (!url) return;
+    editImagen.value = url;
+    editPreview.src = url;
+    editPreview.classList.remove('hidden');
+    mostrarToast('Imagen subida.');
+  };
+
+  overlay.querySelector('#editGuardarBtn').onclick = async () => {
+    const errEl = overlay.querySelector('#editErr');
+    errEl.textContent = '';
+    const tipo = overlay.querySelector('#editTipo').value;
+    const corteId = overlay.querySelector('#editCorte').value;
+    const tema = overlay.querySelector('#editTema').value.trim() || 'Repaso';
+    const enunciado = overlay.querySelector('#editEnunciado').value.trim();
+    const imagenUrl = editImagen.value.trim() || null;
+    if (!enunciado) { errEl.textContent = 'El enunciado es obligatorio.'; return; }
+
+    let respuestaCorrecta = null;
+    let nuevasOpciones = [];
+    if (tipo === 'opcion_unica') {
+      const filas = listaOpcionesEdit.querySelectorAll('.opcion-row');
+      let hayCorrecta = false;
+      filas.forEach((fila, i) => {
+        const texto = fila.querySelector('input[type="text"]').value.trim();
+        if (!texto) return;
+        const correcta = fila.querySelector('input[type="radio"]').checked;
+        if (correcta) hayCorrecta = true;
+        nuevasOpciones.push({ texto, es_correcta: correcta, orden: i + 1 });
+      });
+      if (nuevasOpciones.length < 2) { errEl.textContent = 'Necesitas al menos 2 opciones con texto.'; return; }
+      if (!hayCorrecta) { errEl.textContent = 'Marca cuál opción es la correcta.'; return; }
+    } else {
+      respuestaCorrecta = overlay.querySelector('#editRespuestaCompletar').value.trim();
+      if (!respuestaCorrecta) { errEl.textContent = 'La respuesta correcta es obligatoria.'; return; }
+    }
+
+    const { error: errUpd } = await supabase.from('preguntas').update({
+      tipo, corte_id: corteId, tema, enunciado, imagen_url: imagenUrl,
+      respuesta_correcta: tipo === 'completar' ? respuestaCorrecta : null
+    }).eq('id', preguntaId);
+    if (errUpd) { errEl.textContent = errUpd.message; return; }
+
+    if (tipo === 'opcion_unica') {
+      await supabase.from('opciones').delete().eq('pregunta_id', preguntaId);
+      await supabase.from('opciones').insert(nuevasOpciones.map(o => ({ pregunta_id: preguntaId, ...o })));
+    } else {
+      await supabase.from('opciones').delete().eq('pregunta_id', preguntaId);
+    }
+
+    mostrarToast('Pregunta actualizada.');
+    overlay.remove();
+    renderPreguntasSectionProfesor();
+  };
 }
 
 function renderCortesTablaProfesor() {
@@ -1081,9 +1390,10 @@ async function renderGrupoSelectProfesor() {
   sel.onchange = () => {
     grupoActivo = sel.value;
     document.getElementById('panelGestionQuiz').classList.add('hidden');
-    renderPreguntasSectionProfesor(); renderListaQuizzesProfesor(); actualizarStatsProfesor();
+    renderPreguntasSectionProfesor(); renderListaQuizzesProfesor(); actualizarStatsProfesor(); inicializarResultadosTab();
   };
   renderPreguntasSectionProfesor(); renderListaQuizzesProfesor(); actualizarStatsProfesor();
+  inicializarResultadosTab();
 }
 
 async function actualizarStatsProfesor() {
@@ -1102,30 +1412,165 @@ async function actualizarDestinoCarga() {
   const { data: quizzes } = await supabase.from('quizzes').select('id, titulo').eq('grupo_id', grupoActivo).order('titulo');
   sel.innerHTML = '<option value="banco">📚 Al banco general del grupo (sin asignar a un quiz)</option>' +
     (quizzes || []).map(q => `<option value="${q.id}">📝 Al quiz: "${q.titulo}"</option>`).join('');
+  actualizarEtiquetasDestino();
+}
+
+function actualizarEtiquetasDestino() {
+  const sel = document.getElementById('destinoCarga');
+  if (!sel) return;
+  const texto = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';
+  document.querySelectorAll('.destinoLabel').forEach(el => el.textContent = texto);
+}
+
+function extraerColaCompletar(cols) {
+  // Para preguntas "completar": en vez de fijarnos en la posición exacta (columna 13 y 14),
+  // tomamos los últimos valores no vacíos de la fila en orden: primero la respuesta, luego el tema.
+  // Así toleramos una celda vacía de más o de menos por errores de conteo al pegar filas.
+  const cola = cols.slice(4).map(v => String(v ?? '').trim()).filter(v => v);
+  return { respuesta: cola[0] || null, tema: cola[1] || 'Repaso' };
+}
+
+function normalizarEnunciado(s) { return String(s ?? '').trim(); }
+
+let overlayCargaEl = null;
+function mostrarCargaProgreso(titulo) {
+  overlayCargaEl = document.createElement('div');
+  overlayCargaEl.className = 'carga-overlay';
+  overlayCargaEl.innerHTML = `
+    <div class="carga-box">
+      <div class="carga-spinner"></div>
+      <p class="carga-titulo">${titulo}</p>
+      <p class="carga-sub" id="cargaProgresoTexto">Preparando...</p>
+      <div class="carga-barra-fondo"><div class="carga-barra-relleno" id="cargaProgresoBarra"></div></div>
+      <p class="carga-aviso">⚠️ No cierres ni recargues esta página hasta que termine</p>
+    </div>`;
+  document.body.appendChild(overlayCargaEl);
+  window.onbeforeunload = () => 'Se está cargando información, ¿seguro que quieres salir?';
+}
+function actualizarCargaProgreso(actual, total) {
+  if (!overlayCargaEl) return;
+  const pct = total ? Math.round((actual / total) * 100) : 0;
+  overlayCargaEl.querySelector('#cargaProgresoTexto').textContent = `Cargando ${actual} de ${total}...`;
+  overlayCargaEl.querySelector('#cargaProgresoBarra').style.width = pct + '%';
+}
+function ocultarCargaProgreso() {
+  if (overlayCargaEl) { overlayCargaEl.remove(); overlayCargaEl = null; }
+  window.onbeforeunload = null;
+}
+
+function validarFila(cols, enunciadosExistentes) {
+  const [tipoRaw, corteNumRaw, enunciado, imagenUrl] = cols.map(c => String(c ?? '').trim());
+  const tipo = (tipoRaw || 'opcion_unica').toLowerCase();
+  const corte = cortesCache.find(c => String(c.numero) === String(corteNumRaw));
+  let tema = String(cols[13] ?? '').trim() || 'Repaso';
+
+  if (!['opcion_unica', 'completar'].includes(tipo)) {
+    return { valido: false, motivo: `Tipo "${tipoRaw}" no reconocido (debe ser opcion_unica o completar)`, tipo, corteNumero: corteNumRaw, enunciado, tema };
+  }
+  if (!enunciado) return { valido: false, motivo: 'Falta el enunciado', tipo, corteNumero: corteNumRaw, enunciado, tema };
+  if (!corte) return { valido: false, motivo: `El corte "${corteNumRaw}" no existe`, tipo, corteNumero: corteNumRaw, enunciado, tema };
+  if (enunciadosExistentes && enunciadosExistentes.has(normalizarEnunciado(enunciado))) {
+    return { valido: false, duplicado: true, motivo: 'Ya existe una pregunta idéntica en el banco', tipo, corteNumero: corte.numero, enunciado, tema };
+  }
+
+  if (tipo === 'opcion_unica') {
+    const [, , , , o1, c1, o2, c2, o3, c3, o4, c4] = cols.map(c => String(c ?? '').trim());
+    const opciones = [[o1, c1], [o2, c2], [o3, c3], [o4, c4]].filter(([texto]) => texto);
+    if (opciones.length < 2) return { valido: false, motivo: 'Necesita al menos 2 opciones con texto', tipo, corteNumero: corteNumRaw, enunciado, tema };
+    const correctas = opciones.filter(([, c]) => esVerdadero(c));
+    if (correctas.length !== 1) return { valido: false, motivo: correctas.length === 0 ? 'Ninguna opción marcada como correcta (V)' : 'Hay más de una opción marcada como correcta', tipo, corteNumero: corteNumRaw, enunciado, tema };
+  } else {
+    const { respuesta, tema: temaExtraido } = extraerColaCompletar(cols);
+    tema = temaExtraido;
+    if (!respuesta) return { valido: false, motivo: 'Falta la respuesta correcta', tipo, corteNumero: corteNumRaw, enunciado, tema };
+  }
+  return { valido: true, motivo: '', tipo, corteNumero: corte.numero, enunciado, tema, cols };
+}
+
+function mostrarPreviewCarga(filasCrudas, contenedorId, textareaIdParaLimpiar, destinoFijo, onCompletado) {
+  let filas = filasCrudas.filter(f => f.some(c => String(c ?? '').trim() !== ''));
+  if (filas.length && String(filas[0][0] ?? '').toLowerCase().includes('tipo')) filas = filas.slice(1);
+
+  const enunciadosExistentes = new Set(preguntasCache.map(p => normalizarEnunciado(p.enunciado)));
+  const vistosEnEsteLote = new Set();
+  const resultados = filas.map(cols => {
+    const r = { ...validarFila(cols, enunciadosExistentes), cols };
+    if (r.valido) {
+      const key = normalizarEnunciado(r.enunciado);
+      if (vistosEnEsteLote.has(key)) return { ...r, valido: false, duplicado: true, motivo: 'Duplicada dentro de las mismas filas pegadas' };
+      vistosEnEsteLote.add(key);
+    }
+    return r;
+  });
+  const validas = resultados.filter(r => r.valido);
+  const duplicadas = resultados.filter(r => r.duplicado);
+  const invalidas = resultados.filter(r => !r.valido && !r.duplicado);
+
+  const cont = document.getElementById(contenedorId);
+  cont.innerHTML = `
+    <div class="table-container preguntas-scroll">
+      <table>
+        <tr><th></th><th>Tipo</th><th>Corte</th><th>Tema</th><th>Enunciado</th><th>Estado</th></tr>
+        ${resultados.map(r => `<tr style="${r.valido ? '' : r.duplicado ? 'background:#FFF7ED;' : 'background:var(--error-bg);'}">
+          <td>${r.valido ? '✅' : r.duplicado ? '⚠️' : '❌'}</td><td>${r.tipo}</td><td>${r.corteNumero || '-'}</td><td>${r.tema}</td>
+          <td>${(r.enunciado || '').slice(0, 60)}${(r.enunciado || '').length > 60 ? '…' : ''}</td>
+          <td style="font-size:11.5px; color:${r.valido ? '#2FAE6C' : r.duplicado ? '#EA580C' : 'var(--error)'};">${r.valido ? 'Nueva, lista para cargar' : r.motivo}</td>
+        </tr>`).join('')}
+      </table>
+    </div>
+    <p class="subtitle" style="margin-top:10px;">✅ ${validas.length} nuevas &nbsp;·&nbsp; ⚠️ ${duplicadas.length} ya existen (no se cargan) &nbsp;·&nbsp; ❌ ${invalidas.length} con error</p>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn btn-primary" id="confirmarCargaBtn" ${validas.length ? '' : 'disabled'} style="flex:1;">📥 Cargar ${validas.length} pregunta${validas.length === 1 ? '' : 's'} nueva${validas.length === 1 ? '' : 's'}</button>
+      <button class="btn btn-secondary" id="cancelarCargaBtn">Cancelar</button>
+    </div>
+  `;
+
+  cont.querySelector('#cancelarCargaBtn').onclick = () => {
+    cont.innerHTML = '';
+    if (textareaIdParaLimpiar) { const el = document.getElementById(textareaIdParaLimpiar); if (el) el.value = ''; }
+  };
+
+  if (validas.length) {
+    cont.querySelector('#confirmarCargaBtn').onclick = async () => {
+      const destino = destinoFijo || document.getElementById('destinoCarga').value;
+      await procesarFilas(validas.map(r => r.cols), destino);
+      cont.innerHTML = `<p class="ok-msg">✅ ${validas.length} preguntas cargadas correctamente.</p>`;
+      if (textareaIdParaLimpiar) { const el = document.getElementById(textareaIdParaLimpiar); if (el) el.value = ''; }
+      if (onCompletado) await onCompletado();
+    };
+  }
 }
 
 async function procesarFilas(filasCrudas, destino = 'banco') {
   let filas = filasCrudas.filter(f => f.some(c => String(c ?? '').trim() !== ''));
   if (filas.length && String(filas[0][0] ?? '').toLowerCase().includes('tipo')) filas = filas.slice(1);
 
+  mostrarCargaProgreso('Cargando preguntas...');
   let cargadas = 0, fallidas = 0;
   const preguntasCreadasIds = [];
+  let procesadas = 0;
 
   for (const cols of filas) {
-    const [tipoRaw, corteNumRaw, enunciado, imagenUrl, o1, c1, o2, c2, o3, c3, o4, c4, respCorrecta] = cols.map(c => String(c ?? '').trim());
+    procesadas++;
+    actualizarCargaProgreso(procesadas, filas.length);
+    const [tipoRaw, corteNumRaw, enunciado, imagenUrl, o1, c1, o2, c2, o3, c3, o4, c4] = cols.map(c => String(c ?? '').trim());
     const tipo = (tipoRaw || 'opcion_unica').toLowerCase();
     const corte = cortesCache.find(c => String(c.numero) === String(corteNumRaw));
     if (!enunciado || !corte) { fallidas++; continue; }
 
-    let respuestaCompletar = respCorrecta;
-    if (tipo === 'completar' && !respuestaCompletar) {
-      respuestaCompletar = [c4, o4, c3, o3, c2, o2, c1, o1].find(v => v) || null;
+    let respuestaCompletar = null;
+    let tema = String(cols[13] ?? '').trim() || 'Repaso';
+    if (tipo === 'completar') {
+      const extraido = extraerColaCompletar(cols);
+      respuestaCompletar = extraido.respuesta;
+      tema = extraido.tema;
     }
 
     const { data: pregunta, error: errP } = await supabase.from('preguntas').insert({
       grupo_id: grupoActivo, corte_id: corte.id, enunciado, tipo,
       imagen_url: imagenUrl || null,
-      respuesta_correcta: tipo === 'completar' ? respuestaCompletar : null
+      respuesta_correcta: tipo === 'completar' ? respuestaCompletar : null,
+      tema
     }).select('id').single();
 
     if (errP) { fallidas++; continue; }
@@ -1138,6 +1583,8 @@ async function procesarFilas(filasCrudas, destino = 'banco') {
     preguntasCreadasIds.push(pregunta.id);
     cargadas++;
   }
+
+  ocultarCargaProgreso();
 
   if (destino !== 'banco' && preguntasCreadasIds.length) {
     const { data: existentes } = await supabase.from('quiz_preguntas').select('orden').eq('quiz_id', destino).order('orden', { ascending: false }).limit(1);
@@ -1158,8 +1605,17 @@ async function procesarFilas(filasCrudas, destino = 'banco') {
 }
 
 async function renderPreguntasSectionProfesor() {
-  const { data: preguntas } = await supabase.from('preguntas').select('id, enunciado, tipo, cortes(numero, nombre)').eq('grupo_id', grupoActivo).order('created_at', { ascending: false });
+  const { data: preguntas } = await supabase.from('preguntas').select('id, enunciado, tipo, tema, imagen_url, respuesta_correcta, corte_id, cortes(numero, nombre)').eq('grupo_id', grupoActivo).order('created_at', { ascending: false });
   preguntasCache = preguntas || [];
+
+  const { data: quizzesGrupo } = await supabase.from('quizzes').select('id, titulo').eq('grupo_id', grupoActivo).order('titulo');
+  const { data: qp } = await supabase.from('quiz_preguntas').select('quiz_id, pregunta_id').in('quiz_id', (quizzesGrupo || []).map(q => q.id).length ? (quizzesGrupo || []).map(q => q.id) : ['00000000-0000-0000-0000-000000000000']);
+  mapaPreguntaQuizzes = {};
+  (qp || []).forEach(r => { (mapaPreguntaQuizzes[r.pregunta_id] = mapaPreguntaQuizzes[r.pregunta_id] || []).push(r.quiz_id); });
+
+  const filtroQuiz = document.getElementById('filtroQuiz');
+  filtroQuiz.innerHTML = '<option value="">Todos los quizzes</option>' + (quizzesGrupo || []).map(q => `<option value="${q.id}">${q.titulo}</option>`).join('');
+
   document.getElementById('preguntasCount').textContent = `${preguntasCache.length} preguntas cargadas`;
   renderTablaPreguntasProfesor();
 }
@@ -1168,16 +1624,19 @@ function renderTablaPreguntasProfesor() {
   const buscador = (document.getElementById('buscadorPreguntas').value || '').toLowerCase();
   const filtroCorte = document.getElementById('filtroCorte').value;
   const filtroTipo = document.getElementById('filtroTipo').value;
+  const filtroQuiz = document.getElementById('filtroQuiz').value;
   const filtradas = preguntasCache.filter(p => {
     const matchTexto = p.enunciado.toLowerCase().includes(buscador);
     const matchCorte = !filtroCorte || (p.cortes && String(p.cortes.numero) === filtroCorte);
     const matchTipo = !filtroTipo || p.tipo === filtroTipo;
-    return matchTexto && matchCorte && matchTipo;
+    const matchQuiz = !filtroQuiz || (mapaPreguntaQuizzes[p.id] || []).includes(filtroQuiz);
+    return matchTexto && matchCorte && matchTipo && matchQuiz;
   });
   const tabla = document.getElementById('tablaPreguntas');
-  tabla.innerHTML = '<tr><th>Corte</th><th>Tipo</th><th>Enunciado</th></tr>' +
-    (filtradas.length ? filtradas.map(p => `<tr><td>${p.cortes ? p.cortes.numero : '-'}</td><td>${p.tipo}</td><td>${p.enunciado}</td></tr>`).join('')
-    : '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">No se encontraron preguntas.</td></tr>');
+  tabla.innerHTML = '<tr><th>Corte</th><th>Tema</th><th>Tipo</th><th>Enunciado</th><th></th></tr>' +
+    (filtradas.length ? filtradas.map(p => `<tr><td>${p.cortes ? p.cortes.numero : '-'}</td><td>${p.tema || 'Repaso'}</td><td>${p.tipo}</td><td>${p.enunciado}</td><td><button class="btn btn-sm btn-secondary editarPreguntaBtn" data-id="${p.id}">✏️ Editar</button></td></tr>`).join('')
+    : '<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">No se encontraron preguntas.</td></tr>');
+  tabla.querySelectorAll('.editarPreguntaBtn').forEach(btn => btn.onclick = () => abrirEditorPregunta(btn.dataset.id));
 }
 
 async function crearQuizProfesor() {
@@ -1230,6 +1689,7 @@ async function renderListaQuizzesProfesor() {
         <button class="btn btn-sm btn-primary gestionarBtn" data-id="${q.id}" data-titulo="${q.titulo}">⚙️ Gestionar preguntas</button>
         <button class="btn btn-sm btn-secondary toggleBtn" data-id="${q.id}" data-activo="${q.activo}">${q.activo ? 'Desactivar' : 'Activar'}</button>
         <button class="btn btn-sm btn-secondary verBtn" data-id="${q.id}" data-titulo="${q.titulo}">📊</button>
+        <button class="btn btn-sm btn-danger eliminarQuizBtn" data-id="${q.id}" data-titulo="${q.titulo}">🗑️</button>
       </div></td>
     </tr>`).join('') || '<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Todavía no hay quizzes. Crea uno arriba.</td></tr>';
 
@@ -1245,8 +1705,26 @@ async function renderListaQuizzesProfesor() {
   });
   tabla.querySelectorAll('.verBtn').forEach(btn => btn.onclick = () => verResultadosProfesor(btn.dataset.id, btn.dataset.titulo));
   tabla.querySelectorAll('.gestionarBtn').forEach(btn => btn.onclick = () => abrirPanelGestionQuiz(btn.dataset.id, btn.dataset.titulo));
+  tabla.querySelectorAll('.eliminarQuizBtn').forEach(btn => btn.onclick = () => eliminarQuizConPreguntas(btn.dataset.id, btn.dataset.titulo));
 
   actualizarDestinoCarga();
+}
+
+async function eliminarQuizConPreguntas(quizId, titulo) {
+  if (!confirm(`¿Eliminar el quiz "${titulo}"? Esto borra también todas las preguntas cargadas en él (si alguna se reutilizó en otro quiz combinado, desaparecerá de ahí también). Los resultados de los alumnos en este quiz se pierden. Esto no se puede deshacer.`)) return;
+  const { data: qp } = await supabase.from('quiz_preguntas').select('pregunta_id').eq('quiz_id', quizId);
+  const preguntaIds = (qp || []).map(r => r.pregunta_id);
+
+  const { error } = await supabase.from('quizzes').delete().eq('id', quizId);
+  if (error) { mostrarToast('No se pudo borrar el quiz: ' + error.message, 'error'); return; }
+
+  if (preguntaIds.length) await supabase.from('preguntas').delete().in('id', preguntaIds);
+
+  mostrarToast(`Quiz eliminado junto con ${preguntaIds.length} pregunta${preguntaIds.length === 1 ? '' : 's'}.`);
+  document.getElementById('panelGestionQuiz').classList.add('hidden');
+  renderListaQuizzesProfesor();
+  renderPreguntasSectionProfesor();
+  actualizarStatsProfesor();
 }
 
 async function abrirPanelGestionQuiz(quizId, titulo) {
@@ -1264,7 +1742,12 @@ async function abrirPanelGestionQuiz(quizId, titulo) {
       <div class="sub-tab-content active" id="subtab-ver"><div id="preguntasDelQuiz" style="margin-top:14px;">Cargando...</div></div>
       <div class="sub-tab-content" id="subtab-manual">
         <p class="subtitle" style="margin-top:14px;">Marca preguntas del banco para añadirlas a este quiz.</p>
-        <div class="search-bar"><input type="text" id="buscadorManual" class="form-control" placeholder="🔍 Buscar pregunta..."></div>
+        <div class="search-bar">
+          <input type="text" id="buscadorManual" class="form-control" placeholder="🔍 Buscar pregunta...">
+          <select id="filtroQuizOrigen" class="form-control"><option value="">Cualquier quiz de origen</option></select>
+          <select id="filtroTemaOrigen" class="form-control"><option value="">Cualquier tema</option></select>
+        </div>
+        <button class="btn btn-secondary" id="btnSeleccionarTodasVisibles" style="margin-bottom:10px;">☑️ Seleccionar todas las visibles</button>
         <div class="preguntas-seleccionables-scroll" id="listaSeleccionables"></div>
         <div id="contadorSeleccionados" class="hidden floating-counter"><span id="numSeleccionados">0</span> preguntas seleccionadas<button id="btnAgregarSeleccionadas">Añadir al quiz</button></div>
       </div>
@@ -1277,11 +1760,13 @@ async function abrirPanelGestionQuiz(quizId, titulo) {
             <input type="file" id="excelMasivoInput" accept=".xlsx,.xls,.csv" class="form-control" style="margin-top:6px; padding:9px;">
           </div>
           <div>
-            <label style="font-weight:700; color:var(--text-muted); font-size:12px; text-transform:uppercase;">Pegar filas</label>
-            <textarea id="csvMasivoInput" class="form-control" placeholder="opcion_unica,1,¿La capital...?,,Verdadero,V,Falso,F,,,,,"></textarea>
-            <button class="btn btn-primary" id="cargarMasivoBtn" style="margin-top:8px; width:100%;">Cargar y asignar</button>
+            <label style="font-weight:700; color:var(--text-muted); font-size:12px; text-transform:uppercase;">Pegar filas (acepta , tab o |)</label>
+            <textarea id="csvMasivoInput" class="form-control" placeholder="opcion_unica,1,¿La capital...?,,Verdadero,V,Falso,F,,,,,,Tema"></textarea>
+            <button class="btn btn-primary" id="previsualizarMasivoBtn" style="margin-top:8px; width:100%;">👁️ Previsualizar</button>
           </div>
         </div>
+        <p style="font-size:11.5px; color:var(--primary); font-weight:800; margin-top:10px;">📌 Se cargará y asignará a: "${titulo}"</p>
+        <div id="previewCargaMasivaCont" style="margin-top:10px;"></div>
       </div>
     </div>`;
 
@@ -1297,6 +1782,8 @@ async function abrirPanelGestionQuiz(quizId, titulo) {
   await cargarPreguntasDelQuiz(quizId);
   await cargarSeleccionables(quizId);
 
+  const refrescarPanel = async () => { await cargarPreguntasDelQuiz(quizId); await cargarSeleccionables(quizId); renderListaQuizzesProfesor(); };
+
   panel.querySelector('#plantillaMasivaBtn').onclick = () => descargarPlantilla('plantilla_preguntas.xlsx');
   panel.querySelector('#excelMasivoInput').onchange = async (e) => {
     const archivo = e.target.files[0];
@@ -1305,17 +1792,14 @@ async function abrirPanelGestionQuiz(quizId, titulo) {
     const libro = XLSX.read(buffer, { type: 'array' });
     const hoja = libro.Sheets[libro.SheetNames[0]];
     const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
-    await procesarFilas(filas, quizId);
-    await cargarPreguntasDelQuiz(quizId); await cargarSeleccionables(quizId);
+    mostrarPreviewCarga(filas, 'previewCargaMasivaCont', null, quizId, refrescarPanel);
     e.target.value = '';
   };
-  panel.querySelector('#cargarMasivoBtn').onclick = async () => {
+  panel.querySelector('#previsualizarMasivoBtn').onclick = () => {
     const raw = panel.querySelector('#csvMasivoInput').value.trim();
     if (!raw) { mostrarToast('Pega al menos una fila.', 'error'); return; }
-    const filas = raw.split('\n').map(linea => { const d = linea.includes('\t') ? '\t' : ','; return linea.split(d).map(c => c.trim()); });
-    await procesarFilas(filas, quizId);
-    await cargarPreguntasDelQuiz(quizId); await cargarSeleccionables(quizId);
-    panel.querySelector('#csvMasivoInput').value = '';
+    const filas = raw.split('\n').map(linea => { const d = linea.includes('\t') ? '\t' : linea.includes('|') ? '|' : ','; return linea.split(d).map(c => c.trim()); });
+    mostrarPreviewCarga(filas, 'previewCargaMasivaCont', 'csvMasivoInput', quizId, refrescarPanel);
   };
 }
 
@@ -1355,26 +1839,67 @@ async function cargarSeleccionables(quizId) {
   if (!cont) return;
   const { data: yaAsignadas } = await supabase.from('quiz_preguntas').select('pregunta_id').eq('quiz_id', quizId);
   const idsAsignados = new Set((yaAsignadas || []).map(a => a.pregunta_id));
-  const { data: preguntas } = await supabase.from('preguntas').select('id, enunciado, tipo, cortes(numero)').eq('grupo_id', grupoActivo).order('created_at', { ascending: false });
-  const disponibles = (preguntas || []).filter(p => !idsAsignados.has(p.id));
+  const { data: preguntas } = await supabase.from('preguntas').select('id, enunciado, tipo, tema, cortes(numero)').eq('grupo_id', grupoActivo).order('created_at', { ascending: false });
+  const disponiblesBase = (preguntas || []).filter(p => !idsAsignados.has(p.id));
 
-  if (!disponibles.length) { cont.innerHTML = `<div class="empty-state"><p>No hay preguntas disponibles en el banco para añadir.</p></div>`; return; }
+  const { data: quizzesGrupo } = await supabase.from('quizzes').select('id, titulo').eq('grupo_id', grupoActivo).neq('id', quizId).order('titulo');
+  const { data: qpTodas } = await supabase.from('quiz_preguntas').select('quiz_id, pregunta_id');
+  const mapaPregQuiz = {};
+  (qpTodas || []).forEach(r => { (mapaPregQuiz[r.pregunta_id] = mapaPregQuiz[r.pregunta_id] || []).push(r.quiz_id); });
 
-  cont.innerHTML = disponibles.map(p => `
-    <div class="pregunta-item">
-      <input type="checkbox" class="chkPregunta" value="${p.id}">
-      <div class="pregunta-texto">${p.enunciado}<div class="pregunta-meta"><span>Corte ${p.cortes?.numero || '-'}</span><span>${p.tipo}</span></div></div>
-    </div>`).join('');
+  const selQuizOrigen = document.getElementById('filtroQuizOrigen');
+  selQuizOrigen.innerHTML = '<option value="">Cualquier quiz de origen</option>' + (quizzesGrupo || []).map(q => `<option value="${q.id}">${q.titulo}</option>`).join('');
 
-  const contador = document.getElementById('contadorSeleccionados');
-  const numSpan = document.getElementById('numSeleccionados');
-  cont.querySelectorAll('.chkPregunta').forEach(chk => {
-    chk.onchange = () => {
-      const n = cont.querySelectorAll('.chkPregunta:checked').length;
-      numSpan.textContent = n;
-      contador.classList.toggle('hidden', n === 0);
-    };
-  });
+  const temasUnicos = [...new Set(disponiblesBase.map(p => p.tema || 'Repaso'))].sort();
+  const selTema = document.getElementById('filtroTemaOrigen');
+  selTema.innerHTML = '<option value="">Cualquier tema</option>' + temasUnicos.map(t => `<option value="${t}">${t}</option>`).join('');
+
+  function renderLista() {
+    const quizOrigen = selQuizOrigen.value;
+    const tema = selTema.value;
+    const disponibles = disponiblesBase.filter(p => {
+      const matchQuiz = !quizOrigen || (mapaPregQuiz[p.id] || []).includes(quizOrigen);
+      const matchTema = !tema || (p.tema || 'Repaso') === tema;
+      return matchQuiz && matchTema;
+    });
+
+    if (!disponibles.length) { cont.innerHTML = `<div class="empty-state"><p>No hay preguntas disponibles con ese filtro.</p></div>`; return; }
+
+    cont.innerHTML = disponibles.map(p => `
+      <div class="pregunta-item">
+        <input type="checkbox" class="chkPregunta" value="${p.id}">
+        <div class="pregunta-texto">${p.enunciado}<div class="pregunta-meta"><span>${p.tema || 'Repaso'}</span><span>Corte ${p.cortes?.numero || '-'}</span><span>${p.tipo}</span></div></div>
+      </div>`).join('');
+
+    cont.querySelectorAll('.chkPregunta').forEach(chk => { chk.onchange = actualizarContador; });
+    aplicarBusqueda();
+  }
+
+  function actualizarContador() {
+    const contador = document.getElementById('contadorSeleccionados');
+    const numSpan = document.getElementById('numSeleccionados');
+    const n = cont.querySelectorAll('.chkPregunta:checked').length;
+    numSpan.textContent = n;
+    contador.classList.toggle('hidden', n === 0);
+  }
+
+  function aplicarBusqueda() {
+    const q = (document.getElementById('buscadorManual').value || '').toLowerCase();
+    cont.querySelectorAll('.pregunta-item').forEach(item => {
+      item.style.display = item.querySelector('.pregunta-texto').textContent.toLowerCase().includes(q) ? 'flex' : 'none';
+    });
+  }
+
+  selQuizOrigen.onchange = renderLista;
+  selTema.onchange = renderLista;
+  document.getElementById('buscadorManual').oninput = aplicarBusqueda;
+
+  document.getElementById('btnSeleccionarTodasVisibles').onclick = () => {
+    cont.querySelectorAll('.pregunta-item').forEach(item => {
+      if (item.style.display !== 'none') item.querySelector('.chkPregunta').checked = true;
+    });
+    actualizarContador();
+  };
 
   document.getElementById('btnAgregarSeleccionadas').onclick = async () => {
     const seleccionados = Array.from(cont.querySelectorAll('.chkPregunta:checked')).map(c => c.value);
@@ -1388,21 +1913,51 @@ async function cargarSeleccionables(quizId) {
     await cargarPreguntasDelQuiz(quizId); await cargarSeleccionables(quizId); renderListaQuizzesProfesor();
   };
 
-  const buscador = document.getElementById('buscadorManual');
-  buscador.oninput = () => {
-    const q = buscador.value.toLowerCase();
-    cont.querySelectorAll('.pregunta-item').forEach(item => {
-      item.style.display = item.querySelector('.pregunta-texto').textContent.toLowerCase().includes(q) ? 'flex' : 'none';
-    });
+  renderLista();
+}
+
+async function inicializarResultadosTab() {
+  const selQuiz = document.getElementById('resultadosQuizSelect');
+  const selAlumno = document.getElementById('resultadosAlumnoSelect');
+  if (!selQuiz || !selAlumno || !grupoActivo) return;
+
+  const { data: quizzes } = await supabase.from('quizzes').select('id, titulo').eq('grupo_id', grupoActivo).order('titulo');
+  selQuiz.innerHTML = '<option value="">Selecciona un quiz...</option>' + (quizzes || []).map(q => `<option value="${q.id}">${q.titulo}</option>`).join('');
+  selQuiz.onchange = () => {
+    if (selQuiz.value) verResultadosProfesor(selQuiz.value, selQuiz.options[selQuiz.selectedIndex].text, false);
+    else document.getElementById('resultadosSection').innerHTML = '';
+  };
+
+  const { data: estudiantes } = await supabase.from('estudiantes').select('id, nombre').eq('grupo_id', grupoActivo).order('nombre');
+  selAlumno.innerHTML = '<option value="">Selecciona un alumno...</option>' + (estudiantes || []).map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
+  selAlumno.onchange = async () => {
+    const cont = document.getElementById('resultadosAlumnoSection');
+    if (!selAlumno.value) { cont.innerHTML = ''; return; }
+    const { data: intentos } = await supabase.from('intentos')
+      .select('puntaje_total, estado, iniciado_en, quizzes(titulo, modo)')
+      .eq('estudiante_id', selAlumno.value)
+      .order('iniciado_en', { ascending: false });
+    const propios = (intentos || []).filter(i => i.quizzes);
+    cont.innerHTML = `
+      <div class="table-container"><table>
+        <tr><th>Quiz</th><th>Modo</th><th>Puntaje</th><th>Estado</th><th>Fecha</th></tr>
+        ${propios.map(i => `<tr>
+          <td>${i.quizzes.titulo}</td><td>${i.quizzes.modo}</td><td>${i.puntaje_total ?? '-'}</td><td>${i.estado}</td>
+          <td>${i.iniciado_en ? new Date(i.iniciado_en).toLocaleDateString() : '-'}</td>
+        </tr>`).join('') || '<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Este alumno todavía no ha tomado ningún quiz.</td></tr>'}
+      </table></div>`;
   };
 }
 
-async function verResultadosProfesor(quizId, titulo) {
+async function verResultadosProfesor(quizId, titulo, cambiarPestana = true) {
   const { data: intentos } = await supabase.from('intentos').select('puntaje_total, estado, estudiantes(nombre)').eq('quiz_id', quizId);
-  document.querySelector('.nav-item[data-tab="resultados"]').click();
+  if (cambiarPestana) {
+    document.querySelector('.nav-item[data-tab="resultados"]').click();
+    const sel = document.getElementById('resultadosQuizSelect');
+    if (sel) sel.value = quizId;
+  }
   document.getElementById('resultadosSection').innerHTML = `
-    <h2>Resultados: ${titulo}</h2>
-    <p class="subtitle">Listado de estudiantes que han tomado este quiz.</p>
+    <p class="subtitle">Listado de estudiantes que han tomado "${titulo}".</p>
     <div class="table-container"><table>
       <tr><th>Estudiante</th><th>Puntaje</th><th>Estado</th></tr>
       ${(intentos || []).map(i => `<tr><td>${i.estudiantes ? i.estudiantes.nombre : '-'}</td><td>${i.puntaje_total ?? '-'}</td><td>${i.estado}</td></tr>`).join('') || '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">Nadie lo ha tomado todavía.</td></tr>'}
