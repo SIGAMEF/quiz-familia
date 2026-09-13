@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Quiz de Estudio 2 - Química, Biología y Física</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        body {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+        }
+        .app-container {
+            background: #fff;
+            width: 100%;
+            max-width: 600px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            max-height: 95vh;
+        }
+        .header {
+            background: #d81b60;
+            color: white;
+            padding: 12px 15px;
+            text-align: center;
+            position: relative;
+        }
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .header-top h1 {
+            font-size: 1.1rem;
+            margin: 0;
+        }
+        .header-top .user-name {
+            font-size: 0.9rem;
+            background: rgba(255,255,255,0.2);
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-weight: bold;
+        }
+        .score-board {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            font-size: 0.85rem;
+            background: rgba(255,255,255,0.15);
+            padding: 5px 10px;
+            border-radius: 20px;
+            margin-top: 5px;
+        }
+        .score-board span {
+            font-weight: bold;
+        }
+        .correct-count { color: #a5d6a7; }
+        .incorrect-count { color: #ef9a9a; }
+
+        .content {
+            padding: 20px;
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Pantalla de inicio */
+        .start-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            gap: 20px;
+            height: 100%;
+        }
+        .start-screen input {
+            padding: 12px;
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            width: 80%;
+            font-size: 1rem;
+            text-align: center;
+        }
+        .btn {
+            background: #d81b60;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn:hover {
+            background: #ad1457;
+            transform: scale(1.02);
+        }
+        .btn:active {
+            transform: scale(0.98);
+        }
+        .btn-wa {
+            background: #25D366;
+            margin-top: 10px;
+        }
+        .btn-wa:hover {
+            background: #1ebe5d;
+        }
+
+        /* Pantalla de pregunta */
+        .question-screen {
+            display: none;
+            flex-direction: column;
+            gap: 15px;
+            height: 100%;
+        }
+        .question-text {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .option-btn {
+            background: #f0f0f0;
+            border: 2px solid #ddd;
+            border-radius: 12px;
+            padding: 12px 15px;
+            text-align: left;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+            color: #333;
+        }
+        .option-btn:hover:not(:disabled) {
+            background: #fce4ec;
+            border-color: #d81b60;
+        }
+        .option-btn.correct {
+            background: #c8e6c9;
+            border-color: #2e7d32;
+            color: #1b5e20;
+        }
+        .option-btn.incorrect {
+            background: #ffcdd2;
+            border-color: #c62828;
+            color: #b71c1c;
+        }
+        .option-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.8;
+        }
+        .feedback {
+            margin-top: 10px;
+            font-weight: bold;
+            text-align: center;
+            min-height: 24px;
+            font-size: 1rem;
+        }
+        .feedback.correct { color: #2e7d32; }
+        .feedback.incorrect { color: #c62828; }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #d81b60;
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        /* Reporte final */
+        .end-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 15px;
+            height: 100%;
+        }
+        .report-list {
+            width: 100%;
+            text-align: left;
+            max-height: 350px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            border-radius: 10px;
+            padding: 10px;
+            background: #fafafa;
+            margin-bottom: 10px;
+        }
+        .report-item {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            font-size: 0.85rem;
+        }
+        .report-item:last-child {
+            border-bottom: none;
+        }
+        .report-item .q {
+            font-weight: bold;
+            color: #333;
+        }
+        .report-item .a {
+            margin-top: 4px;
+        }
+        .report-item .a.correct {
+            color: #2e7d32;
+        }
+        .report-item .a.incorrect {
+            color: #c62828;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .app-container { border-radius: 0; max-height: 100vh; }
+            body { padding: 0; }
+            .header-top h1 { font-size: 0.95rem; }
+            .header-top .user-name { font-size: 0.8rem; padding: 3px 8px; }
+            .question-text { font-size: 1rem; }
+            .option-btn { font-size: 0.9rem; padding: 10px; }
+            .score-board { font-size: 0.75rem; gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container" id="app">
+    <!-- Encabezado con Nombre y Marcador -->
+    <div class="header">
+        <div class="header-top">
+            <h1>🧪 Quiz de Estudio 2</h1>
+            <div class="user-name" id="userNameDisplay">Invitado</div>
+        </div>
+        <div class="score-board">
+            <span>✅ <span class="correct-count" id="liveCorrect">0</span></span>
+            <span>❌ <span class="incorrect-count" id="liveIncorrect">0</span></span>
+            <span>📊 <span id="liveProgress">0/10</span></span>
+        </div>
+    </div>
+
+    <!-- Contenido Dinámico -->
+    <div class="content" id="content"></div>
+</div>
+
+<script>
+    // ============================================================
+    // BANCO DE PREGUNTAS (Extraído de los nuevos PDFs)
+    // ============================================================
+    const questionBank = [
+        // --- QUÍMICA ---
+        { tema: "quimica", pregunta: "La química es una ciencia natural y experimental que estudia a la ____.", opciones: ["materia", "energía", "velocidad", "fuerza"], correcta: 0 },
+        { tema: "quimica", pregunta: "Todo lo que existe, todo lo que nos rodea es ____.", opciones: ["materia", "átomo", "célula", "molécula"], correcta: 0 },
+        { tema: "quimica", pregunta: "El hombre primitivo descubre el ____ y se produce la primera reacción química.", opciones: ["fuego", "agua", "aire", "hierro"], correcta: 0 },
+        { tema: "quimica", pregunta: "Filósofos que propusieron la primera teoría atómica:", opciones: ["Leucipo y Demócrito", "Aristóteles y Platón", "Newton y Galileo", "Dalton y Thomson"], correcta: 0 },
+        { tema: "quimica", pregunta: "Leucipo y Demócrito fueron filósofos que nacieron en ____.", opciones: ["Grecia", "Roma", "Egipto", "Persia"], correcta: 0 },
+        { tema: "quimica", pregunta: "Personajes que buscaban el elixir de la vida y la piedra filosofal:", opciones: ["Alquimistas", "Químicos", "Físicos", "Astrónomos"], correcta: 0 },
+        { tema: "quimica", pregunta: "¿En qué cultura del antiguo Perú destacaron por sus textiles y tintes?", opciones: ["Paracas", "Chimú", "Inca", "Moche"], correcta: 0 },
+        { tema: "quimica", pregunta: "En el antiguo Perú, la cultura Chimú destacó en metalurgia con la aleación de oro, plata y ____.", opciones: ["cobre", "hierro", "bronce", "estaño"], correcta: 0 },
+        { tema: "quimica", pregunta: "Los incas destacaron en metalurgia con el ____.", opciones: ["bronce", "acero", "aluminio", "oro"], correcta: 0 },
+        { tema: "quimica", pregunta: "Se considera a Antoine Lavoisier como el padre de la química ____.", opciones: ["moderna", "antigua", "orgánica", "inorgánica"], correcta: 0 },
+        { tema: "quimica", pregunta: "Lavoisier nació en Francia en ____.", opciones: ["1743", "1643", "1843", "1543"], correcta: 0 },
+        { tema: "quimica", pregunta: "La química general estudia las leyes generales de la química, como la ley de la ____.", opciones: ["combustión", "gravedad", "termodinámica", "óptica"], correcta: 0 },
+        { tema: "quimica", pregunta: "El metano (CH4) es estudiado por la química ____.", opciones: ["inorgánica", "orgánica", "analítica", "física"], correcta: 0 },
+        { tema: "quimica", pregunta: "Rama de la química que estudia el átomo de carbono:", opciones: ["Química orgánica", "Química inorgánica", "Química analítica", "Bioquímica"], correcta: 0 },
+        { tema: "quimica", pregunta: "La fotosíntesis es un proceso estudiado por la ____.", opciones: ["Bioquímica", "Química inorgánica", "Química física", "Química analítica"], correcta: 0 },
+        { tema: "quimica", pregunta: "Rama de la química que estudia a los minerales:", opciones: ["Química inorgánica", "Química orgánica", "Bioquímica", "Química nuclear"], correcta: 0 },
+        { tema: "quimica", pregunta: "«Todos los cuerpos caen por efecto de la gravedad» corresponde a la química ____.", opciones: ["General", "Orgánica", "Inorgánica", "Analítica"], correcta: 0 },
+        { tema: "quimica", pregunta: "La glucosa (C6H12O6) es estudiada por la química ____.", opciones: ["Orgánica", "Inorgánica", "General", "Analítica"], correcta: 0 },
+        { tema: "quimica", pregunta: "El dióxido de carbono (CO2) es un compuesto estudiado por la química ____.", opciones: ["Inorgánica", "Orgánica", "General", "Analítica"], correcta: 0 },
+        { tema: "quimica", pregunta: "«Todos los cuerpos arden por la presencia del oxígeno» corresponde a una ley de la química ____.", opciones: ["General", "Orgánica", "Inorgánica", "Analítica"], correcta: 0 },
+        { tema: "quimica", pregunta: "Rama de la química que estudia los procesos químicos en los seres vivos:", opciones: ["Bioquímica", "Química orgánica", "Química inorgánica", "Química física"], correcta: 0 },
+        { tema: "quimica", pregunta: "¿Cuál es el primer paso del método científico?", opciones: ["Observación", "Hipótesis", "Experimentación", "Teoría"], correcta: 0 },
+        { tema: "quimica", pregunta: "Es una respuesta posible para el problema observado:", opciones: ["Hipótesis", "Teoría", "Ley", "Observación"], correcta: 0 },
+        { tema: "quimica", pregunta: "Paso del método científico donde la hipótesis se somete a experimentos:", opciones: ["Experimentación", "Observación", "Hipótesis", "Teoría"], correcta: 0 },
+        { tema: "quimica", pregunta: "Tienen validez hasta que son incapaces de explicar cualquier hecho o fenómeno de la naturaleza:", opciones: ["Teoría", "Ley", "Hipótesis", "Observación"], correcta: 0 },
+        { tema: "quimica", pregunta: "«Los dinosaurios se extinguieron por la caída de un meteorito» es un ejemplo de:", opciones: ["Hipótesis", "Teoría", "Ley", "Observación"], correcta: 0 },
+        { tema: "quimica", pregunta: "¿Cuáles son los sentidos que ayudan al científico a observar?", opciones: ["Vista, oído, olfato", "Tacto, gusto, vista", "Oído, gusto, tacto", "Vista, gusto, olfato"], correcta: 0 },
+        { tema: "quimica", pregunta: "«Las plantas son verdes por la presencia de clorofila» es un ejemplo de:", opciones: ["Teoría", "Ley", "Hipótesis", "Observación"], correcta: 0 },
+        { tema: "quimica", pregunta: "«Todos los cuerpos caen por efecto de la gravedad» es un ejemplo de:", opciones: ["Ley", "Teoría", "Hipótesis", "Observación"], correcta: 0 },
+        { tema: "quimica", pregunta: "Es todo lo que existe, ocupa un lugar en el espacio, posee masa y volumen:", opciones: ["Materia", "Energía", "Átomo", "Molécula"], correcta: 0 },
+        { tema: "quimica", pregunta: "Son sustancias simples constituidas por un solo tipo de átomo:", opciones: ["Elementos", "Compuestos", "Mezclas", "Soluciones"], correcta: 0 },
+        { tema: "quimica", pregunta: "El sodio (Na), hierro (Fe) y calcio (Ca) son ejemplos de:", opciones: ["Metales", "No metales", "Gases nobles", "Orgánicos"], correcta: 0 },
+        { tema: "quimica", pregunta: "El azufre (S), nitrógeno (N) y cloro (Cl) son ejemplos de:", opciones: ["No metales", "Metales", "Gases nobles", "Orgánicos"], correcta: 0 },
+        { tema: "quimica", pregunta: "El helio (He), argón (Ar) y neón (Ne) son ejemplos de:", opciones: ["Gases nobles", "Metales", "No metales", "Orgánicos"], correcta: 0 },
+        { tema: "quimica", pregunta: "La glucosa (C6H12O6), etanol (C2H5OH) y metano (CH4) son ejemplos de:", opciones: ["Orgánicos", "Inorgánicos", "Metales", "Gases nobles"], correcta: 0 },
+        { tema: "quimica", pregunta: "Es la resistencia que ofrece todo cuerpo a cambiar su estado de reposo o movimiento:", opciones: ["Inercia", "Impenetrabilidad", "Gravedad", "Divisibilidad"], correcta: 0 },
+        { tema: "quimica", pregunta: "Es la propiedad por la cual dos cuerpos no pueden ocupar el mismo espacio al mismo tiempo:", opciones: ["Impenetrabilidad", "Inercia", "Gravedad", "Divisibilidad"], correcta: 0 },
+        { tema: "quimica", pregunta: "Es una enorme fuerza con la cual la Tierra atrae a un cuerpo hacia su centro:", opciones: ["Gravedad", "Inercia", "Impenetrabilidad", "Divisibilidad"], correcta: 0 },
+        { tema: "quimica", pregunta: "Propiedad por la cual los cuerpos pueden dividirse en pedazos cada vez más pequeños:", opciones: ["Divisibilidad", "Inercia", "Impenetrabilidad", "Gravedad"], correcta: 0 },
+
+        // --- BIOLOGÍA ---
+        { tema: "biologia", pregunta: "Es el conjunto de reacciones químicas que permiten a los seres vivos intercambiar sustancias con su medio:", opciones: ["Metabolismo", "Reproducción", "Crecimiento", "Nutrición"], correcta: 0 },
+        { tema: "biologia", pregunta: "En el anabolismo, se construyen moléculas ____ a partir de moléculas simples.", opciones: ["complejas", "simples", "inorgánicas", "pequeñas"], correcta: 0 },
+        { tema: "biologia", pregunta: "En el catabolismo, se descomponen moléculas complejas en moléculas ____.", opciones: ["simples", "complejas", "orgánicas", "grandes"], correcta: 0 },
+        { tema: "biologia", pregunta: "La fotosíntesis corresponde a la fase del metabolismo llamada:", opciones: ["Anabolismo", "Catabolismo", "Respiración", "Digestión"], correcta: 0 },
+        { tema: "biologia", pregunta: "La respiración celular corresponde a la fase del metabolismo llamada:", opciones: ["Catabolismo", "Anabolismo", "Fotosíntesis", "Síntesis"], correcta: 0 },
+        { tema: "biologia", pregunta: "Es la función mediante la cual los seres vivos originan nuevos seres semejantes a sus padres:", opciones: ["Reproducción", "Metabolismo", "Crecimiento", "Nutrición"], correcta: 0 },
+        { tema: "biologia", pregunta: "En organismos unicelulares, el crecimiento es el aumento en el ____ celular.", opciones: ["tamaño", "número", "peso", "volumen"], correcta: 0 },
+        { tema: "biologia", pregunta: "En organismos pluricelulares, el crecimiento es el aumento en el número de ____.", opciones: ["células", "órganos", "tejidos", "sistemas"], correcta: 0 },
+        { tema: "biologia", pregunta: "¿Por qué los virus no son considerados seres vivos?", opciones: ["No se nutren ni se relacionan por sí mismos", "Son muy pequeños", "No tienen ADN", "Son microscópicos"], correcta: 0 },
+        { tema: "biologia", pregunta: "Los virus necesitan obligatoriamente la intervención de una ____ para reproducirse.", opciones: ["célula", "bacteria", "proteína", "molécula"], correcta: 0 },
+        { tema: "biologia", pregunta: "La estructura de los virus consta de una molécula de información genética y una cápsula de ____.", opciones: ["proteínas", "lípidos", "carbohidratos", "agua"], correcta: 0 },
+        { tema: "biologia", pregunta: "Ante una enfermedad viral, ¿es recomendable tomar antibióticos?", opciones: ["No, porque los antibióticos matan bacterias, no virus", "Sí, siempre", "Solo si hay fiebre", "Depende del virus"], correcta: 0 },
+        { tema: "biologia", pregunta: "La nutrición que realizan las plantas se conoce como:", opciones: ["Autótrofa", "Heterótrofa", "Mixótrofa", "Holozóica"], correcta: 0 },
+        { tema: "biologia", pregunta: "Característica por la cual los seres vivos se relacionan mediante estímulos y respuestas:", opciones: ["Relación", "Nutrición", "Metabolismo", "Crecimiento"], correcta: 0 },
+        { tema: "biologia", pregunta: "Característica por la cual los seres vivos intercambian sustancias con su medio ambiente:", opciones: ["Nutrición", "Relación", "Reproducción", "Crecimiento"], correcta: 0 },
+        { tema: "biologia", pregunta: "No forma parte del nivel biológico:", opciones: ["Átomo", "Célula", "Tejido", "Órgano"], correcta: 0 },
+        { tema: "biologia", pregunta: "Tipo de reproducción en la que participan gametos:", opciones: ["Sexual", "Asexual", "Partenogénesis", "Fragmentación"], correcta: 0 },
+        { tema: "biologia", pregunta: "La ciencia que clasifica a los seres vivos se denomina:", opciones: ["Taxonomía", "Biología", "Ecología", "Genética"], correcta: 0 },
+        { tema: "biologia", pregunta: "A Carlos Linneo se le considera el Padre de la:", opciones: ["Taxonomía", "Biología", "Genética", "Ecología"], correcta: 0 },
+        { tema: "biologia", pregunta: "¿Quién propuso los cinco reinos?", opciones: ["Robert Whittaker", "Carl Woese", "Ernst Haeckel", "Aristóteles"], correcta: 0 },
+        { tema: "biologia", pregunta: "¿Quién propuso un sexto reino (Arqueobacterias)?", opciones: ["Carl Woese", "Robert Whittaker", "Ernst Haeckel", "Aristóteles"], correcta: 0 },
+        { tema: "biologia", pregunta: "El reino más primitivo y menos evolucionado es:", opciones: ["Monera", "Protista", "Fungi", "Animalia"], correcta: 0 },
+        { tema: "biologia", pregunta: "El reino Monera está integrado por:", opciones: ["Bacterias y cianobacterias", "Protozoarios y algas", "Hongos y levaduras", "Plantas y animales"], correcta: 0 },
+        { tema: "biologia", pregunta: "Las células del reino Monera se denominan:", opciones: ["Procariotas", "Eucariotas", "Pluricelulares", "Unicelulares"], correcta: 0 },
+        { tema: "biologia", pregunta: "El reino Protista está integrado por:", opciones: ["Algas y protozoarios", "Bacterias y hongos", "Plantas y animales", "Virus y bacterias"], correcta: 0 },
+        { tema: "biologia", pregunta: "Las algas tienen nutrición:", opciones: ["Autótrofa", "Heterótrofa", "Mixótrofa", "Saprófita"], correcta: 0 },
+        { tema: "biologia", pregunta: "Los protozoarios tienen nutrición:", opciones: ["Heterótrofa", "Autótrofa", "Mixótrofa", "Fotosintética"], correcta: 0 },
+        { tema: "biologia", pregunta: "El reino Fungi está integrado por:", opciones: ["Hongos", "Algas", "Bacterias", "Protozoos"], correcta: 0 },
+        { tema: "biologia", pregunta: "Los hongos tienen nutrición:", opciones: ["Heterótrofa", "Autótrofa", "Mixótrofa", "Fotosintética"], correcta: 0 },
+        { tema: "biologia", pregunta: "El reino Plantae tiene nutrición:", opciones: ["Autótrofa", "Heterótrofa", "Mixótrofa", "Saprófita"], correcta: 0 },
+        { tema: "biologia", pregunta: "El reino más evolucionado es:", opciones: ["Animal", "Vegetal", "Fungi", "Monera"], correcta: 0 },
+        { tema: "biologia", pregunta: "Las bacterias son seres:", opciones: ["Unicelulares", "Pluricelulares", "Multicelulares", "Coloniales"], correcta: 0 },
+        { tema: "biologia", pregunta: "Las bacterias se reproducen de forma asexual por:", opciones: ["Bipartición", "Gemación", "Esporulación", "Fragmentación"], correcta: 0 },
+        { tema: "biologia", pregunta: "Las bacterias con forma redonda se denominan:", opciones: ["Cocos", "Bacilos", "Espirilos", "Vibrios"], correcta: 0 },
+        { tema: "biologia", pregunta: "Las bacterias con forma ovalada se denominan:", opciones: ["Bacilos", "Cocos", "Espirilos", "Vibrios"], correcta: 0 },
+        { tema: "biologia", pregunta: "Las bacterias con forma espiralada se denominan:", opciones: ["Espirilos", "Cocos", "Bacilos", "Vibrios"], correcta: 0 },
+        { tema: "biologia", pregunta: "Estructura bacteriana que permite la síntesis de proteínas:", opciones: ["Ribosomas", "Flagelo", "Pared celular", "Cápsula"], correcta: 0 },
+        { tema: "biologia", pregunta: "Estructura que usa la bacteria para desplazarse:", opciones: ["Flagelo", "Ribosoma", "Pared celular", "ADN"], correcta: 0 },
+        { tema: "biologia", pregunta: "Son las únicas bacterias capaces de realizar fotosíntesis:", opciones: ["Cianobacterias", "Cocos", "Bacilos", "Espirilos"], correcta: 0 },
+        { tema: "biologia", pregunta: "El Nostoc es llamado comúnmente:", opciones: ["Cushuro", "Yuyo", "Alga", "Hongo"], correcta: 0 },
+        { tema: "biologia", pregunta: "Las arqueobacterias son un grupo de microorganismos:", opciones: ["Unicelulares", "Pluricelulares", "Multicelulares", "Coloniales"], correcta: 0 },
+        { tema: "biologia", pregunta: "Las arqueobacterias poseen genes más cercanos a los de las células:", opciones: ["Eucariotas", "Procariotas", "Bacterias", "Virus"], correcta: 0 },
+        { tema: "biologia", pregunta: "Los protozoarios también son llamados:", opciones: ["Protozoos", "Algas", "Hongos", "Bacterias"], correcta: 0 },
+        { tema: "biologia", pregunta: "Los protozoarios son:", opciones: ["Unicelulares y microscópicos", "Pluricelulares", "Multicelulares", "Coloniales"], correcta: 0 },
+        { tema: "biologia", pregunta: "Los protozoarios con cilios se denominan:", opciones: ["Ciliados", "Flagelados", "Sarcodinos", "Esporozoos"], correcta: 0 },
+        { tema: "biologia", pregunta: "Los protozoarios que utilizan pseudópodos se denominan:", opciones: ["Sarcodinos", "Ciliados", "Flagelados", "Esporozoos"], correcta: 0 },
+        { tema: "biologia", pregunta: "Los protozoarios que utilizan flagelos se denominan:", opciones: ["Flagelados", "Ciliados", "Sarcodinos", "Esporozoos"], correcta: 0 },
+        { tema: "biologia", pregunta: "Los protozoarios parásitos que producen esporas se denominan:", opciones: ["Esporozoos", "Ciliados", "Flagelados", "Sarcodinos"], correcta: 0 },
+        { tema: "biologia", pregunta: "La malaria o paludismo es causada por:", opciones: ["Esporozoos", "Ciliados", "Flagelados", "Sarcodinos"], correcta: 0 },
+        { tema: "biologia", pregunta: "El árbol de la quina se usa para curar:", opciones: ["Paludismo", "Tuberculosis", "Cólera", "Tétano"], correcta: 0 },
+        { tema: "biologia", pregunta: "La quinina se extrae de la corteza del árbol de la ____.", opciones: ["quina", "coca", "eucalipto", "cedro"], correcta: 0 },
+        { tema: "biologia", pregunta: "El reino Fungi está integrado por:", opciones: ["Hongos", "Algas", "Protozoos", "Bacterias"], correcta: 0 },
+        { tema: "biologia", pregunta: "El antibiótico penicilina se elabora a partir de un hongo llamado:", opciones: ["Penicillium", "Aspergillus", "Candida", "Mucor"], correcta: 0 },
+        { tema: "biologia", pregunta: "La ciencia que estudia a los hongos se llama:", opciones: ["Micología", "Botánica", "Zoología", "Ecología"], correcta: 0 },
+        { tema: "biologia", pregunta: "Cualquier enfermedad producida por hongos se llama:", opciones: ["Micosis", "Bacteriosis", "Virosis", "Parasitosis"], correcta: 0 },
+        { tema: "biologia", pregunta: "Los hongos que se utilizan para elaborar cerveza, vino y pan son:", opciones: ["Levaduras", "Mohos", "Champiñones", "Setas"], correcta: 0 },
+        { tema: "biologia", pregunta: "El champiñón pertenece al grupo de los:", opciones: ["Basidiomicetos", "Ascomicetos", "Cigomicetos", "Deuteromicetos"], correcta: 0 },
+        { tema: "biologia", pregunta: "El moho negro del pan pertenece al grupo de los:", opciones: ["Cigomicetos", "Basidiomicetos", "Ascomicetos", "Deuteromicetos"], correcta: 0 },
+        { tema: "biologia", pregunta: "Los hongos imperfectos que causan enfermedades como el pie de atleta son:", opciones: ["Deuteromicetos", "Basidiomicetos", "Ascomicetos", "Cigomicetos"], correcta: 0 },
+        { tema: "biologia", pregunta: "La relación entre un hongo y un alga se denomina:", opciones: ["Líquenes", "Micorriza", "Simbiosis", "Parasitismo"], correcta: 0 },
+        { tema: "biologia", pregunta: "La relación entre un hongo y las raíces de una planta se denomina:", opciones: ["Micorriza", "Líquenes", "Simbiosis", "Parasitismo"], correcta: 0 },
+        { tema: "biologia", pregunta: "La tiña es causada por un:", opciones: ["Hongo", "Gusano", "Virus", "Bacteria"], correcta: 0 },
+        { tema: "biologia", pregunta: "El pie de atleta es un tipo de:", opciones: ["Tiña podal", "Tiña corporal", "Tiña de la cabeza", "Tiña inguinal"], correcta: 0 },
+        { tema: "biologia", pregunta: "Las plantas son seres:", opciones: ["Eucariotas pluricelulares", "Procariotas unicelulares", "Eucariotas unicelulares", "Procariotas pluricelulares"], correcta: 0 },
+        { tema: "biologia", pregunta: "El pigmento verde de las plantas se llama:", opciones: ["Clorofila", "Hemoglobina", "Melanina", "Caroteno"], correcta: 0 },
+        { tema: "biologia", pregunta: "Las plantas sin flores se clasifican en:", opciones: ["Musgos y helechos", "Gimnospermas y angiospermas", "Monocotiledóneas y dicotiledóneas", "Algas y hongos"], correcta: 0 },
+        { tema: "biologia", pregunta: "Las plantas con flores se clasifican en:", opciones: ["Gimnospermas y angiospermas", "Musgos y helechos", "Algas y hongos", "Briofitas y pteridofitas"], correcta: 0 },
+        { tema: "biologia", pregunta: "Los pinos, abetos y cedro son ejemplos de:", opciones: ["Gimnospermas", "Angiospermas", "Musgos", "Helechos"], correcta: 0 },
+        { tema: "biologia", pregunta: "El rosal, geranio y puya Raymondi son ejemplos de:", opciones: ["Angiospermas", "Gimnospermas", "Musgos", "Helechos"], correcta: 0 },
+        { tema: "biologia", pregunta: "La raíz de la planta cumple la función de:", opciones: ["Fijar la planta y absorber agua", "Realizar la fotosíntesis", "Transportar savia", "Reproducir la planta"], correcta: 0 },
+        { tema: "biologia", pregunta: "El tallo de la planta cumple la función de:", opciones: ["Sostener y conducir sustancias", "Fijar la planta", "Absorber agua", "Realizar la fotosíntesis"], correcta: 0 },
+        { tema: "biologia", pregunta: "La hoja de la planta cumple la función de:", opciones: ["Transformar energía luminosa en química", "Fijar la planta", "Absorber agua", "Reproducir la planta"], correcta: 0 },
+        { tema: "biologia", pregunta: "La flor es el órgano:", opciones: ["Reproductor de la planta", "De sostén", "De absorción", "De fotosíntesis"], correcta: 0 },
+        { tema: "biologia", pregunta: "El fruto es el ovario de la flor maduro luego de la:", opciones: ["Fecundación", "Fotosíntesis", "Germinación", "Polinización"], correcta: 0 },
+        { tema: "biologia", pregunta: "La semilla contiene el ____ a partir del cual puede desarrollarse una nueva planta.", opciones: ["Embrión", "Fruto", "Ovario", "Tallo"], correcta: 0 },
+        { tema: "biologia", pregunta: "La planta carnívora más grande del mundo es la:", opciones: ["Nepenthes rajah", "Venus atrapamoscas", "Dionaea", "Sarracenia"], correcta: 0 },
+        { tema: "biologia", pregunta: "La Nepenthes rajah puede almacenar hasta ____ litros de agua.", opciones: ["2", "1", "3", "4"], correcta: 0 },
+        { tema: "biologia", pregunta: "El reino animal es el más:", opciones: ["Evolucionado", "Primitivo", "Simple", "Pequeño"], correcta: 0 },
+        { tema: "biologia", pregunta: "Los animales tienen nutrición:", opciones: ["Heterótrofa", "Autótrofa", "Mixótrofa", "Fotosintética"], correcta: 0 },
+        { tema: "biologia", pregunta: "Los animales que presentan columna vertebral se llaman:", opciones: ["Vertebrados", "Invertebrados", "Ovíparos", "Vivíparos"], correcta: 0 },
+        { tema: "biologia", pregunta: "Los animales que no presentan columna vertebral se llaman:", opciones: ["Invertebrados", "Vertebrados", "Ovíparos", "Vivíparos"], correcta: 0 },
+        { tema: "biologia", pregunta: "Las esponjas de mar pertenecen al grupo de los:", opciones: ["Poríferos", "Celentéreos", "Nematodos", "Anélidos"], correcta: 0 },
+        { tema: "biologia", pregunta: "Las medusas pertenecen al grupo de los:", opciones: ["Celentéreos", "Poríferos", "Nematodos", "Anélidos"], correcta: 0 },
+        { tema: "biologia", pregunta: "La lombriz de tierra pertenece al grupo de los:", opciones: ["Anélidos", "Poríferos", "Nematodos", "Moluscos"], correcta: 0 },
+        { tema: "biologia", pregunta: "El caracol, babosa y pulpo pertenecen al grupo de los:", opciones: ["Moluscos", "Anélidos", "Artrópodos", "Equinodermos"], correcta: 0 },
+        { tema: "biologia", pregunta: "Los insectos, arácnidos y crustáceos pertenecen al grupo de los:", opciones: ["Artrópodos", "Moluscos", "Anélidos", "Equinodermos"], correcta: 0 },
+        { tema: "biologia", pregunta: "La estrella de mar pertenece al grupo de los:", opciones: ["Equinodermos", "Artrópodos", "Moluscos", "Anélidos"], correcta: 0 },
+        { tema: "biologia", pregunta: "El tiburón, bonito y anchoveta son ejemplos de:", opciones: ["Peces", "Anfibios", "Reptiles", "Aves"], correcta: 0 },
+        { tema: "biologia", pregunta: "El sapo y la rana son ejemplos de:", opciones: ["Anfibios", "Peces", "Reptiles", "Aves"], correcta: 0 },
+        { tema: "biologia", pregunta: "La tortuga, serpiente y dragón de Komodo son ejemplos de:", opciones: ["Reptiles", "Anfibios", "Peces", "Aves"], correcta: 0 },
+        { tema: "biologia", pregunta: "El pingüino, búho y avestruz son ejemplos de:", opciones: ["Aves", "Reptiles", "Anfibios", "Peces"], correcta: 0 },
+        { tema: "biologia", pregunta: "La ballena, delfín y marsopas son ejemplos de:", opciones: ["Cetáceos", "Peces", "Anfibios", "Reptiles"], correcta: 0 },
+        { tema: "biologia", pregunta: "El pulpo imitador puede imitar a más de ____ animales marinos.", opciones: ["15", "5", "10", "20"], correcta: 0 },
+        { tema: "biologia", pregunta: "El nombre científico del pulpo imitador es:", opciones: ["Thaumoctopus mimicus", "Octopus vulgaris", "Sepia officinalis", "Loligo vulgaris"], correcta: 0 },
+        { tema: "biologia", pregunta: "El pulpo imitador puede medir hasta ____ cm de longitud.", opciones: ["60", "30", "90", "45"], correcta: 0 },
+
+        // --- FÍSICA ---
+        { tema: "fisica", pregunta: "La palabra física proviene del griego PHYSIS que significa:", opciones: ["Naturaleza", "Movimiento", "Energía", "Materia"], correcta: 0 },
+        { tema: "fisica", pregunta: "La mecánica estudia:", opciones: ["El movimiento", "La luz", "El sonido", "El calor"], correcta: 0 },
+        { tema: "fisica", pregunta: "La óptica estudia:", opciones: ["Los fenómenos de la luz", "El movimiento", "El sonido", "El calor"], correcta: 0 },
+        { tema: "fisica", pregunta: "La acústica estudia:", opciones: ["Los fenómenos relacionados con el sonido", "La luz", "El movimiento", "El calor"], correcta: 0 },
+        { tema: "fisica", pregunta: "La termodinámica estudia:", opciones: ["Los fenómenos relacionados con el calor", "La luz", "El sonido", "El movimiento"], correcta: 0 },
+        { tema: "fisica", pregunta: "La electricidad estudia:", opciones: ["La carga eléctrica", "Los imanes", "La luz", "El sonido"], correcta: 0 },
+        { tema: "fisica", pregunta: "El magnetismo estudia:", opciones: ["A los imanes", "La carga eléctrica", "La luz", "El sonido"], correcta: 0 },
+        { tema: "fisica", pregunta: "El electromagnetismo estudia:", opciones: ["La relación entre electricidad y magnetismo", "La luz", "El sonido", "El calor"], correcta: 0 },
+        { tema: "fisica", pregunta: "Es comparar una cantidad con otra (generalmente llamado patrón):", opciones: ["Medir", "Magnitud", "Unidad", "Instrumento"], correcta: 0 },
+        { tema: "fisica", pregunta: "La unidad de longitud en el SI es:", opciones: ["Metro", "Kilogramo", "Segundo", "Kelvin"], correcta: 0 },
+        { tema: "fisica", pregunta: "La unidad de masa en el SI es:", opciones: ["Kilogramo", "Metro", "Segundo", "Kelvin"], correcta: 0 },
+        { tema: "fisica", pregunta: "La unidad de tiempo en el SI es:", opciones: ["Segundo", "Metro", "Kilogramo", "Kelvin"], correcta: 0 },
+        { tema: "fisica", pregunta: "La unidad de temperatura en el SI es:", opciones: ["Kelvin", "Metro", "Kilogramo", "Segundo"], correcta: 0 },
+        { tema: "fisica", pregunta: "La unidad de intensidad de corriente en el SI es:", opciones: ["Amperio", "Metro", "Kilogramo", "Segundo"], correcta: 0 },
+        { tema: "fisica", pregunta: "La unidad de intensidad luminosa en el SI es:", opciones: ["Candela", "Amperio", "Metro", "Kilogramo"], correcta: 0 },
+        { tema: "fisica", pregunta: "La unidad de cantidad de sustancia en el SI es:", opciones: ["Mol", "Candela", "Amperio", "Metro"], correcta: 0 },
+        { tema: "fisica", pregunta: "1 km equivale a ____ metros.", opciones: ["1000", "100", "10", "10000"], correcta: 0 },
+        { tema: "fisica", pregunta: "1 m equivale a ____ cm.", opciones: ["100", "10", "1000", "10000"], correcta: 0 },
+        { tema: "fisica", pregunta: "1 kg equivale a ____ gramos.", opciones: ["1000", "100", "10", "10000"], correcta: 0 },
+        { tema: "fisica", pregunta: "1 tonelada equivale a ____ kg.", opciones: ["1000", "100", "10", "10000"], correcta: 0 },
+        { tema: "fisica", pregunta: "1 hora equivale a ____ minutos.", opciones: ["60", "30", "100", "24"], correcta: 0 },
+        { tema: "fisica", pregunta: "1 minuto equivale a ____ segundos.", opciones: ["60", "30", "100", "24"], correcta: 0 },
+        { tema: "fisica", pregunta: "1 hora equivale a ____ segundos.", opciones: ["3600", "60", "600", "360"], correcta: 0 },
+        { tema: "fisica", pregunta: "La magnitud derivada que se mide en Joule (J) es:", opciones: ["Energía", "Fuerza", "Presión", "Volumen"], correcta: 0 },
+        { tema: "fisica", pregunta: "La magnitud derivada que se mide en m/s² es:", opciones: ["Aceleración", "Velocidad", "Área", "Volumen"], correcta: 0 },
+        { tema: "fisica", pregunta: "La magnitud derivada que se mide en m/s es:", opciones: ["Velocidad", "Aceleración", "Área", "Volumen"], correcta: 0 },
+        { tema: "fisica", pregunta: "La magnitud derivada que se mide en m² es:", opciones: ["Área", "Volumen", "Velocidad", "Aceleración"], correcta: 0 },
+        { tema: "fisica", pregunta: "La magnitud derivada que se mide en m³ es:", opciones: ["Volumen", "Área", "Velocidad", "Aceleración"], correcta: 0 },
+        { tema: "fisica", pregunta: "La magnitud derivada que se mide en Newton (N) es:", opciones: ["Fuerza", "Energía", "Presión", "Volumen"], correcta: 0 },
+        { tema: "fisica", pregunta: "La magnitud derivada que se mide en Pascal (Pa) es:", opciones: ["Presión", "Fuerza", "Energía", "Volumen"], correcta: 0 },
+        { tema: "fisica", pregunta: "Es todo lo que realiza movimiento mecánico:", opciones: ["Móvil", "Recorrido", "Desplazamiento", "Trayectoria"], correcta: 0 },
+        { tema: "fisica", pregunta: "Es la medida de la trayectoria:", opciones: ["Recorrido", "Desplazamiento", "Móvil", "Velocidad"], correcta: 0 },
+        { tema: "fisica", pregunta: "Es la línea que une el punto inicial y el final:", opciones: ["Desplazamiento", "Recorrido", "Trayectoria", "Móvil"], correcta: 0 },
+        { tema: "fisica", pregunta: "El movimiento rectilíneo es aquel que describe una trayectoria:", opciones: ["Recta", "Circular", "Parabólica", "Curva"], correcta: 0 },
+        { tema: "fisica", pregunta: "El movimiento circular es aquel que describe una trayectoria:", opciones: ["Circular", "Recta", "Parabólica", "Curva"], correcta: 0 },
+        { tema: "fisica", pregunta: "El movimiento parabólico es aquel que describe una trayectoria:", opciones: ["Parabólica", "Recta", "Circular", "Curva"], correcta: 0 },
+        { tema: "fisica", pregunta: "La unidad del desplazamiento según el SI es:", opciones: ["Metro", "Kilogramo", "Segundo", "Kelvin"], correcta: 0 },
+        { tema: "fisica", pregunta: "La unidad de la velocidad en el SI es:", opciones: ["m/s", "m/s²", "m", "s"], correcta: 0 },
+        { tema: "fisica", pregunta: "El movimiento de rotación de la Tierra sobre su propio eje tarda:", opciones: ["24 horas", "12 horas", "365 días", "30 días"], correcta: 0 },
+        { tema: "fisica", pregunta: "El movimiento de rotación determina la existencia de:", opciones: ["Los días y las noches", "Las estaciones", "Los años", "Los meses"], correcta: 0 },
+        { tema: "fisica", pregunta: "El eje terrestre es una línea imaginaria que pasa por el:", opciones: ["Centro del planeta", "Ecuador", "Polo norte", "Trópico"], correcta: 0 },
+        { tema: "fisica", pregunta: "La Tierra tiene más de ____ millones de habitantes.", opciones: ["7.000", "6.500", "7.500", "6.980"], correcta: 0 },
+        { tema: "fisica", pregunta: "La montaña más alta de la Tierra es el:", opciones: ["Everest", "Mont Blanc", "Kilimanjaro", "Aconcagua"], correcta: 0 },
+        { tema: "fisica", pregunta: "El punto más profundo de la Tierra es la fosa de las:", opciones: ["Marianas", "Nazaré", "Tonga", "Japón"], correcta: 0 },
+        { tema: "fisica", pregunta: "La temperatura más alta registrada en la Tierra ha sido de:", opciones: ["60°C", "56°C", "62°C", "-90°C"], correcta: 0 },
+        { tema: "fisica", pregunta: "La temperatura más baja registrada en la Tierra ha sido de:", opciones: ["-90°C", "-60°C", "-56°C", "-100°C"], correcta: 0 },
+        { tema: "fisica", pregunta: "La Tierra es el ____ planeta más cercano al sol.", opciones: ["tercer", "primer", "segundo", "cuarto"], correcta: 0 },
+        { tema: "fisica", pregunta: "La Tierra es el quinto planeta más ____ del sistema solar.", opciones: ["grande", "pequeño", "cercano", "lejano"], correcta: 0 },
+        { tema: "fisica", pregunta: "El porcentaje de agua en la Tierra es de:", opciones: ["70%", "30%", "50%", "90%"], correcta: 0 },
+        { tema: "fisica", pregunta: "El porcentaje de tierra en la Tierra es de:", opciones: ["30%", "70%", "50%", "10%"], correcta: 0 },
+        { tema: "fisica", pregunta: "La Tierra es el único planeta que cuenta con:", opciones: ["Vida", "Agua", "Atmósfera", "Luna"], correcta: 0 },
+        { tema: "fisica", pregunta: "El movimiento de rotación se realiza en ____ horas.", opciones: ["24", "12", "48", "36"], correcta: 0 },
+        { tema: "fisica", pregunta: "Un día equivale a ____ horas.", opciones: ["24", "12", "48", "36"], correcta: 0 }
+    ];
+
+    // ============================================================
+    // LÓGICA DEL QUIZ
+    // ============================================================
+    const QUESTIONS_PER_ROUND = 10;
+    let currentQuestions = [];
+    let currentIndex = 0;
+    let correctCount = 0;
+    let incorrectCount = 0;
+    let userAnswers = [];
+    let userName = "";
+
+    const content = document.getElementById('content');
+    const liveCorrect = document.getElementById('liveCorrect');
+    const liveIncorrect = document.getElementById('liveIncorrect');
+    const liveProgress = document.getElementById('liveProgress');
+    const userNameDisplay = document.getElementById('userNameDisplay');
+
+    function shuffleArray(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    }
+
+    function getRandomQuestions(n) {
+        const shuffled = shuffleArray([...questionBank]);
+        return shuffled.slice(0, n);
+    }
+
+    function updateScoreBoard() {
+        liveCorrect.textContent = correctCount;
+        liveIncorrect.textContent = incorrectCount;
+        liveProgress.textContent = `${currentIndex}/${QUESTIONS_PER_ROUND}`;
+    }
+
+    // Pantalla de inicio (solo pide nombre si no está definido)
+    function renderStart() {
+        if (userName) {
+            startQuiz();
+            return;
+        }
+        content.innerHTML = `
+            <div class="start-screen">
+                <h2>¡Bienvenido al Quiz 2!</h2>
+                <p style="color:#666; font-size:0.9rem;">Pon a prueba tus conocimientos de Química, Biología y Física.</p>
+                <input type="text" id="nameInput" placeholder="Escribe tu nombre" maxlength="20">
+                <button class="btn" id="startBtn">🚀 Comenzar</button>
+            </div>
+        `;
+        document.getElementById('startBtn').addEventListener('click', () => {
+            const name = document.getElementById('nameInput').value.trim();
+            if (!name) {
+                alert("Por favor, ingresa tu nombre para comenzar.");
+                return;
+            }
+            userName = name;
+            userNameDisplay.textContent = userName;
+            startQuiz();
+        });
+    }
+
+    function startQuiz() {
+        currentQuestions = getRandomQuestions(QUESTIONS_PER_ROUND);
+        currentIndex = 0;
+        correctCount = 0;
+        incorrectCount = 0;
+        userAnswers = [];
+        updateScoreBoard();
+        renderQuestion();
+    }
+
+    function renderQuestion() {
+        if (currentIndex >= currentQuestions.length) {
+            renderEnd();
+            return;
+        }
+
+        const q = currentQuestions[currentIndex];
+        const progressPercent = (currentIndex / QUESTIONS_PER_ROUND) * 100;
+
+        const optionsWithIndex = q.opciones.map((opt, idx) => ({ text: opt, originalIndex: idx }));
+        const shuffledOptions = shuffleArray([...optionsWithIndex]);
+
+        let optionsHtml = '';
+        shuffledOptions.forEach((opt) => {
+            if (opt.text.trim() === "") return;
+            optionsHtml += `<button class="option-btn" data-index="${opt.originalIndex}">${opt.text}</button>`;
+        });
+
+        content.innerHTML = `
+            <div class="question-screen" style="display:flex;">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width:${progressPercent}%"></div>
+                </div>
+                <div class="question-text">${currentIndex + 1}. ${q.pregunta}</div>
+                <div class="options" id="optionsContainer">
+                    ${optionsHtml}
+                </div>
+                <div class="feedback" id="feedback"></div>
+            </div>
+        `;
+
+        const optionButtons = document.querySelectorAll('.option-btn');
+        optionButtons.forEach(btn => {
+            btn.addEventListener('click', () => handleAnswer(btn, q));
+        });
+    }
+
+    function handleAnswer(selectedBtn, question) {
+        const allButtons = document.querySelectorAll('.option-btn');
+        allButtons.forEach(btn => btn.disabled = true);
+
+        const selectedIndex = parseInt(selectedBtn.dataset.index);
+        const isCorrect = selectedIndex === question.correcta;
+        const feedbackEl = document.getElementById('feedback');
+
+        if (isCorrect) {
+            selectedBtn.classList.add('correct');
+            feedbackEl.textContent = "¡Excelente! 🎉 Respuesta correcta.";
+            feedbackEl.className = "feedback correct";
+            correctCount++;
+            allButtons.forEach(btn => {
+                if (parseInt(btn.dataset.index) === question.correcta) {
+                    btn.classList.add('correct');
+                }
+            });
+        } else {
+            selectedBtn.classList.add('incorrect');
+            feedbackEl.textContent = "¡Uy, te equivocaste! 😅 La respuesta correcta era: " + question.opciones[question.correcta];
+            feedbackEl.className = "feedback incorrect";
+            incorrectCount++;
+            allButtons.forEach(btn => {
+                if (parseInt(btn.dataset.index) === question.correcta) {
+                    btn.classList.add('correct');
+                }
+            });
+        }
+
+        userAnswers.push({
+            pregunta: question.pregunta,
+            seleccionada: question.opciones[selectedIndex],
+            correcta: question.opciones[question.correcta],
+            esCorrecta: isCorrect,
+            tema: question.tema
+        });
+
+        updateScoreBoard();
+
+        setTimeout(() => {
+            currentIndex++;
+            updateScoreBoard();
+            renderQuestion();
+        }, 1800);
+    }
+
+    function renderEnd() {
+        const total = userAnswers.length;
+        const percentage = Math.round((correctCount / total) * 100);
+        let mensaje = "";
+        if (percentage >= 90) mensaje = "¡Eres un genio! 🏆";
+        else if (percentage >= 70) mensaje = "¡Muy bien! Sigue así. 🌟";
+        else if (percentage >= 50) mensaje = "Buen intento, puedes mejorar. 💪";
+        else mensaje = "No te desanimes, ¡repasa y vuelve a intentarlo! 📚";
+
+        let reportHtml = '';
+        userAnswers.forEach((ans, i) => {
+            const clase = ans.esCorrecta ? 'correct' : 'incorrect';
+            const icono = ans.esCorrecta ? '✅' : '❌';
+            reportHtml += `
+                <div class="report-item">
+                    <div class="q">${i+1}. ${ans.pregunta}</div>
+                    <div class="a ${clase}">${icono} Tu respuesta: ${ans.seleccionada} | Correcta: ${ans.correcta}</div>
+                </div>
+            `;
+        });
+
+        // Reporte de WhatsApp (solo resumen, sin detalle)
+        const notaFinal = Math.round((correctCount / total) * 10);
+        let textoWA = `📝 *REPORTE DE QUIZ 2*\n`;
+        textoWA += `━━━━━━━━━━━━━━━━━━\n`;
+        textoWA += `👤 *Alumno:* ${userName}\n`;
+        textoWA += `🔁 *Intento:* 1\n`;
+        textoWA += `📋 *Preguntas:* ${total}\n`;
+        textoWA += `✅ *Acertadas:* ${correctCount}\n`;
+        textoWA += `❌ *Erradas:* ${incorrectCount}\n`;
+        textoWA += `🎯 *Nota:* ${notaFinal}/10\n`;
+        textoWA += `━━━━━━━━━━━━━━━━━━\n`;
+        textoWA += `📱 _Generado por Quiz de Estudio_`;
+
+        content.innerHTML = `
+            <div class="end-screen" style="display:flex;">
+                <h2>${mensaje}</h2>
+                <p style="font-size:1.1rem;"><strong>${userName}</strong>, tu puntaje fue: <strong>${correctCount}/${total}</strong> (${percentage}%)</p>
+                <div class="report-list">
+                    ${reportHtml}
+                </div>
+                <button class="btn" id="restartBtn">🔄 Intentar de nuevo</button>
+                <button class="btn btn-wa" id="shareBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+                    Compartir por WhatsApp
+                </button>
+            </div>
+        `;
+
+        document.getElementById('restartBtn').addEventListener('click', () => {
+            startQuiz();
+        });
+
+        document.getElementById('shareBtn').addEventListener('click', () => {
+            const url = `https://wa.me/?text=${encodeURIComponent(textoWA)}`;
+            window.open(url, '_blank');
+        });
+    }
+
+    // Iniciar la app
+    renderStart();
+
+</script>
+</body>
+</html>
