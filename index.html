@@ -917,6 +917,18 @@
         }
     }
 
+    let inactividadTimeout;
+    function reiniciarInactividad() {
+        clearTimeout(inactividadTimeout);
+        inactividadTimeout = setTimeout(async () => {
+            detenerMusica();
+            await supabase.auth.signOut();
+            location.reload();
+        }, 10 * 60 * 1000); // 10 minutos sin interacción
+    }
+    ['click', 'keydown', 'mousemove', 'touchstart', 'scroll'].forEach(ev => document.addEventListener(ev, reiniciarInactividad));
+    reiniciarInactividad();
+
     init();
 </script>
 </body>

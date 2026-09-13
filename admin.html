@@ -1969,6 +1969,17 @@ async function verResultadosProfesor(quizId, titulo, cambiarPestana = true) {
     </table></div>`;
 }
 
+let inactividadTimeout;
+function reiniciarInactividad() {
+  clearTimeout(inactividadTimeout);
+  inactividadTimeout = setTimeout(async () => {
+    await supabase.auth.signOut();
+    window.location.href = 'index.html';
+  }, 10 * 60 * 1000); // 10 minutos sin interacción
+}
+['click', 'keydown', 'mousemove', 'touchstart', 'scroll'].forEach(ev => document.addEventListener(ev, reiniciarInactividad));
+reiniciarInactividad();
+
 init();
 </script>
 </body>
