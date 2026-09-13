@@ -364,6 +364,7 @@
                     </div>
                 </div>
                 <div class="header-actions">
+                    <button class="icon-btn" id="vozBtn" title="Leer preguntas en voz alta">${vozPreguntaActivada() ? '🔊' : '🔈'}</button>
                     <button class="icon-btn" id="musicaBtn" title="Música">🎵</button>
                     <button class="icon-btn" id="configBtn" title="Configuración">⚙️</button>
                     <button class="icon-btn" id="logout" title="Salir">🚪</button>
@@ -386,6 +387,11 @@
         `;
 
         document.getElementById('logout').onclick = async () => { detenerMusica(); await supabase.auth.signOut(); renderLogin(); };
+        document.getElementById('vozBtn').onclick = (e) => {
+            const activo = !vozPreguntaActivada();
+            localStorage.setItem('quiz_voz_pregunta', activo ? '1' : '0');
+            e.currentTarget.textContent = activo ? '🔊' : '🔈';
+        };
         document.getElementById('musicaBtn').onclick = (e) => toggleMusica(e.currentTarget);
         document.getElementById('configBtn').onclick = () => abrirConfigModal();
         document.getElementById('avatarBtn').onclick = () => abrirAvatarModal();
@@ -602,6 +608,22 @@
         } catch (e) { }
     }
 
+    function vozPreguntaActivada() {
+        return localStorage.getItem('quiz_voz_pregunta') === '1';
+    }
+
+    function leerPreguntaEnVoz(texto, alTerminar) {
+        try {
+            speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(texto);
+            utterance.lang = 'es-ES';
+            utterance.volume = 1;
+            utterance.rate = 1;
+            if (alTerminar) utterance.onend = alTerminar;
+            speechSynthesis.speak(utterance);
+        } catch (e) { if (alTerminar) alTerminar(); }
+    }
+
     function reproducirTono(tipo) {
         try {
             const ctx = getAudioCtx();
@@ -757,7 +779,8 @@
             document.getElementById('nextBtn').classList.remove('hidden');
         }
 
-        if (esEstudio) {
+        function iniciarTemporizadorEstudio() {
+            if (!esEstudio) return;
             let restante = state.segundosPorPregunta;
             const circulo = document.getElementById('circuloTiempo');
             intervaloTiempo = setInterval(() => {
@@ -769,6 +792,12 @@
                 else if (restante > 0) { reproducirTic(false); }
                 if (restante <= 0) { clearInterval(intervaloTiempo); marcarTiempoAgotado(); }
             }, 1000);
+        }
+
+        if (vozPreguntaActivada()) {
+            leerPreguntaEnVoz(pregunta.enunciado, iniciarTemporizadorEstudio);
+        } else {
+            iniciarTemporizadorEstudio();
         }
 
         if (pregunta.tipo === 'completar') {
