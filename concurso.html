@@ -93,6 +93,16 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const app = document.getElementById('app');
 
 function sanitizarUsuario(u) { return (u || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, ''); }
+function decirEnVoz(texto) {
+  try {
+    speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(texto);
+    utterance.lang = 'es-ES';
+    utterance.volume = 1;
+    utterance.rate = 1;
+    speechSynthesis.speak(utterance);
+  } catch (e) { }
+}
 function anchoSheet(ancho) { document.getElementById('app').className = ancho ? 'sheet ancho' : 'sheet'; }
 
 let state = {
@@ -374,6 +384,7 @@ async function renderPreguntaConcursoVivo() {
       const fb = document.getElementById('feedback');
       fb.classList.remove('hidden'); fb.classList.add(es_correcta ? 'correct' : 'incorrect');
       fb.textContent = es_correcta ? '¡Correcto!' : `Incorrecto. Era: ${texto_correcto}`;
+      decirEnVoz(es_correcta ? `Correcto. Es ${texto_correcto}` : `Incorrecto. Es ${texto_correcto}`);
       document.getElementById('esperaTexto').style.display = 'block';
     };
     opts.appendChild(b);
@@ -450,6 +461,7 @@ async function renderPreguntaConcursoPlazo() {
       const fb = document.getElementById('feedback');
       fb.classList.remove('hidden'); fb.classList.add(es_correcta ? 'correct' : 'incorrect');
       fb.textContent = es_correcta ? '¡Correcto!' : `Incorrecto. Era: ${texto_correcto}`;
+      decirEnVoz(es_correcta ? `Correcto. Es ${texto_correcto}` : `Incorrecto. Es ${texto_correcto}`);
       document.getElementById('siguienteBtn').classList.remove('hidden');
     };
     opts.appendChild(b);

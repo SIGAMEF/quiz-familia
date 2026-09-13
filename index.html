@@ -591,6 +591,17 @@
         return audioCtx;
     }
 
+    function decirEnVoz(texto) {
+        try {
+            speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(texto);
+            utterance.lang = 'es-ES';
+            utterance.volume = 1;
+            utterance.rate = 1;
+            speechSynthesis.speak(utterance);
+        } catch (e) { }
+    }
+
     function reproducirTono(tipo) {
         try {
             const ctx = getAudioCtx();
@@ -739,6 +750,7 @@
                 });
                 const correcta = data && data[0] ? data[0].respuesta_correcta : '—';
                 fb.textContent = `⏰ Se acabó el tiempo. La respuesta correcta era: ${correcta}`;
+                decirEnVoz(`Incorrecto. Es ${correcta}`);
             } else {
                 fb.textContent = '⏰ Se acabó el tiempo.';
             }
@@ -781,6 +793,7 @@
                     fb.classList.remove('hidden');
                     fb.classList.add(esCorrecta ? 'correct' : 'incorrect');
                     fb.textContent = esCorrecta ? '✅ ¡Correcto!' : `❌ Incorrecto. La respuesta correcta era: ${correcta}`;
+                    decirEnVoz(esCorrecta ? `Correcto. Es ${correcta}` : `Incorrecto. Es ${correcta}`);
                 }
                 document.getElementById('nextBtn').classList.remove('hidden');
             };
@@ -806,6 +819,7 @@
                         fb.classList.remove('hidden');
                         fb.classList.add(esCorrecta ? 'correct' : 'incorrect');
                         fb.textContent = esCorrecta ? '✅ ¡Correcto!' : `❌ Incorrecto. La respuesta correcta era: ${correcto}`;
+                        decirEnVoz(esCorrecta ? `Correcto. Es ${correcto}` : `Incorrecto. Es ${correcto}`);
                     }
                     document.getElementById('nextBtn').classList.remove('hidden');
                 };
