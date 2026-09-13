@@ -3,70 +3,157 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel del profesor</title>
+<title>Panel</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root {
-    --board: #16332a; --board-line: #244539;
-    --paper: #f4efdd; --paper-line: #ddd3ad;
-    --ink: #22281f; --ink-muted: #5a5f4f;
-    --chalk-amber: #f2c14e; --pen-red: #d9503a; --pen-green: #4f8f5e;
+    --primary: #7C6FF0; --primary-dark: #6C5CE7; --primary-light: #EDE9FE;
+    --bg: #F8F7FC; --card-bg: #FFFFFF;
+    --text-main: #2D2A45; --text-muted: #8E86AC; --border: #EBE3FB;
+    --success: #4CD98A; --success-bg: #E6FBF0;
+    --error: #FF6F91; --error-bg: #FFE4E9; --warning: #FFC857;
   }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; min-height: 100vh; background: var(--board);
-    background-image: linear-gradient(var(--board-line) 1px, transparent 1px), linear-gradient(90deg, var(--board-line) 1px, transparent 1px);
-    background-size: 28px 28px;
-    font-family: 'Source Sans 3', sans-serif; color: var(--ink);
-    display: flex; justify-content: center; padding: 32px 16px;
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Nunito', sans-serif; background-color: var(--bg); color: var(--text-main); display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 250px; background: var(--card-bg); border-right: 1px solid var(--border);
+    padding: 28px 18px; display: flex; flex-direction: column; position: fixed; height: 100vh; overflow-y: auto; z-index: 100;
   }
-  .wrap { width: 100%; max-width: 720px; }
-  .card {
-    background: var(--paper); border-radius: 4px; padding: 24px 26px;
-    box-shadow: 0 8px 0 rgba(0,0,0,0.15); margin-bottom: 20px;
+  .logo { font-family: 'Baloo 2', sans-serif; font-size: 22px; font-weight: 800; color: var(--primary); margin-bottom: 30px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 12px;
+    color: var(--text-muted); font-weight: 700; cursor: pointer; margin-bottom: 6px;
+    border: none; background: none; width: 100%; text-align: left; font-size: 14px;
   }
-  h1 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 26px; margin: 0 0 4px; }
-  h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 18px; margin: 0 0 14px; }
-  h2.sub { font-size: 15px; margin-top: 26px; }
-  .subtitle { color: var(--ink-muted); font-size: 14px; margin: 0 0 18px; }
-  label { display: block; font-size: 13px; color: var(--ink-muted); margin: 12px 0 4px; }
-  input, select, textarea {
-    width: 100%; padding: 9px 11px; border: 1.5px solid var(--paper-line);
-    border-radius: 4px; background: #fff; font-size: 14px; font-family: inherit;
+  .nav-item:hover { background: var(--primary-light); color: var(--primary); }
+  .nav-item.active { background: var(--primary); color: #fff; box-shadow: 0 4px 12px rgba(124,111,240,0.3); }
+
+  .main-content { margin-left: 250px; flex: 1; padding: 32px; max-width: 1200px; }
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 10px; }
+  .header h1 { font-family: 'Baloo 2', sans-serif; font-size: 26px; font-weight: 800; }
+  .user-badge { display: flex; align-items: center; gap: 8px; background: var(--card-bg); padding: 7px 14px; border-radius: 30px; border: 1px solid var(--border); font-weight: 700; font-size: 13px; }
+
+  .sticky-group { position: sticky; top: 0; z-index: 50; background: var(--bg); padding: 10px 0 16px; margin-bottom: 16px; border-bottom: 2px solid var(--border); }
+  .sticky-group select { max-width: 380px; font-size: 15px; font-weight: 700; padding: 12px 16px; background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+
+  .card { background: var(--card-bg); border-radius: 18px; padding: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); border: 1px solid var(--border); margin-bottom: 20px; }
+  .card h2 { font-family: 'Baloo 2', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 5px; }
+  .card p.subtitle { color: var(--text-muted); font-size: 13px; margin-bottom: 18px; font-weight: 600; }
+
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .form-control { width: 100%; padding: 10px 14px; border: 2px solid var(--border); border-radius: 10px; font-size: 14px; font-family: inherit; background: #FAFAFE; color: var(--text-main); }
+  .form-control:focus { outline: none; border-color: var(--primary); background: #fff; box-shadow: 0 0 0 4px rgba(124,111,240,0.1); }
+  textarea.form-control { min-height: 110px; font-family: monospace; font-size: 12.5px; }
+
+  .btn { font-family: 'Baloo 2', sans-serif; font-weight: 700; font-size: 14px; cursor: pointer; border: none; border-radius: 10px; padding: 10px 20px; display: inline-flex; align-items: center; gap: 6px; }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; box-shadow: 0 4px 12px rgba(108,92,231,0.3); }
+  .btn-secondary { background: var(--primary-light); color: var(--primary); }
+  .btn-danger { background: var(--error-bg); color: var(--error); }
+  .btn-sm { padding: 6px 14px; font-size: 12.5px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 900px) {
+    .grid-2 { grid-template-columns: 1fr; }
+    .sidebar { width: 66px; padding: 18px 8px; }
+    .sidebar .nav-text, .logo-text { display: none; }
+    .main-content { margin-left: 66px; padding: 18px; }
   }
-  textarea { min-height: 120px; font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; }
-  button {
-    font-family: 'Fraunces', serif; font-weight: 600; font-size: 14px;
-    cursor: pointer; border: none; border-radius: 4px; padding: 9px 16px;
-  }
-  .btn-primary { background: var(--ink); color: var(--paper); margin-top: 14px; }
-  .btn-small { background: var(--chalk-amber); color: var(--ink); font-size: 13px; padding: 6px 12px; }
-  .btn-outline { background: none; border: 1.5px solid var(--ink-muted); color: var(--ink); font-size: 13px; padding: 6px 12px; }
-  .btn-link { background: none; color: var(--ink-muted); text-decoration: underline; font-family: 'Source Sans 3'; font-size: 13px; padding: 4px 0; }
-  .row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
-  .row > div { flex: 1; min-width: 140px; }
+
+  .table-container { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { text-align: left; padding: 12px 14px; background: #F8F7FC; color: var(--text-muted); font-weight: 700; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid var(--border); }
+  td { padding: 12px 14px; border-bottom: 1px solid var(--border); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 800; }
+  .pill.on { background: var(--success-bg); color: #2FAE6C; }
+  .pill.off { background: var(--border); color: var(--text-muted); }
+
+  .error-msg { color: var(--error); font-size: 12.5px; margin-top: 6px; font-weight: 700; min-height: 16px; }
+  .ok-msg { color: #2FAE6C; font-size: 12.5px; margin-top: 6px; font-weight: 700; }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; animation: fadeIn 0.25s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .check-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+  .check-list label { display: flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 600; background: #F8F7FC; padding: 7px 12px; border-radius: 10px; border: 1px solid var(--border); cursor: pointer; }
+  .check-list label:hover { border-color: var(--primary); }
+  .check-list input { width: auto; accent-color: var(--primary); }
+
+  .stat-card { padding: 18px; border-radius: 14px; flex: 1; min-width: 110px; }
+  .stat-number { font-size: 26px; font-weight: 800; }
+  .stat-label { font-size: 12.5px; font-weight: 700; color: var(--text-muted); }
+
+  .search-bar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .search-bar input { flex: 1; min-width: 180px; }
+  .search-bar select { width: auto; min-width: 140px; }
+
+  .toast-container { position: fixed; top: 18px; right: 18px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+  .toast { padding: 13px 18px; border-radius: 12px; font-weight: 700; font-size: 13.5px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); animation: slideIn 0.3s ease; }
+  .toast.success { background: var(--success); color: #fff; }
+  .toast.error { background: var(--error); color: #fff; }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  .preguntas-scroll { max-height: 380px; overflow-y: auto; border: 1.5px solid var(--border); border-radius: 12px; }
+
+  .instrucciones { background: #F8F7FC; border-left: 4px solid var(--primary); padding: 14px; border-radius: 8px; margin-bottom: 18px; }
+  .instrucciones code { background: var(--primary-light); color: var(--primary); padding: 2px 6px; border-radius: 4px; font-size: 11.5px; font-weight: 700; }
+
+  .management-panel { background: #FAFAFE; border: 2px solid var(--primary-light); border-radius: 16px; padding: 22px; margin-top: 14px; }
+  .management-panel h3 { font-family: 'Baloo 2', sans-serif; font-size: 17px; font-weight: 700; margin-bottom: 14px; color: var(--primary); }
+  .sub-tabs { display: flex; gap: 8px; margin-bottom: 14px; border-bottom: 2px solid var(--border); padding-bottom: 8px; flex-wrap: wrap; }
+  .sub-tab { padding: 7px 14px; border-radius: 8px; font-weight: 700; font-size: 12.5px; cursor: pointer; border: none; background: none; color: var(--text-muted); }
+  .sub-tab.active { background: var(--primary); color: #fff; }
+  .sub-tab-content { display: none; }
+  .sub-tab-content.active { display: block; }
+
+  .pregunta-item { display: flex; align-items: flex-start; gap: 10px; padding: 11px; border-radius: 10px; border: 1px solid var(--border); background: #fff; margin-bottom: 7px; }
+  .pregunta-item:hover { border-color: var(--primary); }
+  .pregunta-item input[type="checkbox"] { margin-top: 3px; width: 17px; height: 17px; accent-color: var(--primary); }
+  .pregunta-item .pregunta-texto { flex: 1; font-size: 13.5px; font-weight: 600; line-height: 1.4; }
+  .pregunta-item .pregunta-meta { font-size: 10.5px; color: var(--text-muted); font-weight: 700; margin-top: 4px; display: flex; gap: 6px; }
+  .pregunta-item .pregunta-meta span { background: var(--bg); padding: 2px 7px; border-radius: 6px; }
+  .preguntas-seleccionables-scroll { max-height: 280px; overflow-y: auto; padding-right: 6px; }
+
+  .floating-counter { position: fixed; bottom: 24px; right: 24px; background: var(--primary); color: #fff; padding: 14px 20px; border-radius: 14px; font-weight: 800; font-size: 14px; box-shadow: 0 8px 24px rgba(124,111,240,0.4); display: flex; align-items: center; gap: 10px; z-index: 200; }
+  .floating-counter button { background: #fff; color: var(--primary); border: none; padding: 7px 14px; border-radius: 8px; font-weight: 800; cursor: pointer; font-family: 'Baloo 2', sans-serif; font-size: 13px; }
+
+  .empty-state { text-align: center; padding: 32px 16px; color: var(--text-muted); }
+  .empty-state p { font-weight: 700; font-size: 14px; }
+
   .pwd-wrap { position: relative; }
-  .pwd-wrap button { position: absolute; right: 6px; top: 6px; padding: 4px 10px; font-size: 12px; }
-  .check-list { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 4px; }
-  .check-list label { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--ink); margin: 0; }
-  .check-list input { width: auto; }
-  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13.5px; }
-  th, td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--paper-line); vertical-align: top; }
-  .pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
-  .pill.on { background: #ecf5ed; color: var(--pen-green); }
-  .pill.off { background: #f1eee0; color: var(--ink-muted); }
-  .error { color: var(--pen-red); font-size: 13px; margin-top: 8px; min-height: 14px; }
-  .ok-msg { color: var(--pen-green); font-size: 13px; margin-top: 8px; }
+  .pwd-wrap button { position: absolute; right: 5px; top: 5px; padding: 4px 10px; font-size: 11.5px; }
   .hidden { display: none; }
-  .topbar { display: flex; justify-content: space-between; align-items: center; }
-  .hint { font-size: 12px; color: var(--ink-muted); margin-top: 6px; line-height: 1.5; }
-  code { background: #ece6cf; padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+
+  .btn-success { background: var(--success-bg); color: #2FAE6C; border: 2px solid var(--success); }
+  .constructor-card { background: #FAFAFE; border: 2px solid var(--primary-light); border-radius: 16px; padding: 22px; margin-bottom: 18px; }
+  .opcion-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; padding: 9px 10px; background: #fff; border-radius: 10px; border: 1.5px solid var(--border); }
+  .opcion-row.correcta { border-color: var(--success); background: var(--success-bg); }
+  .opcion-row input[type="radio"] { width: 19px; height: 19px; accent-color: var(--success); cursor: pointer; flex-shrink: 0; }
+  .opcion-row input[type="text"] { flex: 1; border: none; background: transparent; font-size: 13.5px; font-weight: 600; font-family: inherit; outline: none; color: var(--text-main); }
+  .opcion-row .btn-eliminar-opcion { background: none; border: none; color: var(--error); cursor: pointer; font-size: 17px; padding: 3px 7px; border-radius: 6px; }
+  .opcion-row .btn-eliminar-opcion:hover { background: var(--error-bg); }
+  .btn-add-opcion { background: var(--primary-light); color: var(--primary); border: 2px dashed var(--primary); padding: 9px 18px; border-radius: 10px; font-weight: 700; cursor: pointer; font-family: 'Nunito', sans-serif; font-size: 13.5px; width: 100%; margin-top: 6px; }
+  .btn-add-opcion:hover { background: var(--primary); color: #fff; }
+  .preview-imagen { margin-top: 8px; max-width: 180px; max-height: 130px; border-radius: 10px; border: 2px solid var(--border); object-fit: cover; }
+  .lista-temporal { background: #FFF7ED; border: 2px solid var(--warning); border-radius: 16px; padding: 18px; margin-top: 18px; }
+  .lista-temporal h3 { font-family: 'Baloo 2', sans-serif; font-size: 16px; font-weight: 700; color: #EA580C; margin-bottom: 12px; }
+  .pregunta-temporal-item { background: #fff; border-radius: 12px; padding: 12px; margin-bottom: 8px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .pregunta-temporal-item .enunciado { font-weight: 700; font-size: 13.5px; margin-bottom: 5px; }
+  .pregunta-temporal-item .meta { font-size: 11px; color: var(--text-muted); font-weight: 700; display: flex; gap: 6px; flex-wrap: wrap; }
+  .pregunta-temporal-item .meta span { background: var(--bg); padding: 2px 7px; border-radius: 6px; }
 </style>
 </head>
 <body>
-<div class="wrap" id="app"></div>
+<div id="root"></div>
+<div class="toast-container" id="toastContainer"></div>
 
 <script type="module">
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
@@ -78,158 +165,275 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const clienteCreacion = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: false, autoRefreshToken: false, storageKey: 'temp-creacion-cuentas' }
 });
-const app = document.getElementById('app');
 const DOMINIO_INTERNO = 'quizapp.com';
+const root = document.getElementById('root');
 
-function sanitizarUsuario(u) {
-  return (u || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
+function sanitizarUsuario(u) { return (u || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, ''); }
+function esVerdadero(v) { return ['v', '1', 'si', 'sí', 'true', 'x'].includes(String(v ?? '').trim().toLowerCase()); }
+
+function mostrarToast(mensaje, tipo = 'success') {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast ${tipo}`;
+  toast.innerHTML = `${tipo === 'success' ? '✅' : '❌'} ${mensaje}`;
+  container.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateX(100%)'; setTimeout(() => toast.remove(), 300); }, 3500);
 }
 
-let me = { id: null, rol: null };
+function descargarPlantilla(nombreArchivo = 'plantilla_preguntas.xlsx') {
+  const encabezados = ['tipo','corte_numero','enunciado','imagen_url','opcion_1','correcta_1','opcion_2','correcta_2','opcion_3','correcta_3','opcion_4','correcta_4','respuesta_correcta'];
+  const filas = [
+    encabezados,
+    ['opcion_unica', 1, '¿La capital de Perú es Lima?', '', 'Verdadero', 'V', 'Falso', 'F', '', '', '', '', ''],
+    ['completar', 1, 'El símbolo químico del oro es ___', '', '', '', '', '', '', '', '', '', 'Au']
+  ];
+  const hoja = XLSX.utils.aoa_to_sheet(filas);
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, 'Preguntas');
+  XLSX.writeFile(libro, nombreArchivo);
+}
+
+function instruccionesCargaHtml() {
+  return `
+    <div class="instrucciones">
+      <p style="font-weight:700; margin-bottom:6px;">📋 Formato de columnas:</p>
+      <p style="font-size:11.5px; line-height:1.7;">
+        <code>tipo</code>, <code>corte_numero</code>, <code>enunciado</code>, <code>imagen_url</code>,
+        <code>opcion_1</code>, <code>correcta_1</code>, <code>opcion_2</code>, <code>correcta_2</code>,
+        <code>opcion_3</code>, <code>correcta_3</code>, <code>opcion_4</code>, <code>correcta_4</code>,
+        <code>respuesta_correcta</code>
+      </p>
+      <ul style="font-size:11.5px; margin-top:6px; padding-left:18px; line-height:1.7;">
+        <li><code>tipo</code>: <code>opcion_unica</code> o <code>completar</code></li>
+        <li>En <code>correcta_N</code> escribe <code>V</code> o <code>F</code></li>
+        <li>Deja vacías las columnas de opciones si el tipo es <code>completar</code></li>
+        <li><code>imagen_url</code> es opcional</li>
+        <li>La primera fila de encabezados se ignora automáticamente</li>
+      </ul>
+    </div>`;
+}
+
+let me = { id: null, rol: null, usuario: null };
 let cortesCache = [];
-let grupoActivo = null;
-let seleccionQuizzes = new Set();
 
 async function init() {
   if (SUPABASE_URL.includes('TU_SUPABASE')) {
-    app.innerHTML = `<div class="card"><h1>Falta configurar</h1><p class="subtitle">Reemplaza SUPABASE_URL y SUPABASE_ANON_KEY al inicio del archivo.</p></div>`;
+    root.innerHTML = `<div style="padding:40px;"><h1>Falta configurar</h1><p>Reemplaza SUPABASE_URL y SUPABASE_ANON_KEY.</p></div>`;
     return;
   }
   const { data: { session } } = await supabase.auth.getSession();
-  if (session) loadDashboard(); else renderLogin();
-}
+  if (!session) { window.location.href = 'index.html'; return; }
 
-function renderLogin() {
-  app.innerHTML = `
-    <div class="card">
-      <h1>Panel del profesor</h1>
-      <p class="subtitle">Inicia sesión con tu cuenta de administrador o profesor</p>
-      <label>Usuario</label><input type="text" id="usuario" autocomplete="username">
-      <label>Contraseña</label><input type="password" id="password" autocomplete="current-password">
-      <button class="btn-primary" id="loginBtn">Entrar</button>
-      <div class="error" id="err"></div>
-    </div>`;
-  document.getElementById('loginBtn').onclick = async () => {
-    const usuario = sanitizarUsuario(document.getElementById('usuario').value);
-    const password = document.getElementById('password').value;
-    const errEl = document.getElementById('err');
-    const { data: emailReal } = await supabase.rpc('obtener_email_por_usuario', { p_usuario: usuario });
-    if (!emailReal) { errEl.textContent = 'Usuario o contraseña incorrectos.'; return; }
-    const { error } = await supabase.auth.signInWithPassword({ email: emailReal, password });
-    if (error) { errEl.textContent = 'Usuario o contraseña incorrectos.'; return; }
-    loadDashboard();
-  };
-}
-
-async function loadDashboard() {
-  const { data: { user } } = await supabase.auth.getUser();
-  const { data: perfil } = await supabase.from('perfiles').select('id, rol, usuario').eq('id', user.id).single();
+  const { data: perfil } = await supabase.from('perfiles').select('id, rol, usuario').eq('id', session.user.id).single();
   me = perfil;
 
   if (me.rol === 'estudiante') {
-    app.innerHTML = `<div class="card"><h1>Panel del profesor</h1><p class="subtitle">Esta página es solo para profesores y administradores. Usa la página de estudiante para tomar tus quizzes.</p>
-    <button class="btn-link" id="logout">Salir</button></div>`;
-    document.getElementById('logout').onclick = async () => { await supabase.auth.signOut(); renderLogin(); };
+    root.innerHTML = `<div style="padding:40px; max-width:500px;"><h1 style="font-family:'Baloo 2',sans-serif;">Panel del profesor</h1><p style="margin-top:10px; color:var(--text-muted);">Esta página es solo para profesores y administradores. Usa la página de estudiante para tomar tus quizzes.</p><button class="btn btn-secondary" id="logout" style="margin-top:16px;">Salir</button></div>`;
+    document.getElementById('logout').onclick = async () => { await supabase.auth.signOut(); window.location.href = 'index.html'; };
     return;
   }
 
   const { data: cortes } = await supabase.from('cortes').select('*').order('numero');
   cortesCache = cortes || [];
 
-  if (me.rol === 'admin') {
-    app.innerHTML = `
-      <div class="card">
-        <div class="topbar"><h1>Panel del administrador</h1><button class="btn-link" id="logout">Salir</button></div>
-        <p class="subtitle">${me.usuario} · rol: ${me.rol}</p>
-      </div>
-      <div id="adminSection"></div>
-      <div id="cortesSection" class="card"></div>
-      <div id="quizzesGlobalSection" class="card"></div>
-    `;
-    document.getElementById('logout').onclick = async () => { await supabase.auth.signOut(); renderLogin(); };
-    renderAdminSection();
-    renderCortesSection();
-    renderQuizzesGlobalSection();
-    return;
-  }
-
-  // ---- Vista de profesor ----
-  app.innerHTML = `
-    <div class="card">
-      <div class="topbar"><h1>Panel del profesor</h1><button class="btn-link" id="logout">Salir</button></div>
-      <p class="subtitle">${me.usuario} · rol: ${me.rol}</p>
-    </div>
-    <div class="card">
-      <h2>Grupo con el que vas a trabajar</h2>
-      <select id="grupoSelect"></select>
-    </div>
-    <div id="cortesSection" class="card"></div>
-    <div id="cargaSection" class="hidden"></div>
-    <div id="preguntasSection" class="hidden"></div>
-    <div id="quizSection" class="hidden"></div>
-    <div id="resultadosSection" class="hidden"></div>
-  `;
-  document.getElementById('logout').onclick = async () => { await supabase.auth.signOut(); renderLogin(); };
-  renderCortesSection();
-  await renderGrupoSelect();
+  if (me.rol === 'admin') renderAdminApp(); else renderProfesorApp();
 }
 
-// ====================================================================
-// ADMIN: grupos + profesores
-// ====================================================================
-function renderAdminSection() {
-  const el = document.getElementById('adminSection');
-  el.innerHTML = `
-    <div class="card">
-      <h2>Crear grupo</h2>
-      <div class="row">
-        <div><label>Nombre</label><input id="gNombre" placeholder="4to Secundaria A"></div>
-        <div><label>Nivel</label><input id="gNivel" placeholder="Secundaria"></div>
-        <div><button class="btn-primary" id="gCrear">Crear grupo</button></div>
+function activarTabs(navSelector, tabPrefix, titulos) {
+  document.querySelectorAll(navSelector).forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll(navSelector).forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(`${tabPrefix}-${btn.dataset.tab}`).classList.add('active');
+      document.getElementById('pageTitle').textContent = titulos[btn.dataset.tab] || 'Panel';
+    };
+  });
+}
+
+// ====================================================================================
+// ============================  PANEL DEL ADMINISTRADOR  ============================
+// ====================================================================================
+
+function renderAdminApp() {
+  root.innerHTML = `
+    <aside class="sidebar">
+      <div class="logo"><span class="logo-text">📘 QuizPanel</span></div>
+      <button class="nav-item active" data-tab="resumen">📊 <span class="nav-text">Resumen</span></button>
+      <button class="nav-item" data-tab="grupos">👥 <span class="nav-text">Grupos</span></button>
+      <button class="nav-item" data-tab="profesores">👨‍🏫 <span class="nav-text">Profesores</span></button>
+      <button class="nav-item" data-tab="cortes">📅 <span class="nav-text">Cortes</span></button>
+      <button class="nav-item" data-tab="quizzes">📝 <span class="nav-text">Quizzes</span></button>
+    </aside>
+    <main class="main-content">
+      <div class="header">
+        <h1 id="pageTitle">Resumen</h1>
+        <div class="user-badge"><span>👤</span><span>${me.usuario}</span><span style="color:var(--text-muted); font-size:11px;">(Admin)</span>
+          <button class="btn btn-sm btn-secondary" id="logout" style="margin-left:8px;">Salir</button>
+        </div>
       </div>
-      <div class="error" id="gErr"></div>
-      <table id="gruposTabla"><tr><th>Nombre</th><th>Nivel</th><th></th></tr></table>
-    </div>
-    <div class="card">
-      <h2>Crear profesor</h2>
-      <p class="subtitle">Tú le asignas usuario y clave directamente, y eliges de una vez a qué grupo(s) queda a cargo.</p>
-      <div class="row">
-        <div><label>Usuario</label><input id="profUsuario" placeholder="jperez" autocomplete="off"></div>
-        <div>
-          <label>Contraseña</label>
-          <div class="pwd-wrap">
-            <input id="profPassword" type="password" autocomplete="new-password">
-            <button type="button" class="btn-link" id="verClaveBtn">Ver</button>
+
+      <div class="tab-content active" id="admtab-resumen">
+        <div class="grid-2">
+          <div class="card">
+            <h2>Resumen rápido</h2>
+            <p class="subtitle">Estado actual de la plataforma.</p>
+            <div style="display:flex; gap:16px; flex-wrap:wrap;">
+              <div class="stat-card" style="background:var(--primary-light);"><div class="stat-number" style="color:var(--primary);" id="statGrupos">0</div><div class="stat-label">Grupos</div></div>
+              <div class="stat-card" style="background:#FFF7ED;"><div class="stat-number" style="color:#EA580C;" id="statProfesores">0</div><div class="stat-label">Profesores</div></div>
+              <div class="stat-card" style="background:#F0FDF4;"><div class="stat-number" style="color:#16A34A;" id="statQuizzes">0</div><div class="stat-label">Quizzes</div></div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Acciones rápidas</h2>
+            <p class="subtitle">Atajos a las tareas más comunes.</p>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <button class="btn btn-primary" data-goto="grupos">➕ Crear nuevo grupo</button>
+              <button class="btn btn-secondary" data-goto="profesores">👨‍🏫 Agregar profesor</button>
+              <button class="btn btn-secondary" data-goto="quizzes">📝 Ver quizzes</button>
+            </div>
           </div>
         </div>
       </div>
-      <label>Grupo(s) a cargo</label>
-      <div class="check-list" id="profGruposCheck"></div>
-      <button class="btn-primary" id="profCrear">Crear profesor</button>
-      <div class="error" id="profErr"></div>
 
-      <h2 class="sub">Profesores</h2>
-      <table id="profesoresTabla"><tr><th>Usuario</th><th>Grupos a cargo</th><th></th><th></th></tr></table>
-    </div>
+      <div class="tab-content" id="admtab-grupos">
+        <div class="card">
+          <h2>Crear grupo</h2>
+          <p class="subtitle">Añade una nueva clase o sección.</p>
+          <div class="grid-2">
+            <div class="form-group"><label>Nombre del grupo</label><input class="form-control" id="gNombre" placeholder="4to Secundaria A"></div>
+            <div class="form-group"><label>Nivel educativo</label><input class="form-control" id="gNivel" placeholder="Secundaria"></div>
+          </div>
+          <button class="btn btn-primary" id="gCrear">Crear grupo</button>
+          <div class="error-msg" id="gErr"></div>
+        </div>
+        <div class="card">
+          <h2>Grupos existentes</h2>
+          <div class="table-container"><table id="gruposTabla"><tr><th>Nombre</th><th>Nivel</th><th></th></tr></table></div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="admtab-profesores">
+        <div class="card">
+          <h2>Crear profesor</h2>
+          <p class="subtitle">Tú le asignas usuario y clave; el profesor no se registra solo.</p>
+          <div class="grid-2">
+            <div class="form-group"><label>Usuario</label><input class="form-control" id="profUsuario" placeholder="jperez" autocomplete="off"></div>
+            <div class="form-group"><label>Contraseña</label>
+              <div class="pwd-wrap"><input class="form-control" id="profPassword" type="password" autocomplete="new-password">
+                <button type="button" class="btn btn-sm btn-secondary" id="verClaveBtn">Ver</button></div>
+            </div>
+          </div>
+          <div class="form-group"><label>Grupos a cargo</label><div class="check-list" id="profGruposCheck"></div></div>
+          <button class="btn btn-primary" id="profCrear">Crear profesor</button>
+          <div class="error-msg" id="profErr"></div>
+        </div>
+        <div class="card">
+          <h2>Profesores registrados</h2>
+          <div class="table-container"><table id="profesoresTabla"><tr><th>Usuario</th><th>Grupos a cargo</th><th></th><th></th></tr></table></div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="admtab-cortes">
+        <div class="card">
+          <h2>Cortes (bimestres)</h2>
+          <p class="subtitle">Estos son globales, los usan todos los grupos.</p>
+          <div class="table-container"><table id="cortesTabla"><tr><th>Número</th><th>Nombre</th><th></th></tr></table></div>
+          <div class="grid-2" style="margin-top:16px;">
+            <div class="form-group"><label>Número</label><input class="form-control" id="cNumero" type="number" placeholder="1"></div>
+            <div class="form-group"><label>Nombre</label><input class="form-control" id="cNombre" placeholder="Primer bimestre"></div>
+          </div>
+          <button class="btn btn-primary" id="cCrear">Agregar corte</button>
+          <div class="error-msg" id="cErr"></div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="admtab-quizzes">
+        <div class="card">
+          <h2>Ver quizzes por grupo</h2>
+          <p class="subtitle">Marca quizzes (de uno o varios grupos) para combinarlos en un quiz nuevo. El contenido de preguntas lo maneja el profesor; aquí solo combinas lo que ya existe.</p>
+          <div class="form-group"><label>Grupo</label><select class="form-control" id="verGrupoSelect"></select></div>
+          <div class="table-container"><table id="quizzesPorGrupoTabla"><tr><th></th><th>Título</th><th>Modo</th><th>Estado</th></tr></table></div>
+          <p class="subtitle" style="margin-top:12px;">Seleccionados: <span id="contadorSeleccion" style="font-weight:800; color:var(--primary);">0</span></p>
+          <div id="combinarForm" class="hidden" style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
+            <div class="form-group"><label>Título del nuevo quiz</label><input class="form-control" id="combTitulo" placeholder="Repaso general"></div>
+            <div class="grid-2">
+              <div class="form-group"><label>Modo</label><select class="form-control" id="combModo"><option value="practica">Práctica</option><option value="examen">Examen</option><option value="estudio">Estudio</option></select></div>
+              <div class="form-group"><label>Grupo destino</label><select class="form-control" id="combGrupoDestino"></select></div>
+            </div>
+            <div class="form-group"><label style="text-transform:none; display:flex; align-items:center; gap:8px;"><input type="checkbox" id="combActivo" checked style="width:auto; accent-color:var(--primary);"> Activo desde ya</label></div>
+            <button class="btn btn-primary" id="combCrear">Crear quiz combinado</button>
+            <div class="error-msg" id="combErr"></div>
+          </div>
+        </div>
+      </div>
+    </main>
   `;
+  document.getElementById('logout').onclick = async () => { await supabase.auth.signOut(); window.location.href = 'index.html'; };
+  root.querySelectorAll('[data-goto]').forEach(btn => btn.onclick = () => document.querySelector(`.nav-item[data-tab="${btn.dataset.goto}"]`).click());
+  activarTabs('.nav-item', 'admtab', { resumen: 'Resumen', grupos: 'Gestión de grupos', profesores: 'Gestión de profesores', cortes: 'Cortes y bimestres', quizzes: 'Administración de quizzes' });
 
+  renderVerClaveToggle();
+  renderGruposAdmin();
+  renderProfesoresAdmin();
+  renderCortesAdmin();
+  renderQuizzesAdminTab();
+  actualizarStatsAdmin();
+}
+
+function renderVerClaveToggle() {
   document.getElementById('verClaveBtn').onclick = () => {
     const inp = document.getElementById('profPassword');
     const btn = document.getElementById('verClaveBtn');
     inp.type = inp.type === 'password' ? 'text' : 'password';
     btn.textContent = inp.type === 'password' ? 'Ver' : 'Ocultar';
   };
+}
 
+async function actualizarStatsAdmin() {
+  const { count: cGrupos } = await supabase.from('grupos').select('*', { count: 'exact', head: true });
+  const { count: cProfesores } = await supabase.from('perfiles').select('*', { count: 'exact', head: true }).eq('rol', 'profesor');
+  const { count: cQuizzes } = await supabase.from('quizzes').select('*', { count: 'exact', head: true });
+  document.getElementById('statGrupos').textContent = cGrupos || 0;
+  document.getElementById('statProfesores').textContent = cProfesores || 0;
+  document.getElementById('statQuizzes').textContent = cQuizzes || 0;
+}
+
+// ---------------- Grupos (admin) ----------------
+function renderGruposAdmin() {
   document.getElementById('gCrear').onclick = async () => {
     const nombre = document.getElementById('gNombre').value.trim();
     const nivel = document.getElementById('gNivel').value.trim();
     if (!nombre) { document.getElementById('gErr').textContent = 'Ponle un nombre al grupo.'; return; }
     const { error } = await supabase.from('grupos').insert({ nombre, nivel });
     if (error) { document.getElementById('gErr').textContent = error.message; return; }
-    document.getElementById('gNombre').value = ''; document.getElementById('gNivel').value = '';
-    document.getElementById('gErr').textContent = '';
-    await Promise.all([renderGruposTabla(), poblarProfGruposCheck(), renderProfesoresTabla()]);
+    document.getElementById('gNombre').value = ''; document.getElementById('gNivel').value = ''; document.getElementById('gErr').textContent = '';
+    mostrarToast('Grupo creado.');
+    await Promise.all([renderTablaGrupos(), poblarProfGruposCheck(), renderProfesoresAdmin(), poblarSelectsQuizAdmin(), actualizarStatsAdmin()]);
   };
+  renderTablaGrupos();
+}
+
+async function renderTablaGrupos() {
+  const { data: grupos } = await supabase.from('grupos').select('id, nombre, nivel').order('nombre');
+  const tabla = document.getElementById('gruposTabla');
+  if (!tabla) return;
+  tabla.innerHTML = '<tr><th>Nombre</th><th>Nivel</th><th></th></tr>' +
+    (grupos || []).map(g => `<tr><td>${g.nombre}</td><td>${g.nivel || '-'}</td><td><button class="btn btn-sm btn-danger borrarGrupoBtn" data-id="${g.id}">Borrar</button></td></tr>`).join('');
+  tabla.querySelectorAll('.borrarGrupoBtn').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm('¿Borrar este grupo? Falla si todavía tiene preguntas, quizzes o estudiantes enlazados.')) return;
+      const { error } = await supabase.from('grupos').delete().eq('id', btn.dataset.id);
+      if (error) { mostrarToast('No se pudo borrar: ' + error.message, 'error'); return; }
+      mostrarToast('Grupo borrado.');
+      await Promise.all([renderTablaGrupos(), poblarProfGruposCheck(), renderProfesoresAdmin(), poblarSelectsQuizAdmin(), actualizarStatsAdmin()]);
+    };
+  });
+}
+
+// ---------------- Profesores (admin) ----------------
+function renderProfesoresAdmin() {
+  poblarProfGruposCheck();
 
   document.getElementById('profCrear').onclick = async () => {
     const usuario = sanitizarUsuario(document.getElementById('profUsuario').value);
@@ -249,46 +453,27 @@ function renderAdminSection() {
 
     const nuevoId = data.user.id;
     const { error: errRol } = await supabase.from('perfiles').update({ rol: 'profesor' }).eq('id', nuevoId);
-    const { error: errGrupos } = await supabase.from('profesor_grupos')
-      .insert(grupoIds.map(gid => ({ profesor_id: nuevoId, grupo_id: gid })));
+    const { error: errGrupos } = await supabase.from('profesor_grupos').insert(grupoIds.map(gid => ({ profesor_id: nuevoId, grupo_id: gid })));
     if (errRol || errGrupos) { errEl.textContent = (errRol || errGrupos).message; return; }
 
-    errEl.innerHTML = '<span class="ok-msg">Profesor creado y asignado.</span>';
-    document.getElementById('profUsuario').value = '';
-    document.getElementById('profPassword').value = '';
+    mostrarToast('Profesor creado.');
+    document.getElementById('profUsuario').value = ''; document.getElementById('profPassword').value = '';
     document.querySelectorAll('#profGruposCheck input:checked').forEach(c => c.checked = false);
-    renderProfesoresTabla();
+    renderTablaProfesores();
+    actualizarStatsAdmin();
   };
 
-  renderGruposTabla();
-  poblarProfGruposCheck();
-  renderProfesoresTabla();
+  renderTablaProfesores();
 }
 
 async function poblarProfGruposCheck() {
   const cont = document.getElementById('profGruposCheck');
   if (!cont) return;
   const { data: grupos } = await supabase.from('grupos').select('id, nombre').order('nombre');
-  cont.innerHTML = (grupos || []).map(g => `<label><input type="checkbox" value="${g.id}"> ${g.nombre}</label>`).join('') || '<p class="hint">Crea un grupo primero.</p>';
+  cont.innerHTML = (grupos || []).map(g => `<label><input type="checkbox" value="${g.id}"> ${g.nombre}</label>`).join('') || '<p style="font-size:12px; color:var(--text-muted);">Crea un grupo primero.</p>';
 }
 
-async function renderGruposTabla() {
-  const { data: grupos } = await supabase.from('grupos').select('id, nombre, nivel').order('nombre');
-  const tabla = document.getElementById('gruposTabla');
-  if (!tabla) return;
-  tabla.innerHTML = '<tr><th>Nombre</th><th>Nivel</th><th></th></tr>' +
-    (grupos || []).map(g => `<tr><td>${g.nombre}</td><td>${g.nivel || '-'}</td><td><button class="btn-outline borrarGrupoBtn" data-id="${g.id}">Borrar</button></td></tr>`).join('');
-  tabla.querySelectorAll('.borrarGrupoBtn').forEach(btn => {
-    btn.onclick = async () => {
-      if (!confirm('¿Borrar este grupo? Falla si todavía tiene preguntas, quizzes o estudiantes enlazados.')) return;
-      const { error } = await supabase.from('grupos').delete().eq('id', btn.dataset.id);
-      if (error) { alert('No se pudo borrar: ' + error.message); return; }
-      await Promise.all([renderGruposTabla(), poblarProfGruposCheck(), renderProfesoresTabla()]);
-    };
-  });
-}
-
-async function renderProfesoresTabla() {
+async function renderTablaProfesores() {
   const tabla = document.getElementById('profesoresTabla');
   if (!tabla) return;
   const { data: profesores } = await supabase.from('perfiles').select('id, usuario').eq('rol', 'profesor').order('usuario');
@@ -299,31 +484,26 @@ async function renderProfesoresTabla() {
     (profesores || []).map(p => {
       const asignados = (asignaciones || []).filter(a => a.profesor_id === p.id);
       const nombres = asignados.map(a => a.grupos ? a.grupos.nombre : '').filter(Boolean).join(', ') || '—';
-      return `<tr><td>${p.usuario}</td><td>${nombres}</td>
-        <td><button class="btn-outline editarBtn" data-id="${p.id}">Editar grupos</button></td>
-        <td><button class="btn-outline resetBtn" data-id="${p.id}" data-usuario="${p.usuario}">Restablecer clave</button></td>
+      return `<tr>
+        <td>${p.usuario}</td><td>${nombres}</td>
+        <td><button class="btn btn-sm btn-secondary editarBtn" data-id="${p.id}">Editar grupos</button></td>
+        <td><button class="btn btn-sm btn-secondary resetBtn" data-id="${p.id}">Restablecer clave</button></td>
       </tr>`;
-    }).join('');
+    }).join('') || '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Todavía no hay profesores.</td></tr>';
 
   tabla.querySelectorAll('.resetBtn').forEach(btn => {
     btn.onclick = () => {
       const fila = btn.closest('tr');
       const celda = fila.children[3];
-      celda.innerHTML = `
-        <div style="display:flex; gap:6px; align-items:center;">
-          <input type="password" class="nuevaClaveInput" placeholder="Nueva clave" style="width:140px">
-          <button class="btn-small confirmarResetBtn">Guardar</button>
-        </div>
-        <div class="error resetErr"></div>`;
+      celda.innerHTML = `<div style="display:flex; gap:6px; align-items:center;"><input type="password" class="form-control nuevaClaveInput" placeholder="Nueva clave" style="width:130px;"><button class="btn btn-sm btn-primary confirmarResetBtn">Guardar</button></div><div class="error-msg resetErr"></div>`;
       celda.querySelector('.confirmarResetBtn').onclick = async () => {
         const nuevaClave = celda.querySelector('.nuevaClaveInput').value;
         const errBox = celda.querySelector('.resetErr');
         if (!nuevaClave || nuevaClave.length < 6) { errBox.textContent = 'Mínimo 6 caracteres.'; return; }
-        const { data, error } = await supabase.functions.invoke('resetear-clave', {
-          body: { usuario_id: btn.dataset.id, nueva_clave: nuevaClave }
-        });
+        const { data, error } = await supabase.functions.invoke('resetear-clave', { body: { usuario_id: btn.dataset.id, nueva_clave: nuevaClave } });
         if (error || (data && data.error)) { errBox.textContent = (data && data.error) || error.message; return; }
         celda.innerHTML = '<span class="ok-msg">Clave actualizada.</span>';
+        mostrarToast('Clave restablecida.');
       };
     };
   });
@@ -334,122 +514,95 @@ async function renderProfesoresTabla() {
       const asignados = new Set((asignaciones || []).filter(a => a.profesor_id === profId).map(a => a.grupo_id));
       const fila = btn.closest('tr');
       const celdaGrupos = fila.children[1];
-      celdaGrupos.innerHTML = `<div class="check-list">${(grupos || []).map(g =>
-        `<label><input type="checkbox" value="${g.id}" ${asignados.has(g.id) ? 'checked' : ''}> ${g.nombre}</label>`
-      ).join('')}</div>`;
+      celdaGrupos.innerHTML = `<div class="check-list">${(grupos || []).map(g => `<label><input type="checkbox" value="${g.id}" ${asignados.has(g.id) ? 'checked' : ''}> ${g.nombre}</label>`).join('')}</div>`;
       btn.textContent = 'Guardar';
       btn.onclick = async () => {
         const seleccionados = Array.from(celdaGrupos.querySelectorAll('input:checked')).map(c => c.value);
         await supabase.from('profesor_grupos').delete().eq('profesor_id', profId);
-        if (seleccionados.length) {
-          await supabase.from('profesor_grupos').insert(seleccionados.map(gid => ({ profesor_id: profId, grupo_id: gid })));
-        }
-        renderProfesoresTabla();
+        if (seleccionados.length) await supabase.from('profesor_grupos').insert(seleccionados.map(gid => ({ profesor_id: profId, grupo_id: gid })));
+        mostrarToast('Grupos actualizados.');
+        renderTablaProfesores();
       };
     };
   });
 }
 
-// ====================================================================
-// Cortes (compartido, admin puede crear, profesor solo ve)
-// ====================================================================
-function renderCortesSection() {
-  const el = document.getElementById('cortesSection');
-  el.innerHTML = `
-    <h2>Cortes (bimestres)</h2>
-    <p class="subtitle">Estos son globales, los usan todos los grupos.</p>
-    <table id="cortesTabla"><tr><th>Número</th><th>Nombre</th>${me.rol === 'admin' ? '<th></th>' : ''}</tr></table>
-    ${me.rol === 'admin' ? `
-    <div class="row" style="margin-top:14px">
-      <div><label>Número</label><input id="cNumero" type="number" placeholder="1"></div>
-      <div><label>Nombre</label><input id="cNombre" placeholder="Primer bimestre"></div>
-      <div><button class="btn-outline" id="cCrear">Agregar corte</button></div>
-    </div>
-    <div class="error" id="cErr"></div>` : ''}
-  `;
+// ---------------- Cortes (admin) ----------------
+function renderCortesAdmin() {
+  document.getElementById('cCrear').onclick = async () => {
+    const numero = Number(document.getElementById('cNumero').value);
+    const nombre = document.getElementById('cNombre').value.trim();
+    if (!numero || !nombre) { document.getElementById('cErr').textContent = 'Completa número y nombre.'; return; }
+    const { error } = await supabase.from('cortes').insert({ numero, nombre });
+    if (error) { document.getElementById('cErr').textContent = error.message; return; }
+    document.getElementById('cErr').textContent = '';
+    const { data: cortes } = await supabase.from('cortes').select('*').order('numero');
+    cortesCache = cortes || [];
+    mostrarToast('Corte agregado.');
+    renderTablaCortesAdmin();
+  };
+  renderTablaCortesAdmin();
+}
+
+function renderTablaCortesAdmin() {
   const tabla = document.getElementById('cortesTabla');
-  cortesCache.forEach(c => {
-    tabla.innerHTML += `<tr><td>${c.numero}</td><td>${c.nombre}</td>${me.rol === 'admin' ? `<td><button class="btn-outline borrarCorteBtn" data-id="${c.id}">Borrar</button></td>` : ''}</tr>`;
-  });
-  if (me.rol === 'admin') {
-    document.getElementById('cCrear').onclick = async () => {
-      const numero = Number(document.getElementById('cNumero').value);
-      const nombre = document.getElementById('cNombre').value.trim();
-      if (!numero || !nombre) { document.getElementById('cErr').textContent = 'Completa número y nombre.'; return; }
-      const { error } = await supabase.from('cortes').insert({ numero, nombre });
-      if (error) { document.getElementById('cErr').textContent = error.message; return; }
+  if (!tabla) return;
+  tabla.innerHTML = '<tr><th>Número</th><th>Nombre</th><th></th></tr>' +
+    cortesCache.map(c => `<tr><td>${c.numero}</td><td>${c.nombre}</td><td><button class="btn btn-sm btn-danger borrarCorteBtn" data-id="${c.id}">Borrar</button></td></tr>`).join('');
+  tabla.querySelectorAll('.borrarCorteBtn').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm('¿Borrar este corte? Falla si algún quiz todavía apunta a él directamente.')) return;
+      const { error } = await supabase.from('cortes').delete().eq('id', btn.dataset.id);
+      if (error) { mostrarToast('No se pudo borrar: ' + error.message, 'error'); return; }
       const { data: cortes } = await supabase.from('cortes').select('*').order('numero');
       cortesCache = cortes || [];
-      renderCortesSection();
+      mostrarToast('Corte borrado.');
+      renderTablaCortesAdmin();
     };
-    tabla.querySelectorAll('.borrarCorteBtn').forEach(btn => {
-      btn.onclick = async () => {
-        if (!confirm('¿Borrar este corte? Falla si algún quiz todavía apunta a él directamente.')) return;
-        const { error } = await supabase.from('cortes').delete().eq('id', btn.dataset.id);
-        if (error) { alert('No se pudo borrar: ' + error.message); return; }
-        const { data: cortes } = await supabase.from('cortes').select('*').order('numero');
-        cortesCache = cortes || [];
-        renderCortesSection();
-      };
-    });
-  }
+  });
 }
 
-// ====================================================================
-// ADMIN: ver quizzes por grupo y combinar en uno nuevo
-// ====================================================================
-async function renderQuizzesGlobalSection() {
-  const el = document.getElementById('quizzesGlobalSection');
+// ---------------- Quizzes: ver por grupo y combinar (admin) ----------------
+let seleccionQuizzesAdmin = new Set();
+
+async function poblarSelectsQuizAdmin() {
   const { data: grupos } = await supabase.from('grupos').select('id, nombre').order('nombre');
-  el.innerHTML = `
-    <h2>Ver quizzes por grupo</h2>
-    <p class="subtitle">Marca quizzes (de uno o varios grupos) para combinarlos en un quiz nuevo. El contenido de preguntas lo maneja el profesor; aquí solo puedes armar combinaciones a partir de lo que ya existe.</p>
-    <select id="verGrupoSelect">${(grupos || []).map(g => `<option value="${g.id}">${g.nombre}</option>`).join('') || '<option value="">No hay grupos</option>'}</select>
-    <table id="quizzesPorGrupoTabla"><tr><th></th><th>Título</th><th>Modo</th><th>Estado</th></tr></table>
-    <p class="hint">Seleccionados para combinar: <span id="contadorSeleccion">0</span></p>
-    <div id="combinarForm" class="hidden">
-      <label>Título del nuevo quiz</label><input id="combTitulo" placeholder="Repaso general">
-      <div class="row">
-        <div><label>Modo</label><select id="combModo"><option value="practica">Práctica</option><option value="examen">Examen</option></select></div>
-        <div><label>Grupo destino</label><select id="combGrupoDestino">${(grupos || []).map(g => `<option value="${g.id}">${g.nombre}</option>`).join('')}</select></div>
-      </div>
-      <label><input type="checkbox" id="combActivo" checked style="width:auto;display:inline-block;margin-right:6px"> Activo desde ya</label>
-      <button class="btn-primary" id="combCrear">Crear quiz combinado</button>
-      <div class="error" id="combErr"></div>
-    </div>
-  `;
-  document.getElementById('verGrupoSelect').onchange = renderQuizzesPorGrupo;
-  document.getElementById('combCrear').onclick = crearQuizCombinado;
-  if (grupos && grupos.length) renderQuizzesPorGrupo();
+  const verSel = document.getElementById('verGrupoSelect');
+  const destSel = document.getElementById('combGrupoDestino');
+  if (verSel) verSel.innerHTML = (grupos || []).map(g => `<option value="${g.id}">${g.nombre}</option>`).join('') || '<option value="">No hay grupos</option>';
+  if (destSel) destSel.innerHTML = (grupos || []).map(g => `<option value="${g.id}">${g.nombre}</option>`).join('');
 }
 
-async function renderQuizzesPorGrupo() {
+async function renderQuizzesAdminTab() {
+  await poblarSelectsQuizAdmin();
+  document.getElementById('verGrupoSelect').onchange = renderQuizzesPorGrupoAdmin;
+  document.getElementById('combCrear').onclick = crearQuizCombinadoAdmin;
+  if (document.getElementById('verGrupoSelect').value) renderQuizzesPorGrupoAdmin();
+}
+
+async function renderQuizzesPorGrupoAdmin() {
   const grupoId = document.getElementById('verGrupoSelect').value;
   const { data: quizzes } = await supabase.from('quizzes').select('id, titulo, modo, activo').eq('grupo_id', grupoId).order('created_at', { ascending: false });
   const tabla = document.getElementById('quizzesPorGrupoTabla');
   tabla.innerHTML = '<tr><th></th><th>Título</th><th>Modo</th><th>Estado</th></tr>' +
-    (quizzes || []).map(q => `
-      <tr>
-        <td><input type="checkbox" class="seleccionQuizChk" value="${q.id}" ${seleccionQuizzes.has(q.id) ? 'checked' : ''}></td>
-        <td>${q.titulo}</td><td>${q.modo}</td>
-        <td><span class="pill ${q.activo ? 'on' : 'off'}">${q.activo ? 'activo' : 'inactivo'}</span></td>
-      </tr>`).join('') || '<tr><td colspan="4">Este grupo todavía no tiene quizzes.</td></tr>';
+    (quizzes || []).map(q => `<tr>
+      <td><input type="checkbox" class="seleccionQuizChk" value="${q.id}" ${seleccionQuizzesAdmin.has(q.id) ? 'checked' : ''}></td>
+      <td>${q.titulo}</td><td>${q.modo}</td>
+      <td><span class="pill ${q.activo ? 'on' : 'off'}">${q.activo ? 'activo' : 'inactivo'}</span></td>
+    </tr>`).join('') || '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Este grupo todavía no tiene quizzes.</td></tr>';
 
   tabla.querySelectorAll('.seleccionQuizChk').forEach(chk => {
-    chk.onchange = () => {
-      if (chk.checked) seleccionQuizzes.add(chk.value); else seleccionQuizzes.delete(chk.value);
-      actualizarContadorSeleccion();
-    };
+    chk.onchange = () => { chk.checked ? seleccionQuizzesAdmin.add(chk.value) : seleccionQuizzesAdmin.delete(chk.value); actualizarContadorSeleccionAdmin(); };
   });
-  actualizarContadorSeleccion();
+  actualizarContadorSeleccionAdmin();
 }
 
-function actualizarContadorSeleccion() {
-  document.getElementById('contadorSeleccion').textContent = seleccionQuizzes.size;
-  document.getElementById('combinarForm').classList.toggle('hidden', seleccionQuizzes.size === 0);
+function actualizarContadorSeleccionAdmin() {
+  document.getElementById('contadorSeleccion').textContent = seleccionQuizzesAdmin.size;
+  document.getElementById('combinarForm').classList.toggle('hidden', seleccionQuizzesAdmin.size === 0);
 }
 
-async function crearQuizCombinado() {
+async function crearQuizCombinadoAdmin() {
   const titulo = document.getElementById('combTitulo').value.trim();
   const modo = document.getElementById('combModo').value;
   const grupoDestino = document.getElementById('combGrupoDestino').value;
@@ -457,170 +610,577 @@ async function crearQuizCombinado() {
   const errEl = document.getElementById('combErr');
   errEl.textContent = '';
   if (!titulo) { errEl.textContent = 'Ponle un título al quiz combinado.'; return; }
-  if (!seleccionQuizzes.size) { errEl.textContent = 'Marca al menos un quiz.'; return; }
+  if (!seleccionQuizzesAdmin.size) { errEl.textContent = 'Marca al menos un quiz.'; return; }
 
-  const { data: qp } = await supabase.from('quiz_preguntas').select('pregunta_id').in('quiz_id', Array.from(seleccionQuizzes));
+  const { data: qp } = await supabase.from('quiz_preguntas').select('pregunta_id').in('quiz_id', Array.from(seleccionQuizzesAdmin));
   const preguntaIds = [...new Set((qp || []).map(r => r.pregunta_id))];
 
-  const { data: nuevoQuiz, error } = await supabase.from('quizzes').insert({
-    grupo_id: grupoDestino, titulo, modo, alcance: 'grupo_preguntas', activo
-  }).select('id').single();
+  const { data: nuevoQuiz, error } = await supabase.from('quizzes').insert({ grupo_id: grupoDestino, titulo, modo, alcance: 'grupo_preguntas', activo }).select('id').single();
   if (error) { errEl.textContent = error.message; return; }
 
   if (preguntaIds.length) {
     const filas = preguntaIds.map((pid, i) => ({ quiz_id: nuevoQuiz.id, pregunta_id: pid, orden: i + 1 }));
     await supabase.from('quiz_preguntas').insert(filas);
   }
-
-  errEl.innerHTML = `<span class="ok-msg">Quiz combinado creado con ${preguntaIds.length} preguntas.</span>`;
-  seleccionQuizzes.clear();
-  renderQuizzesPorGrupo();
+  mostrarToast(`Quiz combinado creado con ${preguntaIds.length} preguntas.`);
+  seleccionQuizzesAdmin.clear();
+  renderQuizzesPorGrupoAdmin();
+  actualizarStatsAdmin();
 }
 
-// ====================================================================
-// PROFESOR: selector de grupo, carga masiva, preguntas, quizzes propios
-// ====================================================================
-async function renderGrupoSelect() {
+// ====================================================================================
+// =============================  PANEL DEL PROFESOR  ================================
+// ====================================================================================
+
+let grupoActivo = null;
+let preguntasCache = [];
+let listaTemporal = [];
+
+function renderProfesorApp() {
+  root.innerHTML = `
+    <aside class="sidebar">
+      <div class="logo"><span class="logo-text">📘 QuizPanel</span></div>
+      <button class="nav-item active" data-tab="resumen">📊 <span class="nav-text">Resumen</span></button>
+      <button class="nav-item" data-tab="cargar">📥 <span class="nav-text">Cargar Preguntas</span></button>
+      <button class="nav-item" data-tab="preguntas">📚 <span class="nav-text">Banco de Preguntas</span></button>
+      <button class="nav-item" data-tab="quizzes">📝 <span class="nav-text">Quizzes</span></button>
+      <button class="nav-item" data-tab="resultados">📈 <span class="nav-text">Resultados</span></button>
+    </aside>
+    <main class="main-content">
+      <div class="header">
+        <h1 id="pageTitle">Resumen</h1>
+        <div class="user-badge"><span>👨‍🏫</span><span>${me.usuario}</span>
+          <button class="btn btn-sm btn-secondary" id="logout" style="margin-left:8px;">Salir</button>
+        </div>
+      </div>
+
+      <div class="sticky-group"><select id="grupoSelect" class="form-control"></select></div>
+
+      <div class="tab-content active" id="proftab-resumen">
+        <div class="grid-2">
+          <div class="card">
+            <h2>Resumen del grupo</h2>
+            <p class="subtitle">Estado actual de tu grupo activo.</p>
+            <div style="display:flex; gap:14px; flex-wrap:wrap;">
+              <div class="stat-card" style="background:var(--primary-light);"><div class="stat-number" style="color:var(--primary);" id="statPreguntas">0</div><div class="stat-label">Preguntas</div></div>
+              <div class="stat-card" style="background:#FFF7ED;"><div class="stat-number" style="color:#EA580C;" id="statQuizzesP">0</div><div class="stat-label">Quizzes</div></div>
+              <div class="stat-card" style="background:#F0FDF4;"><div class="stat-number" style="color:#16A34A;" id="statActivos">0</div><div class="stat-label">Activos</div></div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>Acciones rápidas</h2>
+            <p class="subtitle">Atajos a las tareas más comunes.</p>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <button class="btn btn-primary" data-goto="cargar">📥 Cargar preguntas</button>
+              <button class="btn btn-secondary" data-goto="quizzes">📝 Gestionar quizzes</button>
+              <button class="btn btn-secondary" data-goto="preguntas">📚 Ver banco de preguntas</button>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Cortes (bimestres)</h2>
+          <p class="subtitle">Estos son globales, los usan todos los grupos.</p>
+          <div class="table-container"><table id="cortesTabla"><tr><th>Número</th><th>Nombre</th></tr></table></div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="proftab-cargar">
+        <div class="card">
+          <h2>Cargar preguntas</h2>
+          <p class="subtitle">Elige el método que prefieras. Todos permiten asignar al banco o directo a un quiz.</p>
+          <div class="form-group"><label>¿A dónde cargar estas preguntas?</label>
+            <select id="destinoCarga" class="form-control"><option value="banco">📚 Al banco general del grupo (sin asignar a un quiz)</option></select>
+          </div>
+
+          <div class="sub-tabs">
+            <button class="sub-tab active" data-subtab-cargar="constructor">✍️ Constructor manual</button>
+            <button class="sub-tab" data-subtab-cargar="excel">📄 Subir Excel</button>
+            <button class="sub-tab" data-subtab-cargar="pegar">📋 Pegar filas</button>
+          </div>
+
+          <div class="sub-tab-content active" id="cargasub-constructor">
+            <div class="constructor-card">
+              <h3 style="font-family:'Baloo 2'; font-size:16px; margin-bottom:14px; color:var(--primary);">✍️ Constructor de pregunta</h3>
+              <div class="form-group">
+                <label>Tipo de pregunta</label>
+                <div style="display:flex; gap:10px;">
+                  <label style="display:flex; align-items:center; gap:7px; text-transform:none; font-size:13.5px; cursor:pointer; background:#F8F7FC; padding:9px 14px; border-radius:10px; border:2px solid var(--border); flex:1; margin:0;">
+                    <input type="radio" name="tipoPregunta" value="opcion_unica" checked style="accent-color:var(--primary); width:17px; height:17px;">
+                    <span style="font-weight:700;">🔘 Opción única</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:7px; text-transform:none; font-size:13.5px; cursor:pointer; background:#F8F7FC; padding:9px 14px; border-radius:10px; border:2px solid var(--border); flex:1; margin:0;">
+                    <input type="radio" name="tipoPregunta" value="completar" style="accent-color:var(--primary); width:17px; height:17px;">
+                    <span style="font-weight:700;">✏️ Completar</span>
+                  </label>
+                </div>
+              </div>
+              <div class="form-group"><label>Corte (bimestre)</label><select id="manualCorte" class="form-control"></select></div>
+              <div class="form-group"><label>Enunciado de la pregunta</label><textarea id="manualEnunciado" class="form-control" placeholder="Escribe aquí la pregunta..."></textarea></div>
+              <div class="form-group"><label>Imagen (opcional)</label>
+                <input type="text" id="manualImagen" class="form-control" placeholder="Pega una URL, sube un archivo, o pega una imagen (Ctrl+V) aquí abajo">
+                <input type="file" id="manualImagenArchivo" accept="image/*" class="form-control" style="margin-top:8px; padding:8px;">
+                <div id="zonaPegarImagen" tabindex="0" style="margin-top:8px; border:2px dashed var(--border); border-radius:12px; padding:14px; text-align:center; font-size:12.5px; color:var(--text-muted); font-weight:700; cursor:text;">📋 Haz clic aquí y pega una imagen (Ctrl+V)</div>
+                <div id="subiendoImagenMsg" class="hidden" style="font-size:12px; color:var(--primary); font-weight:700; margin-top:6px;">Subiendo imagen...</div>
+                <img id="previewImagen" class="preview-imagen hidden" alt="Vista previa">
+              </div>
+              <div id="seccionOpciones">
+                <label style="display:block; font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase;">Opciones de respuesta</label>
+                <p style="font-size:11.5px; color:var(--text-muted); font-weight:600; margin-bottom:10px;">Marca el círculo de la izquierda para indicar cuál es la correcta.</p>
+                <div id="listaOpciones"></div>
+                <button type="button" class="btn-add-opcion" id="btnAddOpcion">+ Añadir otra opción</button>
+              </div>
+              <div id="seccionCompletar" class="hidden">
+                <div class="form-group"><label>Respuesta correcta</label><input type="text" id="manualRespuestaCompletar" class="form-control" placeholder="Ej: mecánica"></div>
+              </div>
+              <div style="display:flex; gap:10px; margin-top:18px; flex-wrap:wrap;">
+                <button class="btn btn-primary" id="btnAgregarALista">➕ Agregar a la lista</button>
+                <button class="btn btn-secondary" id="btnLimpiarConstructor">🗑️ Limpiar formulario</button>
+              </div>
+              <div class="error-msg" id="constructorErr"></div>
+            </div>
+            <div class="lista-temporal hidden" id="listaTemporalCont">
+              <h3>📋 Preguntas listas para guardar (<span id="contadorTemporal">0</span>)</h3>
+              <div id="itemsTemporales"></div>
+              <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
+                <button class="btn btn-success" id="btnGuardarTodas">💾 Guardar todas las preguntas</button>
+                <button class="btn btn-danger" id="btnVaciarLista">🗑️ Vaciar lista</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="sub-tab-content" id="cargasub-excel">
+            ${instruccionesCargaHtml()}
+            <button class="btn btn-secondary" id="plantillaBtn" style="margin-bottom:16px;">📄 Descargar plantilla de Excel</button>
+            <div class="form-group"><label>Subir archivo Excel (.xlsx, .xls, .csv)</label><input type="file" id="excelInput" accept=".xlsx,.xls,.csv" class="form-control" style="padding:9px;"></div>
+          </div>
+
+          <div class="sub-tab-content" id="cargasub-pegar">
+            ${instruccionesCargaHtml()}
+            <textarea id="csvInput" class="form-control" placeholder="opcion_unica,1,¿La capital de Perú es Lima?,,Verdadero,V,Falso,F,,,,,&#10;completar,1,El símbolo químico del oro es ___,,,,,,,,,,Au" style="min-height:130px;"></textarea>
+            <button class="btn btn-primary" id="cargarBtn" style="margin-top:10px; width:100%;">📥 Cargar preguntas pegadas</button>
+          </div>
+
+          <div class="error-msg" id="cargaErr"></div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="proftab-preguntas">
+        <div class="card">
+          <h2>Banco de preguntas</h2>
+          <p class="subtitle" id="preguntasCount">Cargando...</p>
+          <div class="search-bar">
+            <input type="text" id="buscadorPreguntas" class="form-control" placeholder="🔍 Buscar por enunciado...">
+            <select id="filtroCorte" class="form-control"><option value="">Todos los cortes</option></select>
+            <select id="filtroTipo" class="form-control"><option value="">Todos los tipos</option><option value="opcion_unica">Opción única</option><option value="completar">Completar</option></select>
+          </div>
+          <div class="preguntas-scroll"><table id="tablaPreguntas"><tr><th>Corte</th><th>Tipo</th><th>Enunciado</th></tr></table></div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="proftab-quizzes">
+        <div class="card">
+          <h2>➕ Crear nuevo quiz</h2>
+          <p class="subtitle">Créalo vacío para armarlo a mano, o con todas las preguntas de un corte o del grupo.</p>
+          <div class="form-group"><label>Título</label><input id="qTitulo" class="form-control" placeholder="Práctica bimestre 1"></div>
+          <div class="grid-2">
+            <div class="form-group"><label>Modo</label>
+              <select id="qModo" class="form-control">
+                <option value="practica">Práctica (feedback inmediato)</option>
+                <option value="examen">Examen (califica al final)</option>
+                <option value="estudio">Estudio (preguntas aleatorias, el alumno elige cuántas)</option>
+              </select>
+            </div>
+            <div class="form-group"><label>Alcance inicial</label>
+              <select id="qAlcance" class="form-control">
+                <option value="vacio">Quiz vacío (agregar preguntas después)</option>
+                <option value="un_corte">Todas las preguntas de un corte</option>
+                <option value="acumulado">Todas las preguntas del grupo</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group hidden" id="qCorteWrap"><label>Corte</label><select id="qCorte" class="form-control"></select></div>
+          <div class="form-group"><label style="text-transform:none; display:flex; align-items:center; gap:8px;"><input type="checkbox" id="qActivo" checked style="width:auto; accent-color:var(--primary);"> Activo desde ya</label></div>
+          <button class="btn btn-primary" id="qCrear">Crear quiz</button>
+          <div class="error-msg" id="qErr"></div>
+        </div>
+        <div class="card">
+          <h2>📋 Quizzes del grupo</h2>
+          <p class="subtitle">Gestiona los quizzes existentes y añádeles preguntas.</p>
+          <div class="table-container"><table id="listaQuizzesTabla"><tr><th>Título</th><th>Modo</th><th>Preguntas</th><th>Estado</th><th>Acciones</th></tr></table></div>
+        </div>
+        <div id="panelGestionQuiz" class="hidden"></div>
+      </div>
+
+      <div class="tab-content" id="proftab-resultados">
+        <div class="card" id="resultadosSection">
+          <h2>Resultados</h2>
+          <p class="subtitle">Ve a la pestaña <strong>Quizzes</strong> y haz clic en "Ver resultados" de cualquier quiz.</p>
+        </div>
+      </div>
+    </main>
+  `;
+  document.getElementById('logout').onclick = async () => { await supabase.auth.signOut(); window.location.href = 'index.html'; };
+  root.querySelectorAll('[data-goto]').forEach(btn => btn.onclick = () => document.querySelector(`.nav-item[data-tab="${btn.dataset.goto}"]`).click());
+  activarTabs('.nav-item', 'proftab', { resumen: 'Panel del profesor', cargar: 'Cargar preguntas', preguntas: 'Banco de preguntas', quizzes: 'Gestión de quizzes', resultados: 'Resultados' });
+
+  renderCortesTablaProfesor();
+  renderGrupoSelectProfesor();
+
+  document.getElementById('plantillaBtn').onclick = () => descargarPlantilla();
+  document.getElementById('excelInput').onchange = async (e) => {
+    const archivo = e.target.files[0];
+    if (!archivo) return;
+    if (!grupoActivo) { mostrarToast('Selecciona un grupo primero.', 'error'); return; }
+    const buffer = await archivo.arrayBuffer();
+    const libro = XLSX.read(buffer, { type: 'array' });
+    const hoja = libro.Sheets[libro.SheetNames[0]];
+    const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
+    await procesarFilas(filas, document.getElementById('destinoCarga').value);
+    e.target.value = '';
+  };
+  document.getElementById('cargarBtn').onclick = async () => {
+    const raw = document.getElementById('csvInput').value.trim();
+    if (!raw) { mostrarToast('Pega al menos una fila.', 'error'); return; }
+    if (!grupoActivo) { mostrarToast('Selecciona un grupo primero.', 'error'); return; }
+    const filas = raw.split('\n').map(linea => { const d = linea.includes('\t') ? '\t' : ','; return linea.split(d).map(c => c.trim()); });
+    await procesarFilas(filas, document.getElementById('destinoCarga').value);
+  };
+  document.getElementById('buscadorPreguntas').oninput = renderTablaPreguntasProfesor;
+  document.getElementById('filtroCorte').onchange = renderTablaPreguntasProfesor;
+  document.getElementById('filtroTipo').onchange = renderTablaPreguntasProfesor;
+  document.getElementById('qAlcance').onchange = (e) => document.getElementById('qCorteWrap').classList.toggle('hidden', e.target.value !== 'un_corte');
+  document.getElementById('qCrear').onclick = crearQuizProfesor;
+
+  root.querySelectorAll('[data-subtab-cargar]').forEach(tab => {
+    tab.onclick = () => {
+      root.querySelectorAll('[data-subtab-cargar]').forEach(t => t.classList.remove('active'));
+      root.querySelectorAll('#proftab-cargar .sub-tab-content').forEach(c => c.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(`cargasub-${tab.dataset.subtabCargar}`).classList.add('active');
+    };
+  });
+  inicializarConstructor();
+}
+
+// ---------------- Constructor manual de preguntas ----------------
+function crearFilaOpcion(texto = '') {
+  const div = document.createElement('div');
+  div.className = 'opcion-row';
+  div.innerHTML = `<input type="radio" name="opcionCorrecta"><input type="text" placeholder="Escribe una opción..." value="${texto}"><button type="button" class="btn-eliminar-opcion" title="Eliminar opción">✕</button>`;
+  div.querySelector('.btn-eliminar-opcion').onclick = () => {
+    const lista = document.getElementById('listaOpciones');
+    if (lista.children.length <= 2) { mostrarToast('Debe haber al menos 2 opciones.', 'error'); return; }
+    div.remove();
+  };
+  div.querySelector('input[type="radio"]').onchange = () => {
+    document.getElementById('listaOpciones').querySelectorAll('.opcion-row').forEach(r => r.classList.remove('correcta'));
+    div.classList.add('correcta');
+  };
+  return div;
+}
+
+function inicializarConstructor() {
+  const listaOpciones = document.getElementById('listaOpciones');
+  listaOpciones.innerHTML = '';
+  listaOpciones.appendChild(crearFilaOpcion());
+  listaOpciones.appendChild(crearFilaOpcion());
+  listaOpciones.querySelector('input[type="radio"]').checked = true;
+  listaOpciones.querySelector('.opcion-row').classList.add('correcta');
+
+  document.getElementById('btnAddOpcion').onclick = () => {
+    if (listaOpciones.children.length >= 6) { mostrarToast('Máximo 6 opciones.', 'error'); return; }
+    listaOpciones.appendChild(crearFilaOpcion());
+  };
+
+  document.querySelectorAll('input[name="tipoPregunta"]').forEach(radio => {
+    radio.onchange = () => {
+      const tipo = document.querySelector('input[name="tipoPregunta"]:checked').value;
+      document.getElementById('seccionOpciones').classList.toggle('hidden', tipo !== 'opcion_unica');
+      document.getElementById('seccionCompletar').classList.toggle('hidden', tipo !== 'completar');
+    };
+  });
+
+  const manualImagen = document.getElementById('manualImagen');
+  const previewImagen = document.getElementById('previewImagen');
+  manualImagen.oninput = () => {
+    const url = manualImagen.value.trim();
+    if (url) { previewImagen.src = url; previewImagen.classList.remove('hidden'); previewImagen.onerror = () => previewImagen.classList.add('hidden'); }
+    else previewImagen.classList.add('hidden');
+  };
+
+  document.getElementById('manualImagenArchivo').onchange = async (e) => {
+    const archivo = e.target.files[0];
+    if (!archivo) return;
+    await subirImagenYUsar(archivo);
+    e.target.value = '';
+  };
+
+  const zonaPegar = document.getElementById('zonaPegarImagen');
+  zonaPegar.onpaste = async (e) => {
+    const item = Array.from(e.clipboardData.items).find(it => it.type.startsWith('image/'));
+    if (!item) { mostrarToast('No se encontró ninguna imagen en el portapapeles.', 'error'); return; }
+    await subirImagenYUsar(item.getAsFile());
+  };
+
+  async function subirImagenYUsar(archivo) {
+    const msg = document.getElementById('subiendoImagenMsg');
+    msg.classList.remove('hidden');
+    const extension = (archivo.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+    const nombreArchivo = `preg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${extension}`;
+    const { error } = await supabase.storage.from('preguntas-imagenes').upload(nombreArchivo, archivo, { upsert: true });
+    msg.classList.add('hidden');
+    if (error) { mostrarToast('Error al subir imagen: ' + error.message, 'error'); return; }
+    const { data: urlData } = supabase.storage.from('preguntas-imagenes').getPublicUrl(nombreArchivo);
+    manualImagen.value = urlData.publicUrl;
+    previewImagen.src = urlData.publicUrl;
+    previewImagen.classList.remove('hidden');
+    mostrarToast('Imagen subida.');
+  }
+
+  document.getElementById('btnAgregarALista').onclick = () => {
+    const errEl = document.getElementById('constructorErr');
+    errEl.textContent = '';
+    const tipo = document.querySelector('input[name="tipoPregunta"]:checked').value;
+    const corteId = document.getElementById('manualCorte').value;
+    const enunciado = document.getElementById('manualEnunciado').value.trim();
+    const imagenUrl = document.getElementById('manualImagen').value.trim();
+    if (!enunciado) { errEl.textContent = 'El enunciado es obligatorio.'; return; }
+    if (!corteId) { errEl.textContent = 'Selecciona un corte.'; return; }
+
+    let opciones = [];
+    let respuestaCorrecta = null;
+    if (tipo === 'opcion_unica') {
+      const filas = listaOpciones.querySelectorAll('.opcion-row');
+      const correctaRadio = listaOpciones.querySelector('input[type="radio"]:checked');
+      if (filas.length < 2) { errEl.textContent = 'Necesitas al menos 2 opciones.'; return; }
+      if (!correctaRadio) { errEl.textContent = 'Marca cuál es la opción correcta.'; return; }
+      let hayCorrecta = false;
+      filas.forEach((fila, i) => {
+        const texto = fila.querySelector('input[type="text"]').value.trim();
+        if (!texto) return;
+        const esCorrecta = fila.querySelector('input[type="radio"]').checked;
+        if (esCorrecta) hayCorrecta = true;
+        opciones.push({ texto, es_correcta: esCorrecta, orden: i + 1 });
+      });
+      if (opciones.length < 2) { errEl.textContent = 'Todas las opciones deben tener texto.'; return; }
+      if (!hayCorrecta) { errEl.textContent = 'Marca cuál es la opción correcta.'; return; }
+    } else {
+      respuestaCorrecta = document.getElementById('manualRespuestaCompletar').value.trim();
+      if (!respuestaCorrecta) { errEl.textContent = 'La respuesta correcta es obligatoria.'; return; }
+    }
+
+    const corteObj = cortesCache.find(c => c.id === corteId);
+    listaTemporal.push({
+      tipo, corte_id: corteId, corte_numero: corteObj ? corteObj.numero : '-',
+      enunciado, imagen_url: imagenUrl || null,
+      opciones: tipo === 'opcion_unica' ? opciones : [],
+      respuesta_correcta: tipo === 'completar' ? respuestaCorrecta : null
+    });
+    renderListaTemporal();
+    limpiarConstructor();
+    mostrarToast('Pregunta agregada a la lista.');
+  };
+
+  document.getElementById('btnLimpiarConstructor').onclick = limpiarConstructor;
+  document.getElementById('btnGuardarTodas').onclick = guardarListaTemporal;
+  document.getElementById('btnVaciarLista').onclick = () => {
+    if (!confirm('¿Vaciar la lista de preguntas pendientes? Se perderán.')) return;
+    listaTemporal = [];
+    renderListaTemporal();
+  };
+}
+
+function limpiarConstructor() {
+  document.getElementById('manualEnunciado').value = '';
+  document.getElementById('manualImagen').value = '';
+  document.getElementById('manualImagenArchivo').value = '';
+  document.getElementById('previewImagen').classList.add('hidden');
+  document.getElementById('manualRespuestaCompletar').value = '';
+  document.getElementById('constructorErr').textContent = '';
+  const listaOpciones = document.getElementById('listaOpciones');
+  listaOpciones.innerHTML = '';
+  listaOpciones.appendChild(crearFilaOpcion());
+  listaOpciones.appendChild(crearFilaOpcion());
+  listaOpciones.querySelector('input[type="radio"]').checked = true;
+  listaOpciones.querySelector('.opcion-row').classList.add('correcta');
+}
+
+function renderListaTemporal() {
+  const cont = document.getElementById('listaTemporalCont');
+  const items = document.getElementById('itemsTemporales');
+  cont.classList.toggle('hidden', listaTemporal.length === 0);
+  if (!listaTemporal.length) return;
+  document.getElementById('contadorTemporal').textContent = listaTemporal.length;
+  items.innerHTML = listaTemporal.map((p, i) => `
+    <div class="pregunta-temporal-item">
+      <div>
+        <div class="enunciado">${i + 1}. ${p.enunciado}</div>
+        <div class="meta"><span>Corte ${p.corte_numero}</span><span>${p.tipo === 'opcion_unica' ? `🔘 ${p.opciones.length} opciones` : '✏️ Completar'}</span>${p.imagen_url ? '<span>🖼️ Con imagen</span>' : ''}</div>
+      </div>
+      <button class="btn btn-sm btn-danger" data-idx="${i}">✕</button>
+    </div>`).join('');
+  items.querySelectorAll('button[data-idx]').forEach(btn => {
+    btn.onclick = () => { listaTemporal.splice(Number(btn.dataset.idx), 1); renderListaTemporal(); };
+  });
+}
+
+async function guardarListaTemporal() {
+  if (!listaTemporal.length) return;
+  if (!grupoActivo) { mostrarToast('Selecciona un grupo primero.', 'error'); return; }
+  const destino = document.getElementById('destinoCarga').value;
+  let cargadas = 0;
+  const idsCreados = [];
+
+  for (const p of listaTemporal) {
+    const { data: pregunta, error: errP } = await supabase.from('preguntas').insert({
+      grupo_id: grupoActivo, corte_id: p.corte_id, enunciado: p.enunciado, tipo: p.tipo,
+      imagen_url: p.imagen_url, respuesta_correcta: p.respuesta_correcta
+    }).select('id').single();
+    if (errP) continue;
+    if (p.tipo === 'opcion_unica' && p.opciones.length) {
+      await supabase.from('opciones').insert(p.opciones.map((o, i) => ({ pregunta_id: pregunta.id, texto: o.texto, es_correcta: o.es_correcta, orden: i + 1 })));
+    }
+    idsCreados.push(pregunta.id);
+    cargadas++;
+  }
+
+  if (destino !== 'banco' && idsCreados.length) {
+    const { data: existentes } = await supabase.from('quiz_preguntas').select('orden').eq('quiz_id', destino).order('orden', { ascending: false }).limit(1);
+    const ordenInicial = existentes && existentes.length ? existentes[0].orden : 0;
+    const { error: errAsig } = await supabase.from('quiz_preguntas').insert(idsCreados.map((pid, i) => ({ quiz_id: destino, pregunta_id: pid, orden: ordenInicial + i + 1 })));
+    mostrarToast(errAsig ? 'Preguntas creadas pero error al asignar al quiz.' : `¡${cargadas} preguntas guardadas y asignadas al quiz!`, errAsig ? 'error' : 'success');
+  } else {
+    mostrarToast(`¡${cargadas} preguntas guardadas en el banco!`);
+  }
+
+  listaTemporal = [];
+  renderListaTemporal();
+  renderPreguntasSectionProfesor();
+  renderListaQuizzesProfesor();
+  actualizarStatsProfesor();
+  actualizarDestinoCarga();
+}
+
+function renderCortesTablaProfesor() {
+  const tabla = document.getElementById('cortesTabla');
+  tabla.innerHTML = '<tr><th>Número</th><th>Nombre</th></tr>' + cortesCache.map(c => `<tr><td>${c.numero}</td><td>${c.nombre}</td></tr>`).join('');
+  const filtroCorte = document.getElementById('filtroCorte');
+  filtroCorte.innerHTML = '<option value="">Todos los cortes</option>' + cortesCache.map(c => `<option value="${c.numero}">${c.nombre}</option>`).join('');
+  const qCorte = document.getElementById('qCorte');
+  qCorte.innerHTML = cortesCache.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+  const manualCorte = document.getElementById('manualCorte');
+  if (manualCorte) manualCorte.innerHTML = cortesCache.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+}
+
+async function renderGrupoSelectProfesor() {
   const { data: grupos } = await supabase.from('grupos').select('id, nombre').order('nombre');
   const sel = document.getElementById('grupoSelect');
-  if (!grupos || !grupos.length) {
-    sel.innerHTML = `<option>No tienes grupos asignados todavía</option>`;
-    return;
-  }
+  if (!grupos || !grupos.length) { sel.innerHTML = `<option>No tienes grupos asignados todavía</option>`; return; }
   sel.innerHTML = grupos.map(g => `<option value="${g.id}">${g.nombre}</option>`).join('');
   grupoActivo = grupos[0].id;
-  sel.onchange = () => { grupoActivo = sel.value; renderCargaSection(); renderPreguntasSection(); renderQuizSection(); };
-  renderCargaSection(); renderPreguntasSection(); renderQuizSection();
-}
-
-function renderCargaSection() {
-  const el = document.getElementById('cargaSection');
-  el.classList.remove('hidden');
-  el.innerHTML = `
-    <div class="card">
-      <h2>Carga masiva de preguntas</h2>
-      <p class="subtitle">Pega filas copiadas de Excel (separadas por tabulaciones) o un CSV. Una pregunta por fila, en este orden de columnas:</p>
-      <p class="hint"><code>tipo, corte_numero, enunciado, imagen_url, opcion_1, correcta_1, opcion_2, correcta_2, opcion_3, correcta_3, opcion_4, correcta_4, respuesta_correcta</code></p>
-      <p class="hint">
-        · <code>tipo</code>: <code>opcion_unica</code> o <code>completar</code><br>
-        · en <code>correcta_N</code> escribe <code>V</code> o <code>F</code><br>
-        · deja vacías las columnas de opciones si el tipo es <code>completar</code>, y llena solo <code>respuesta_correcta</code><br>
-        · <code>imagen_url</code> es opcional, déjala vacía si no aplica<br>
-        · si tu primera fila es de encabezados (con la palabra "tipo"), se ignora automáticamente
-      </p>
-      <button class="btn-outline" id="plantillaBtn" style="margin-bottom:10px">Descargar plantilla de ejemplo</button>
-      <textarea id="csvInput" placeholder="opcion_unica,1,¿La capital de Perú es Lima?,,Verdadero,V,Falso,F,,,,,&#10;completar,1,El símbolo químico del oro es ___,,,,,,,,,,Au"></textarea>
-      <button class="btn-primary" id="cargarBtn">Cargar preguntas</button>
-      <div class="error" id="cargaErr"></div>
-    </div>
-  `;
-  document.getElementById('plantillaBtn').onclick = () => {
-    const contenido = 'tipo,corte_numero,enunciado,imagen_url,opcion_1,correcta_1,opcion_2,correcta_2,opcion_3,correcta_3,opcion_4,correcta_4,respuesta_correcta\n' +
-      'opcion_unica,1,¿La capital de Perú es Lima?,,Verdadero,V,Falso,F,,,,,\n' +
-      'completar,1,El símbolo químico del oro es ___,,,,,,,,,,Au\n';
-    const blob = new Blob([contenido], { type: 'text/csv' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob); a.download = 'plantilla_preguntas.csv'; a.click();
+  sel.onchange = () => {
+    grupoActivo = sel.value;
+    document.getElementById('panelGestionQuiz').classList.add('hidden');
+    renderPreguntasSectionProfesor(); renderListaQuizzesProfesor(); actualizarStatsProfesor();
   };
-  document.getElementById('cargarBtn').onclick = cargarPreguntas;
+  renderPreguntasSectionProfesor(); renderListaQuizzesProfesor(); actualizarStatsProfesor();
 }
 
-function esVerdadero(v) {
-  return ['v', '1', 'si', 'sí', 'true', 'x'].includes((v || '').trim().toLowerCase());
+async function actualizarStatsProfesor() {
+  if (!grupoActivo) return;
+  const { count: cPreguntas } = await supabase.from('preguntas').select('*', { count: 'exact', head: true }).eq('grupo_id', grupoActivo);
+  const { count: cQuizzes } = await supabase.from('quizzes').select('*', { count: 'exact', head: true }).eq('grupo_id', grupoActivo);
+  const { count: cActivos } = await supabase.from('quizzes').select('*', { count: 'exact', head: true }).eq('grupo_id', grupoActivo).eq('activo', true);
+  document.getElementById('statPreguntas').textContent = cPreguntas || 0;
+  document.getElementById('statQuizzesP').textContent = cQuizzes || 0;
+  document.getElementById('statActivos').textContent = cActivos || 0;
 }
 
-async function cargarPreguntas() {
-  const raw = document.getElementById('csvInput').value.trim();
-  const errEl = document.getElementById('cargaErr');
-  errEl.textContent = '';
-  if (!raw) { errEl.textContent = 'Pega al menos una fila.'; return; }
-  if (!grupoActivo) { errEl.textContent = 'Selecciona un grupo primero.'; return; }
+async function actualizarDestinoCarga() {
+  const sel = document.getElementById('destinoCarga');
+  if (!sel) return;
+  const { data: quizzes } = await supabase.from('quizzes').select('id, titulo').eq('grupo_id', grupoActivo).order('titulo');
+  sel.innerHTML = '<option value="banco">📚 Al banco general del grupo (sin asignar a un quiz)</option>' +
+    (quizzes || []).map(q => `<option value="${q.id}">📝 Al quiz: "${q.titulo}"</option>`).join('');
+}
 
-  let filas = raw.split('\n').map(l => l.trim()).filter(Boolean);
-  if (filas[0].toLowerCase().includes('tipo')) filas = filas.slice(1);
+async function procesarFilas(filasCrudas, destino = 'banco') {
+  let filas = filasCrudas.filter(f => f.some(c => String(c ?? '').trim() !== ''));
+  if (filas.length && String(filas[0][0] ?? '').toLowerCase().includes('tipo')) filas = filas.slice(1);
 
   let cargadas = 0, fallidas = 0;
-  for (const linea of filas) {
-    const delim = linea.includes('\t') ? '\t' : ',';
-    const cols = linea.split(delim).map(c => c.trim());
-    const [tipoRaw, corteNumRaw, enunciado, imagenUrl, o1, c1, o2, c2, o3, c3, o4, c4, respCorrecta] = cols;
+  const preguntasCreadasIds = [];
+
+  for (const cols of filas) {
+    const [tipoRaw, corteNumRaw, enunciado, imagenUrl, o1, c1, o2, c2, o3, c3, o4, c4, respCorrecta] = cols.map(c => String(c ?? '').trim());
     const tipo = (tipoRaw || 'opcion_unica').toLowerCase();
     const corte = cortesCache.find(c => String(c.numero) === String(corteNumRaw));
     if (!enunciado || !corte) { fallidas++; continue; }
 
+    let respuestaCompletar = respCorrecta;
+    if (tipo === 'completar' && !respuestaCompletar) {
+      respuestaCompletar = [c4, o4, c3, o3, c2, o2, c1, o1].find(v => v) || null;
+    }
+
     const { data: pregunta, error: errP } = await supabase.from('preguntas').insert({
-      grupo_id: grupoActivo,
-      corte_id: corte.id,
-      enunciado,
-      tipo,
+      grupo_id: grupoActivo, corte_id: corte.id, enunciado, tipo,
       imagen_url: imagenUrl || null,
-      respuesta_correcta: tipo === 'completar' ? (respCorrecta || null) : null
+      respuesta_correcta: tipo === 'completar' ? respuestaCompletar : null
     }).select('id').single();
 
     if (errP) { fallidas++; continue; }
 
     if (tipo === 'opcion_unica') {
-      const opciones = [[o1, c1], [o2, c2], [o3, c3], [o4, c4]]
-        .filter(([texto]) => texto)
+      const opciones = [[o1, c1], [o2, c2], [o3, c3], [o4, c4]].filter(([texto]) => texto)
         .map(([texto, correcta], i) => ({ pregunta_id: pregunta.id, texto, es_correcta: esVerdadero(correcta), orden: i + 1 }));
       if (opciones.length) await supabase.from('opciones').insert(opciones);
     }
+    preguntasCreadasIds.push(pregunta.id);
     cargadas++;
   }
-  errEl.innerHTML = `<span class="${fallidas ? 'error' : 'ok-msg'}">Cargadas: ${cargadas}. Con error: ${fallidas}.</span>`;
-  renderPreguntasSection();
+
+  if (destino !== 'banco' && preguntasCreadasIds.length) {
+    const { data: existentes } = await supabase.from('quiz_preguntas').select('orden').eq('quiz_id', destino).order('orden', { ascending: false }).limit(1);
+    const ordenInicial = existentes && existentes.length ? existentes[0].orden : 0;
+    const filasIns = preguntasCreadasIds.map((pid, i) => ({ quiz_id: destino, pregunta_id: pid, orden: ordenInicial + i + 1 }));
+    const { error: errAsig } = await supabase.from('quiz_preguntas').insert(filasIns);
+    if (errAsig) mostrarToast(`Preguntas creadas pero error al asignar al quiz: ${errAsig.message}`, 'error');
+    else mostrarToast(`¡${cargadas} preguntas cargadas y asignadas al quiz!`);
+  } else {
+    if (fallidas) mostrarToast(`Cargadas: ${cargadas}. Con error: ${fallidas}.`, 'error');
+    else mostrarToast(`¡${cargadas} preguntas cargadas al banco!`);
+  }
+
+  renderPreguntasSectionProfesor();
+  renderListaQuizzesProfesor();
+  actualizarStatsProfesor();
+  actualizarDestinoCarga();
 }
 
-async function renderPreguntasSection() {
-  const el = document.getElementById('preguntasSection');
-  el.classList.remove('hidden');
-  const { data: preguntas } = await supabase.from('preguntas')
-    .select('id, enunciado, tipo, cortes(numero, nombre)')
-    .eq('grupo_id', grupoActivo).order('created_at', { ascending: false });
-
-  el.innerHTML = `
-    <div class="card">
-      <h2>Preguntas cargadas (${preguntas ? preguntas.length : 0})</h2>
-      <table>
-        <tr><th>Corte</th><th>Tipo</th><th>Enunciado</th></tr>
-        ${(preguntas || []).map(p => `<tr><td>${p.cortes ? p.cortes.numero : '-'}</td><td>${p.tipo}</td><td>${p.enunciado}</td></tr>`).join('')}
-      </table>
-    </div>
-  `;
+async function renderPreguntasSectionProfesor() {
+  const { data: preguntas } = await supabase.from('preguntas').select('id, enunciado, tipo, cortes(numero, nombre)').eq('grupo_id', grupoActivo).order('created_at', { ascending: false });
+  preguntasCache = preguntas || [];
+  document.getElementById('preguntasCount').textContent = `${preguntasCache.length} preguntas cargadas`;
+  renderTablaPreguntasProfesor();
 }
 
-function renderQuizSection() {
-  const el = document.getElementById('quizSection');
-  el.classList.remove('hidden');
-  el.innerHTML = `
-    <div class="card">
-      <h2>Crear quiz</h2>
-      <label>Título</label><input id="qTitulo" placeholder="Práctica bimestre 1">
-      <div class="row">
-        <div><label>Modo</label>
-          <select id="qModo"><option value="practica">Práctica (feedback inmediato)</option><option value="examen">Examen (califica al final)</option></select>
-        </div>
-        <div><label>Alcance</label>
-          <select id="qAlcance"><option value="un_corte">Un corte específico</option><option value="acumulado">Acumulado (todos los cortes)</option></select>
-        </div>
-        <div id="qCorteWrap"><label>Corte</label>
-          <select id="qCorte">${cortesCache.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('')}</select>
-        </div>
-      </div>
-      <label><input type="checkbox" id="qActivo" checked style="width:auto;display:inline-block;margin-right:6px"> Activo desde ya</label>
-      <button class="btn-primary" id="qCrear">Crear quiz</button>
-      <div class="error" id="qErr"></div>
-    </div>
-    <div id="listaQuizzes"></div>
-  `;
-  document.getElementById('qAlcance').onchange = (e) => {
-    document.getElementById('qCorteWrap').style.display = e.target.value === 'un_corte' ? 'block' : 'none';
-  };
-  document.getElementById('qCrear').onclick = crearQuiz;
-  renderListaQuizzes();
+function renderTablaPreguntasProfesor() {
+  const buscador = (document.getElementById('buscadorPreguntas').value || '').toLowerCase();
+  const filtroCorte = document.getElementById('filtroCorte').value;
+  const filtroTipo = document.getElementById('filtroTipo').value;
+  const filtradas = preguntasCache.filter(p => {
+    const matchTexto = p.enunciado.toLowerCase().includes(buscador);
+    const matchCorte = !filtroCorte || (p.cortes && String(p.cortes.numero) === filtroCorte);
+    const matchTipo = !filtroTipo || p.tipo === filtroTipo;
+    return matchTexto && matchCorte && matchTipo;
+  });
+  const tabla = document.getElementById('tablaPreguntas');
+  tabla.innerHTML = '<tr><th>Corte</th><th>Tipo</th><th>Enunciado</th></tr>' +
+    (filtradas.length ? filtradas.map(p => `<tr><td>${p.cortes ? p.cortes.numero : '-'}</td><td>${p.tipo}</td><td>${p.enunciado}</td></tr>`).join('')
+    : '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">No se encontraron preguntas.</td></tr>');
 }
 
-async function crearQuiz() {
+async function crearQuizProfesor() {
   const titulo = document.getElementById('qTitulo').value.trim();
   const modo = document.getElementById('qModo').value;
   const alcance = document.getElementById('qAlcance').value;
@@ -630,59 +1190,223 @@ async function crearQuiz() {
   errEl.textContent = '';
   if (!titulo) { errEl.textContent = 'Ponle un título al quiz.'; return; }
 
-  const { data: quiz, error: errQ } = await supabase.from('quizzes').insert({
-    grupo_id: grupoActivo, titulo, modo, alcance, corte_id: corteId, activo
-  }).select('id').single();
+  const { data: quiz, error: errQ } = await supabase.from('quizzes').insert({ grupo_id: grupoActivo, titulo, modo, alcance, corte_id: corteId, activo }).select('id').single();
   if (errQ) { errEl.textContent = errQ.message; return; }
 
-  let queryPreguntas = supabase.from('preguntas').select('id').eq('grupo_id', grupoActivo);
-  if (alcance === 'un_corte') queryPreguntas = queryPreguntas.eq('corte_id', corteId);
-  const { data: preguntas } = await queryPreguntas;
-
-  if (preguntas && preguntas.length) {
-    const filas = preguntas.map((p, i) => ({ quiz_id: quiz.id, pregunta_id: p.id, orden: i + 1 }));
-    await supabase.from('quiz_preguntas').insert(filas);
+  let preguntasAsignadas = 0;
+  if (alcance !== 'vacio') {
+    let queryPreguntas = supabase.from('preguntas').select('id').eq('grupo_id', grupoActivo);
+    if (alcance === 'un_corte') queryPreguntas = queryPreguntas.eq('corte_id', corteId);
+    const { data: preguntas } = await queryPreguntas;
+    if (preguntas && preguntas.length) {
+      await supabase.from('quiz_preguntas').insert(preguntas.map((p, i) => ({ quiz_id: quiz.id, pregunta_id: p.id, orden: i + 1 })));
+      preguntasAsignadas = preguntas.length;
+    }
   }
+
   document.getElementById('qTitulo').value = '';
-  errEl.innerHTML = `<span class="ok-msg">Quiz creado con ${preguntas ? preguntas.length : 0} preguntas.</span>`;
-  renderListaQuizzes();
+  mostrarToast(`Quiz "${titulo}" creado con ${preguntasAsignadas} preguntas.`);
+  renderListaQuizzesProfesor();
+  actualizarStatsProfesor();
+  actualizarDestinoCarga();
 }
 
-async function renderListaQuizzes() {
+async function renderListaQuizzesProfesor() {
   const { data: quizzes } = await supabase.from('quizzes').select('id, titulo, modo, activo').eq('grupo_id', grupoActivo).order('created_at', { ascending: false });
-  const el = document.getElementById('listaQuizzes');
-  el.innerHTML = `<div class="card"><h2>Quizzes de este grupo</h2>
-    <table><tr><th>Título</th><th>Modo</th><th>Estado</th><th></th><th></th></tr>
-    ${(quizzes || []).map(q => `
-      <tr>
-        <td>${q.titulo}</td><td>${q.modo}</td>
-        <td><span class="pill ${q.activo ? 'on' : 'off'}">${q.activo ? 'activo' : 'inactivo'}</span></td>
-        <td><button class="btn-outline toggleBtn" data-id="${q.id}" data-activo="${q.activo}">${q.activo ? 'Desactivar' : 'Activar'}</button></td>
-        <td><button class="btn-outline verBtn" data-id="${q.id}" data-titulo="${q.titulo}">Ver resultados</button></td>
+  const { data: conteos } = await supabase.from('quiz_preguntas').select('quiz_id');
+  const mapaConteos = {};
+  (conteos || []).forEach(c => { mapaConteos[c.quiz_id] = (mapaConteos[c.quiz_id] || 0) + 1; });
+
+  const tabla = document.getElementById('listaQuizzesTabla');
+  const opcionesModo = m => ['practica', 'examen', 'estudio'].map(v => `<option value="${v}" ${v === m ? 'selected' : ''}>${v}</option>`).join('');
+
+  tabla.innerHTML = '<tr><th>Título</th><th>Modo</th><th>Preguntas</th><th>Estado</th><th>Acciones</th></tr>' +
+    (quizzes || []).map(q => `<tr>
+      <td>${q.titulo}</td>
+      <td><div style="display:flex; gap:6px; align-items:center;"><select class="form-control modoSelect" data-id="${q.id}" style="padding:6px 8px; font-size:12.5px;">${opcionesModo(q.modo)}</select><button class="btn btn-sm btn-secondary guardarModoBtn" data-id="${q.id}">💾</button></div></td>
+      <td><span style="font-weight:800; color:var(--primary);">${mapaConteos[q.id] || 0}</span></td>
+      <td><span class="pill ${q.activo ? 'on' : 'off'}">${q.activo ? 'activo' : 'inactivo'}</span></td>
+      <td><div style="display:flex; gap:6px; flex-wrap:wrap;">
+        <button class="btn btn-sm btn-primary gestionarBtn" data-id="${q.id}" data-titulo="${q.titulo}">⚙️ Gestionar preguntas</button>
+        <button class="btn btn-sm btn-secondary toggleBtn" data-id="${q.id}" data-activo="${q.activo}">${q.activo ? 'Desactivar' : 'Activar'}</button>
+        <button class="btn btn-sm btn-secondary verBtn" data-id="${q.id}" data-titulo="${q.titulo}">📊</button>
+      </div></td>
+    </tr>`).join('') || '<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Todavía no hay quizzes. Crea uno arriba.</td></tr>';
+
+  tabla.querySelectorAll('.guardarModoBtn').forEach(btn => {
+    btn.onclick = async () => {
+      const nuevoModo = tabla.querySelector(`.modoSelect[data-id="${btn.dataset.id}"]`).value;
+      const { error } = await supabase.from('quizzes').update({ modo: nuevoModo }).eq('id', btn.dataset.id);
+      mostrarToast(error ? 'Error al guardar.' : 'Modo actualizado.', error ? 'error' : 'success');
+    };
+  });
+  tabla.querySelectorAll('.toggleBtn').forEach(btn => {
+    btn.onclick = async () => { await supabase.from('quizzes').update({ activo: btn.dataset.activo !== 'true' }).eq('id', btn.dataset.id); renderListaQuizzesProfesor(); actualizarStatsProfesor(); };
+  });
+  tabla.querySelectorAll('.verBtn').forEach(btn => btn.onclick = () => verResultadosProfesor(btn.dataset.id, btn.dataset.titulo));
+  tabla.querySelectorAll('.gestionarBtn').forEach(btn => btn.onclick = () => abrirPanelGestionQuiz(btn.dataset.id, btn.dataset.titulo));
+
+  actualizarDestinoCarga();
+}
+
+async function abrirPanelGestionQuiz(quizId, titulo) {
+  const panel = document.getElementById('panelGestionQuiz');
+  panel.classList.remove('hidden');
+  panel.innerHTML = `
+    <div class="card">
+      <h2>⚙️ Gestionando: "${titulo}"</h2>
+      <p class="subtitle">Mira las preguntas que ya tiene, añade más del banco, o carga preguntas nuevas directo a este quiz.</p>
+      <div class="sub-tabs">
+        <button class="sub-tab active" data-subtab="ver">📋 Ver preguntas</button>
+        <button class="sub-tab" data-subtab="manual">➕ Añadir del banco</button>
+        <button class="sub-tab" data-subtab="masiva">📥 Carga masiva</button>
+      </div>
+      <div class="sub-tab-content active" id="subtab-ver"><div id="preguntasDelQuiz" style="margin-top:14px;">Cargando...</div></div>
+      <div class="sub-tab-content" id="subtab-manual">
+        <p class="subtitle" style="margin-top:14px;">Marca preguntas del banco para añadirlas a este quiz.</p>
+        <div class="search-bar"><input type="text" id="buscadorManual" class="form-control" placeholder="🔍 Buscar pregunta..."></div>
+        <div class="preguntas-seleccionables-scroll" id="listaSeleccionables"></div>
+        <div id="contadorSeleccionados" class="hidden floating-counter"><span id="numSeleccionados">0</span> preguntas seleccionadas<button id="btnAgregarSeleccionadas">Añadir al quiz</button></div>
+      </div>
+      <div class="sub-tab-content" id="subtab-masiva">
+        <p class="subtitle" style="margin-top:14px;">Sube un Excel o pega filas — se cargan al banco Y se asignan a este quiz.</p>
+        <button class="btn btn-secondary" id="plantillaMasivaBtn" style="margin-bottom:14px;">📄 Descargar plantilla</button>
+        <div class="grid-2">
+          <div>
+            <label style="font-weight:700; color:var(--text-muted); font-size:12px; text-transform:uppercase;">Subir Excel</label>
+            <input type="file" id="excelMasivoInput" accept=".xlsx,.xls,.csv" class="form-control" style="margin-top:6px; padding:9px;">
+          </div>
+          <div>
+            <label style="font-weight:700; color:var(--text-muted); font-size:12px; text-transform:uppercase;">Pegar filas</label>
+            <textarea id="csvMasivoInput" class="form-control" placeholder="opcion_unica,1,¿La capital...?,,Verdadero,V,Falso,F,,,,,"></textarea>
+            <button class="btn btn-primary" id="cargarMasivoBtn" style="margin-top:8px; width:100%;">Cargar y asignar</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  panel.querySelectorAll('.sub-tab').forEach(tab => {
+    tab.onclick = () => {
+      panel.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
+      panel.querySelectorAll('.sub-tab-content').forEach(c => c.classList.remove('active'));
+      tab.classList.add('active');
+      panel.querySelector(`#subtab-${tab.dataset.subtab}`).classList.add('active');
+    };
+  });
+
+  await cargarPreguntasDelQuiz(quizId);
+  await cargarSeleccionables(quizId);
+
+  panel.querySelector('#plantillaMasivaBtn').onclick = () => descargarPlantilla('plantilla_preguntas.xlsx');
+  panel.querySelector('#excelMasivoInput').onchange = async (e) => {
+    const archivo = e.target.files[0];
+    if (!archivo) return;
+    const buffer = await archivo.arrayBuffer();
+    const libro = XLSX.read(buffer, { type: 'array' });
+    const hoja = libro.Sheets[libro.SheetNames[0]];
+    const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, defval: '' });
+    await procesarFilas(filas, quizId);
+    await cargarPreguntasDelQuiz(quizId); await cargarSeleccionables(quizId);
+    e.target.value = '';
+  };
+  panel.querySelector('#cargarMasivoBtn').onclick = async () => {
+    const raw = panel.querySelector('#csvMasivoInput').value.trim();
+    if (!raw) { mostrarToast('Pega al menos una fila.', 'error'); return; }
+    const filas = raw.split('\n').map(linea => { const d = linea.includes('\t') ? '\t' : ','; return linea.split(d).map(c => c.trim()); });
+    await procesarFilas(filas, quizId);
+    await cargarPreguntasDelQuiz(quizId); await cargarSeleccionables(quizId);
+    panel.querySelector('#csvMasivoInput').value = '';
+  };
+}
+
+async function cargarPreguntasDelQuiz(quizId) {
+  const cont = document.getElementById('preguntasDelQuiz');
+  if (!cont) return;
+  const { data: asignadas } = await supabase.from('quiz_preguntas').select('id, orden, preguntas(id, enunciado, tipo, cortes(numero))').eq('quiz_id', quizId).order('orden');
+
+  if (!asignadas || !asignadas.length) {
+    cont.innerHTML = `<div class="empty-state"><p>📭 Este quiz todavía no tiene preguntas.</p><p style="font-size:12.5px; margin-top:6px;">Usa las pestañas de arriba para añadir preguntas.</p></div>`;
+    return;
+  }
+
+  cont.innerHTML = `
+    <p style="font-weight:700; margin-bottom:10px;">📌 ${asignadas.length} preguntas asignadas:</p>
+    <div class="table-container"><table>
+      <tr><th>#</th><th>Corte</th><th>Tipo</th><th>Enunciado</th><th></th></tr>
+      ${asignadas.map((a, i) => `<tr>
+        <td style="font-weight:800; color:var(--primary);">${i + 1}</td>
+        <td>${a.preguntas?.cortes?.numero || '-'}</td><td>${a.preguntas?.tipo || '-'}</td><td>${a.preguntas?.enunciado || '-'}</td>
+        <td><button class="btn btn-sm btn-danger quitarPreguntaBtn" data-id="${a.id}">Quitar</button></td>
       </tr>`).join('')}
     </table></div>`;
 
-  el.querySelectorAll('.toggleBtn').forEach(btn => {
+  cont.querySelectorAll('.quitarPreguntaBtn').forEach(btn => {
     btn.onclick = async () => {
-      await supabase.from('quizzes').update({ activo: btn.dataset.activo !== 'true' }).eq('id', btn.dataset.id);
-      renderListaQuizzes();
+      if (!confirm('¿Quitar esta pregunta del quiz? (no se borra del banco)')) return;
+      await supabase.from('quiz_preguntas').delete().eq('id', btn.dataset.id);
+      mostrarToast('Pregunta quitada del quiz.');
+      await cargarPreguntasDelQuiz(quizId); await cargarSeleccionables(quizId); renderListaQuizzesProfesor();
     };
-  });
-  el.querySelectorAll('.verBtn').forEach(btn => {
-    btn.onclick = () => verResultados(btn.dataset.id, btn.dataset.titulo);
   });
 }
 
-async function verResultados(quizId, titulo) {
-  const { data: intentos } = await supabase.from('intentos')
-    .select('puntaje_total, estado, estudiantes(nombre)').eq('quiz_id', quizId);
-  const el = document.getElementById('resultadosSection');
-  el.classList.remove('hidden');
-  el.innerHTML = `<div class="card"><h2>Resultados: ${titulo}</h2>
-    <table><tr><th>Estudiante</th><th>Puntaje</th><th>Estado</th></tr>
-    ${(intentos || []).map(i => `<tr><td>${i.estudiantes ? i.estudiantes.nombre : '-'}</td><td>${i.puntaje_total ?? '-'}</td><td>${i.estado}</td></tr>`).join('') || '<tr><td colspan="3">Nadie lo ha tomado todavía.</td></tr>'}
+async function cargarSeleccionables(quizId) {
+  const cont = document.getElementById('listaSeleccionables');
+  if (!cont) return;
+  const { data: yaAsignadas } = await supabase.from('quiz_preguntas').select('pregunta_id').eq('quiz_id', quizId);
+  const idsAsignados = new Set((yaAsignadas || []).map(a => a.pregunta_id));
+  const { data: preguntas } = await supabase.from('preguntas').select('id, enunciado, tipo, cortes(numero)').eq('grupo_id', grupoActivo).order('created_at', { ascending: false });
+  const disponibles = (preguntas || []).filter(p => !idsAsignados.has(p.id));
+
+  if (!disponibles.length) { cont.innerHTML = `<div class="empty-state"><p>No hay preguntas disponibles en el banco para añadir.</p></div>`; return; }
+
+  cont.innerHTML = disponibles.map(p => `
+    <div class="pregunta-item">
+      <input type="checkbox" class="chkPregunta" value="${p.id}">
+      <div class="pregunta-texto">${p.enunciado}<div class="pregunta-meta"><span>Corte ${p.cortes?.numero || '-'}</span><span>${p.tipo}</span></div></div>
+    </div>`).join('');
+
+  const contador = document.getElementById('contadorSeleccionados');
+  const numSpan = document.getElementById('numSeleccionados');
+  cont.querySelectorAll('.chkPregunta').forEach(chk => {
+    chk.onchange = () => {
+      const n = cont.querySelectorAll('.chkPregunta:checked').length;
+      numSpan.textContent = n;
+      contador.classList.toggle('hidden', n === 0);
+    };
+  });
+
+  document.getElementById('btnAgregarSeleccionadas').onclick = async () => {
+    const seleccionados = Array.from(cont.querySelectorAll('.chkPregunta:checked')).map(c => c.value);
+    if (!seleccionados.length) return;
+    const { data: existentes } = await supabase.from('quiz_preguntas').select('orden').eq('quiz_id', quizId).order('orden', { ascending: false }).limit(1);
+    const ordenInicial = existentes && existentes.length ? existentes[0].orden : 0;
+    const filas = seleccionados.map((pid, i) => ({ quiz_id: quizId, pregunta_id: pid, orden: ordenInicial + i + 1 }));
+    const { error } = await supabase.from('quiz_preguntas').insert(filas);
+    if (error) { mostrarToast('Error al añadir: ' + error.message, 'error'); return; }
+    mostrarToast(`¡${seleccionados.length} preguntas añadidas al quiz!`);
+    await cargarPreguntasDelQuiz(quizId); await cargarSeleccionables(quizId); renderListaQuizzesProfesor();
+  };
+
+  const buscador = document.getElementById('buscadorManual');
+  buscador.oninput = () => {
+    const q = buscador.value.toLowerCase();
+    cont.querySelectorAll('.pregunta-item').forEach(item => {
+      item.style.display = item.querySelector('.pregunta-texto').textContent.toLowerCase().includes(q) ? 'flex' : 'none';
+    });
+  };
+}
+
+async function verResultadosProfesor(quizId, titulo) {
+  const { data: intentos } = await supabase.from('intentos').select('puntaje_total, estado, estudiantes(nombre)').eq('quiz_id', quizId);
+  document.querySelector('.nav-item[data-tab="resultados"]').click();
+  document.getElementById('resultadosSection').innerHTML = `
+    <h2>Resultados: ${titulo}</h2>
+    <p class="subtitle">Listado de estudiantes que han tomado este quiz.</p>
+    <div class="table-container"><table>
+      <tr><th>Estudiante</th><th>Puntaje</th><th>Estado</th></tr>
+      ${(intentos || []).map(i => `<tr><td>${i.estudiantes ? i.estudiantes.nombre : '-'}</td><td>${i.puntaje_total ?? '-'}</td><td>${i.estado}</td></tr>`).join('') || '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">Nadie lo ha tomado todavía.</td></tr>'}
     </table></div>`;
-  el.scrollIntoView({ behavior: 'smooth' });
 }
 
 init();

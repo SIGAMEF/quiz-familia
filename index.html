@@ -1,359 +1,856 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Quiz</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:wght@400;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --board: #16332a;
-    --board-line: #244539;
-    --paper: #f4efdd;
-    --paper-line: #ddd3ad;
-    --ink: #22281f;
-    --ink-muted: #5a5f4f;
-    --chalk-amber: #f2c14e;
-    --pen-red: #d9503a;
-    --pen-green: #4f8f5e;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    min-height: 100vh;
-    background: var(--board);
-    background-image:
-      linear-gradient(var(--board-line) 1px, transparent 1px),
-      linear-gradient(90deg, var(--board-line) 1px, transparent 1px);
-    background-size: 28px 28px;
-    font-family: 'Source Sans 3', sans-serif;
-    color: var(--ink);
-    display: flex;
-    justify-content: center;
-    padding: 32px 16px;
-  }
-  .sheet {
-    background: var(--paper);
-    background-image: repeating-linear-gradient(var(--paper) 0px, var(--paper) 27px, var(--paper-line) 28px);
-    width: 100%;
-    max-width: 440px;
-    border-radius: 4px;
-    padding: 32px 28px;
-    box-shadow: 0 12px 0 rgba(0,0,0,0.15);
-    align-self: flex-start;
-  }
-  h1 {
-    font-family: 'Fraunces', serif;
-    font-weight: 600;
-    font-size: 26px;
-    margin: 0 0 4px;
-  }
-  .subtitle { color: var(--ink-muted); font-size: 14px; margin: 0 0 24px; }
-  label { display: block; font-size: 13px; color: var(--ink-muted); margin: 14px 0 4px; }
-  input[type="email"], input[type="password"], input[type="text"] {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1.5px solid var(--paper-line);
-    border-radius: 4px;
-    background: #fff;
-    font-size: 15px;
-    font-family: inherit;
-  }
-  button {
-    font-family: 'Fraunces', serif;
-    font-weight: 600;
-    font-size: 15px;
-    cursor: pointer;
-    border: none;
-    border-radius: 4px;
-    padding: 11px 18px;
-  }
-  .btn-primary {
-    background: var(--ink);
-    color: var(--paper);
-    width: 100%;
-    margin-top: 20px;
-  }
-  .btn-link {
-    background: none;
-    color: var(--ink-muted);
-    font-family: 'Source Sans 3', sans-serif;
-    text-decoration: underline;
-    padding: 8px 0;
-    font-size: 13px;
-  }
-  .error { color: var(--pen-red); font-size: 13px; margin-top: 10px; min-height: 16px; }
-  .quiz-item {
-    border: 1.5px solid var(--paper-line);
-    border-radius: 4px;
-    padding: 14px 16px;
-    margin-top: 14px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-  }
-  .quiz-item .meta { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
-  .btn-small {
-    background: var(--chalk-amber);
-    color: var(--ink);
-    font-size: 13px;
-    padding: 8px 14px;
-    white-space: nowrap;
-  }
-  .progress { font-size: 13px; color: var(--ink-muted); margin-bottom: 6px; }
-  .question-text { font-family: 'Fraunces', serif; font-size: 19px; font-weight: 600; margin: 6px 0 20px; }
-  .option {
-    display: block;
-    width: 100%;
-    text-align: left;
-    background: #fff;
-    border: 1.5px solid var(--paper-line);
-    border-radius: 4px;
-    padding: 12px 14px;
-    margin-bottom: 10px;
-    font-family: 'Source Sans 3', sans-serif;
-    font-size: 15px;
-  }
-  .option.selected { border-color: var(--ink); }
-  .option.correct { border-color: var(--pen-green); background: #ecf5ed; }
-  .option.incorrect { border-color: var(--pen-red); background: #fbecea; }
-  .option:disabled { cursor: default; }
-  .feedback { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
-  .feedback.correct { color: var(--pen-green); }
-  .feedback.incorrect { color: var(--pen-red); }
-  .score-stamp {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 42px;
-    color: var(--pen-red);
-    border: 3px solid var(--pen-red);
-    border-radius: 8px;
-    display: inline-block;
-    padding: 8px 20px;
-    transform: rotate(-4deg);
-    margin: 12px 0 20px;
-  }
-  .hidden { display: none; }
-  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz - Estudiante</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --primary: #7C6FF0;
+            --primary-dark: #6C5CE7;
+            --primary-light: #EDE9FE;
+            --bg: #F8F7FC;
+            --card-bg: #FFFFFF;
+            --text-main: #2D2A45;
+            --text-muted: #8E86AC;
+            --border: #EBE3FB;
+            --success: #4CD98A;
+            --success-bg: #E6FBF0;
+            --error: #FF6F91;
+            --error-bg: #FFE4E9;
+            --warning: #FFC857;
+            --warning-bg: #FFF7ED;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: linear-gradient(135deg, #F5F1FF 0%, #FDECF5 50%, #EAF6FF 100%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            padding: 32px 16px;
+        }
+
+        .sheet {
+            background: var(--card-bg);
+            width: 100%;
+            max-width: 480px;
+            border-radius: 28px;
+            padding: 32px 28px;
+            box-shadow: 0 20px 50px rgba(124,111,240,0.2);
+            align-self: flex-start;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sheet::before {
+            content: '';
+            position: absolute;
+            top: -50px;
+            right: -50px;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, rgba(124,111,240,0.1) 0%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        h1 {
+            font-family: 'Baloo 2', sans-serif;
+            font-weight: 800;
+            font-size: 28px;
+            margin: 0 0 6px;
+            color: var(--text-main);
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin: 0 0 24px;
+            font-weight: 600;
+        }
+
+        .login-hero { text-align: center; margin-bottom: 30px; }
+        .login-hero .logo-grande { font-size: 64px; margin-bottom: 12px; display: inline-block; animation: float 3s ease-in-out infinite; }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        .login-hero h1 { font-size: 32px; background: linear-gradient(135deg, var(--primary), #A855F7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .login-hero p { color: var(--text-muted); font-size: 15px; font-weight: 600; }
+
+        label { display: block; font-size: 13px; color: var(--text-muted); margin: 14px 0 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        input[type="email"], input[type="password"], input[type="text"], input[type="number"], select {
+            width: 100%; padding: 14px 16px; border: 2px solid var(--border); border-radius: 14px;
+            background: #FBFAFF; font-size: 15px; font-family: inherit; font-weight: 600; color: var(--text-main);
+        }
+        input:focus, select:focus { outline: none; border-color: var(--primary); background: white; box-shadow: 0 0 0 4px rgba(124, 111, 240, 0.1); }
+
+        button { font-family: 'Baloo 2', sans-serif; font-weight: 700; font-size: 15px; cursor: pointer; border: none; border-radius: 16px; padding: 14px 20px; }
+        button:active { transform: scale(0.97); }
+
+        .btn-primary { background: linear-gradient(135deg, #8B7EF7, #6C5CE7); color: #fff; width: 100%; margin-top: 20px; box-shadow: 0 6px 16px rgba(108,92,231,0.35); }
+        .btn-link { background: none; color: var(--primary); font-family: 'Nunito', sans-serif; font-weight: 700; text-decoration: underline; padding: 8px 0; font-size: 13px; width: 100%; text-align: center; }
+        .error { color: var(--error); font-size: 13px; margin-top: 10px; min-height: 16px; font-weight: 700; text-align: center; }
+
+        .dashboard-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .user-info { display: flex; align-items: center; gap: 12px; }
+        .user-avatar { font-size: 28px; background: var(--primary-light); width: 56px; height: 56px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 12px rgba(124,111,240,0.2); }
+        .user-greeting h2 { font-family: 'Baloo 2', sans-serif; font-size: 20px; font-weight: 800; line-height: 1.1; }
+        .user-greeting p { font-size: 13px; color: var(--text-muted); font-weight: 700; }
+        .header-actions { display: flex; gap: 8px; }
+        .icon-btn { width: 40px; height: 40px; border-radius: 12px; background: var(--bg); border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; padding: 0; }
+        .icon-btn:hover { border-color: var(--primary); background: var(--primary-light); }
+
+        .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 24px; }
+        .stat-box { background: var(--bg); border-radius: 16px; padding: 14px 10px; text-align: center; border: 2px solid var(--border); }
+        .stat-box:hover { border-color: var(--primary); }
+        .stat-icon { font-size: 20px; margin-bottom: 4px; }
+        .stat-value { font-family: 'Baloo 2', sans-serif; font-size: 22px; font-weight: 800; color: var(--primary); line-height: 1; }
+        .stat-label { font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-top: 4px; letter-spacing: 0.3px; }
+
+        .section-title { font-family: 'Baloo 2', sans-serif; font-size: 16px; font-weight: 800; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+
+        .quiz-card { background: var(--card-bg); border: 2px solid var(--border); border-radius: 18px; padding: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 14px; cursor: pointer; position: relative; overflow: hidden; }
+        .quiz-card:hover { border-color: var(--primary); }
+        .quiz-icon { width: 50px; height: 50px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
+        .quiz-info { flex: 1; min-width: 0; }
+        .quiz-title { font-family: 'Baloo 2', sans-serif; font-size: 16px; font-weight: 800; color: var(--text-main); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .quiz-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .quiz-badge { font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 8px; text-transform: uppercase; letter-spacing: 0.3px; }
+        .quiz-badge.practica { background: var(--primary-light); color: var(--primary); }
+        .quiz-badge.examen { background: var(--error-bg); color: var(--error); }
+        .quiz-badge.estudio { background: var(--warning-bg); color: #EA580C; }
+        .quiz-questions { font-size: 12px; color: var(--text-muted); font-weight: 700; }
+        .quiz-arrow { font-size: 20px; color: var(--text-muted); flex-shrink: 0; }
+        .last-score { position: absolute; top: 8px; right: 8px; font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 8px; }
+        .last-score.alta { background: var(--success-bg); color: #2FAE6C; }
+        .last-score.media { background: var(--warning-bg); color: #EA580C; }
+        .last-score.baja { background: var(--error-bg); color: var(--error); }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(45, 42, 69, 0.5); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+        .modal { background: var(--card-bg); border-radius: 24px; padding: 28px; max-width: 400px; width: 100%; box-shadow: 0 20px 50px rgba(0,0,0,0.2); }
+        .modal h3 { font-family: 'Baloo 2', sans-serif; font-size: 20px; margin-bottom: 16px; }
+
+        .setup-card { background: var(--bg); border: 2px solid var(--border); border-radius: 18px; padding: 16px; margin-bottom: 14px; display: flex; gap: 14px; align-items: flex-start; }
+        .setup-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+        .setup-content { flex: 1; }
+        .setup-content h3 { font-family: 'Baloo 2', sans-serif; font-size: 15px; margin-bottom: 4px; }
+        .setup-subtitle { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; font-weight: 600; }
+
+        .avatar-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 8px; }
+        .avatar-option { aspect-ratio: 1; border-radius: 12px; border: 2px solid var(--border); background: white; font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+        .avatar-option:hover { border-color: var(--primary); }
+        .avatar-option.selected { border-color: var(--primary); background: var(--primary-light); box-shadow: 0 0 0 3px rgba(124,111,240,0.2); }
+
+        .counter-input { display: flex; align-items: center; gap: 10px; background: white; border: 2px solid var(--border); border-radius: 12px; padding: 6px; }
+        .counter-btn { width: 36px; height: 36px; border-radius: 8px; background: var(--primary-light); color: var(--primary); font-size: 18px; font-weight: 800; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; padding: 0; font-family: 'Baloo 2', sans-serif; }
+        .counter-btn:hover { background: var(--primary); color: white; }
+        .counter-value { flex: 1; text-align: center; font-family: 'Baloo 2', sans-serif; font-size: 20px; font-weight: 800; color: var(--text-main); border: none; background: none; outline: none; width: 100%; }
+
+        .resultado-container { text-align: center; padding: 20px 0; }
+        .resultado-emoji { font-size: 72px; margin-bottom: 16px; display: inline-block; animation: float 3s ease-in-out infinite; }
+        .estrellas { display: flex; justify-content: center; gap: 8px; margin: 16px 0; }
+        .estrella { font-size: 36px; opacity: 0.2; }
+        .estrella.activa { opacity: 1; animation: pop 0.4s ease; }
+        @keyframes pop { 0% { transform: scale(0); } 70% { transform: scale(1.3); } 100% { transform: scale(1); } }
+
+        .score-stamp { font-family: 'Baloo 2', sans-serif; font-size: 48px; font-weight: 800; color: #fff; background: linear-gradient(135deg, #8B7EF7, #6C5CE7); border-radius: 24px; display: inline-block; padding: 16px 36px; margin: 16px 0; box-shadow: 0 12px 28px rgba(108,92,231,0.4); }
+        .btn-whatsapp { background: linear-gradient(135deg, #25D366, #128C7E); color: white; width: 100%; margin-top: 12px; box-shadow: 0 6px 16px rgba(37,211,102,0.35); }
+        .btn-secondary { background: var(--primary-light); color: var(--primary); width: 100%; margin-top: 10px; }
+        .hidden { display: none; }
+
+        .timer-container { position: relative; width: 52px; height: 52px; display: flex; justify-content: center; align-items: center; }
+        .timer-svg { transform: rotate(-90deg); width: 100%; height: 100%; }
+        .timer-circle-bg { fill: none; stroke: var(--border); stroke-width: 5; }
+        .timer-circle-progress { fill: none; stroke: var(--primary); stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+        .timer-text { position: absolute; font-family: 'Baloo 2', sans-serif; font-size: 14px; font-weight: 800; color: var(--primary); }
+
+        .quiz-top-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .quiz-user-info { display: flex; align-items: center; gap: 8px; }
+        .quiz-avatar { font-size: 20px; background: var(--primary-light); width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+        .quiz-username { font-family: 'Baloo 2', sans-serif; font-weight: 700; color: var(--text-main); font-size: 14px; }
+        .score-badge { background: var(--success-bg); color: #166534; padding: 5px 12px; border-radius: 20px; font-weight: 800; font-size: 13px; display: flex; align-items: center; gap: 5px; }
+        .status-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .question-text { font-family: 'Baloo 2', sans-serif; font-size: 20px; font-weight: 700; margin: 6px 0 20px; line-height: 1.4; }
+
+        .option { display: block; width: 100%; text-align: left; background: #FBFAFF; border: 2px solid var(--border); border-radius: 16px; padding: 14px 18px; margin-bottom: 10px; font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 15px; cursor: pointer; }
+        .option:hover { border-color: var(--primary); background: white; }
+        .option.selected { border-color: var(--primary); }
+        .option.correct { border-color: var(--success); background: var(--success-bg); }
+        .option.incorrect { border-color: var(--error); background: var(--error-bg); }
+        .option:disabled { cursor: default; }
+
+        .feedback { font-size: 14px; font-weight: 800; margin-bottom: 14px; padding: 12px 16px; border-radius: 12px; }
+        .feedback.correct { color: #2FAE6C; background: var(--success-bg); }
+        .feedback.incorrect { color: #E14D72; background: var(--error-bg); }
+
+        .progress-text { color: var(--text-muted); font-weight: 700; font-size: 13px; }
+    </style>
 </head>
 <body>
 <div class="sheet" id="app"></div>
 
 <script type="module">
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-// ------------------------------------------------------------------
-// CONFIGURA ESTO con los datos de tu proyecto Supabase
-// (Settings -> API en tu panel de Supabase)
-// ------------------------------------------------------------------
-const SUPABASE_URL = 'TU_SUPABASE_URL_AQUI';
-const SUPABASE_ANON_KEY = 'TU_SUPABASE_ANON_KEY_AQUI';
+    const SUPABASE_URL = 'https://qiawcxkmszgwvxlbbcdw.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpYXdjeGttc3pnd3Z4bGJiY2R3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyNDU2NjgsImV4cCI6MjEwNDgyMTY2OH0.Yw57xGupEs2f7s1lYIw9Gx1UUP2gg18FbgKj8LVzMfY';
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const app = document.getElementById('app');
-const DOMINIO_INTERNO = 'quizapp.com'; // dominio ficticio, nunca se le muestra al usuario
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const app = document.getElementById('app');
+    const DOMINIO_INTERNO = 'quizapp.com';
 
-function sanitizarUsuario(u) {
-  return (u || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
-}
-
-let state = { estudiante: null, quiz: null, intentoId: null, preguntas: [], index: 0, puntosTotales: 0, sumaPuntos: 0 };
-
-async function init() {
-  if (SUPABASE_URL.includes('TU_SUPABASE')) {
-    app.innerHTML = `<h1>Falta configurar</h1><p class="subtitle">Reemplaza SUPABASE_URL y SUPABASE_ANON_KEY al inicio del archivo con los datos de tu proyecto (Settings → API en Supabase).</p>`;
-    return;
-  }
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session) loadDashboard();
-  else renderLogin();
-}
-
-async function renderLogin(mode = 'login') {
-  const isSignup = mode === 'signup';
-  let grupos = [];
-  if (isSignup) {
-    const { data } = await supabase.from('grupos').select('id, nombre').order('nombre');
-    grupos = data || [];
-  }
-  app.innerHTML = `
-    <h1>Quiz</h1>
-    <p class="subtitle">${isSignup ? 'Crea tu cuenta de estudiante' : 'Inicia sesión para ver tus quizzes'}</p>
-    ${isSignup ? `
-    <label>Nombre completo</label>
-    <input type="text" id="nombre">
-    <label>Grupo</label>
-    <select id="grupoSel">${grupos.map(g => `<option value="${g.id}">${g.nombre}</option>`).join('') || '<option value="">No hay grupos creados todavía</option>'}</select>
-    ` : ''}
-    <label>Usuario</label>
-    <input type="text" id="usuario" autocomplete="username">
-    <label>Contraseña</label>
-    <input type="password" id="password" autocomplete="${isSignup ? 'new-password' : 'current-password'}">
-    <button class="btn-primary" id="submitBtn">${isSignup ? 'Crear cuenta' : 'Entrar'}</button>
-    <button class="btn-link" id="toggleBtn">${isSignup ? 'Ya tengo cuenta' : 'Crear una cuenta nueva'}</button>
-    <div class="error" id="err"></div>
-  `;
-  document.getElementById('toggleBtn').onclick = () => renderLogin(isSignup ? 'login' : 'signup');
-  document.getElementById('submitBtn').onclick = async () => {
-    const usuario = sanitizarUsuario(document.getElementById('usuario').value);
-    const password = document.getElementById('password').value;
-    const errEl = document.getElementById('err');
-    errEl.style.color = ''; errEl.textContent = '';
-
-    if (isSignup) {
-      const nombre = document.getElementById('nombre').value.trim();
-      const grupoId = document.getElementById('grupoSel').value;
-      if (!usuario || !password || !nombre || !grupoId) { errEl.textContent = 'Completa todos los campos.'; return; }
-
-      const { data: existente } = await supabase.rpc('obtener_email_por_usuario', { p_usuario: usuario });
-      if (existente) { errEl.textContent = 'Ese usuario ya existe. Prueba con otro.'; return; }
-
-      const email = `${usuario}@${DOMINIO_INTERNO}`;
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) { errEl.textContent = error.message; return; }
-      const { error: errEst } = await supabase.from('estudiantes').insert({
-        perfil_id: data.user.id, grupo_id: grupoId, nombre
-      });
-      if (errEst) { errEl.textContent = 'Cuenta creada, pero no se pudo enlazar al grupo: ' + errEst.message; return; }
-      errEl.style.color = 'var(--pen-green)'; errEl.textContent = 'Cuenta creada. Ahora inicia sesión.';
-      renderLogin('login');
-      return;
+    function sanitizarUsuario(u) {
+        return (u || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
     }
 
-    if (!usuario || !password) { errEl.textContent = 'Completa usuario y contraseña.'; return; }
-    const { data: emailReal } = await supabase.rpc('obtener_email_por_usuario', { p_usuario: usuario });
-    if (!emailReal) { errEl.textContent = 'Usuario o contraseña incorrectos.'; return; }
-    const { error } = await supabase.auth.signInWithPassword({ email: emailReal, password });
-    if (error) { errEl.textContent = 'Usuario o contraseña incorrectos.'; return; }
-    loadDashboard();
-  };
-}
-
-async function loadDashboard() {
-  app.innerHTML = `<p class="subtitle">Cargando...</p>`;
-  const { data: { user } } = await supabase.auth.getUser();
-
-  const { data: estudiante } = await supabase
-    .from('estudiantes').select('id, grupo_id, nombre').eq('perfil_id', user.id).maybeSingle();
-
-  if (!estudiante) {
-    app.innerHTML = `
-      <div class="topbar"><h1>Quiz</h1><button class="btn-link" id="logout">Salir</button></div>
-      <p class="subtitle">Tu cuenta aún no está asignada a un grupo. Avísale a tu profesor.</p>`;
-    document.getElementById('logout').onclick = async () => { await supabase.auth.signOut(); renderLogin(); };
-    return;
-  }
-  state.estudiante = estudiante;
-
-  const { data: quizzes } = await supabase
-    .from('quizzes').select('id, titulo, modo, activo').eq('grupo_id', estudiante.grupo_id).eq('activo', true);
-
-  const { data: grupos } = await supabase.from('grupos').select('id, nombre').order('nombre');
-
-  app.innerHTML = `
-    <div class="topbar"><h1>Hola, ${estudiante.nombre}</h1><button class="btn-link" id="logout">Salir</button></div>
-    <p class="subtitle">Tus quizzes disponibles</p>
-    <div id="list">${(quizzes || []).length ? '' : '<p class="subtitle">No hay quizzes activos por ahora.</p>'}</div>
-    <label>Cambiar de grupo</label>
-    <select id="grupoCambio">${(grupos || []).map(g => `<option value="${g.id}" ${g.id === estudiante.grupo_id ? 'selected' : ''}>${g.nombre}</option>`).join('')}</select>
-    <button class="btn-link" id="cambiarGrupoBtn">Guardar grupo</button>
-    <div class="error" id="grupoErr"></div>
-  `;
-  document.getElementById('logout').onclick = async () => { await supabase.auth.signOut(); renderLogin(); };
-  document.getElementById('cambiarGrupoBtn').onclick = async () => {
-    const nuevoGrupo = document.getElementById('grupoCambio').value;
-    const { error } = await supabase.from('estudiantes').update({ grupo_id: nuevoGrupo }).eq('id', estudiante.id);
-    const msgEl = document.getElementById('grupoErr');
-    if (error) { msgEl.textContent = error.message; return; }
-    loadDashboard();
-  };
-
-  const list = document.getElementById('list');
-  (quizzes || []).forEach(q => {
-    const item = document.createElement('div');
-    item.className = 'quiz-item';
-    item.innerHTML = `<div><div>${q.titulo}</div><div class="meta">Modo ${q.modo === 'practica' ? 'práctica' : 'examen'}</div></div>
-      <button class="btn-small">Comenzar</button>`;
-    item.querySelector('button').onclick = () => startQuiz(q);
-    list.appendChild(item);
-  });
-}
-
-async function startQuiz(quiz) {
-  state.quiz = quiz;
-  const { data: intento } = await supabase
-    .from('intentos').insert({ quiz_id: quiz.id, estudiante_id: state.estudiante.id }).select('id').single();
-  state.intentoId = intento.id;
-
-  const { data: qp } = await supabase
-    .from('quiz_preguntas')
-    .select('orden, preguntas(id, enunciado, puntos)')
-    .eq('quiz_id', quiz.id)
-    .order('orden');
-
-  state.preguntas = qp.map(r => r.preguntas);
-  state.sumaPuntos = state.preguntas.reduce((a, p) => a + Number(p.puntos), 0);
-  state.index = 0;
-  renderQuestion();
-}
-
-async function renderQuestion() {
-  const pregunta = state.preguntas[state.index];
-  const { data: opciones } = await supabase.rpc('obtener_opciones', { p_pregunta_id: pregunta.id });
-
-  app.innerHTML = `
-    <p class="progress">Pregunta ${state.index + 1} de ${state.preguntas.length}</p>
-    <p class="question-text">${pregunta.enunciado}</p>
-    <div id="opts"></div>
-    <div class="feedback hidden" id="feedback"></div>
-    <button class="btn-primary hidden" id="nextBtn">${state.index + 1 === state.preguntas.length ? 'Finalizar' : 'Siguiente'}</button>
-  `;
-
-  const opts = document.getElementById('opts');
-  opciones.forEach(o => {
-    const b = document.createElement('button');
-    b.className = 'option';
-    b.textContent = o.texto;
-    b.onclick = async () => {
-      opts.querySelectorAll('button').forEach(btn => btn.disabled = true);
-      b.classList.add('selected');
-      const { data: esCorrecta } = await supabase.rpc('responder_pregunta', {
-        p_intento_id: state.intentoId, p_pregunta_id: pregunta.id, p_opcion_id: o.id
-      });
-      if (state.quiz.modo === 'practica') {
-        b.classList.add(esCorrecta ? 'correct' : 'incorrect');
-        const fb = document.getElementById('feedback');
-        fb.classList.remove('hidden');
-        fb.classList.add(esCorrecta ? 'correct' : 'incorrect');
-        fb.textContent = esCorrecta ? '¡Correcto!' : 'Incorrecto.';
-      }
-      document.getElementById('nextBtn').classList.remove('hidden');
+    let state = {
+        estudiante: null, quiz: null, intentoId: null, preguntas: [], index: 0,
+        puntosTotales: 0, sumaPuntos: 0, poolIds: [], correctas: 0
     };
-    opts.appendChild(b);
-  });
 
-  document.getElementById('nextBtn').onclick = () => {
-    state.index++;
-    if (state.index < state.preguntas.length) renderQuestion();
-    else finishQuiz();
-  };
-}
+    async function init() {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+            const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', session.user.id).single();
+            if (perfil && (perfil.rol === 'admin' || perfil.rol === 'profesor')) {
+                window.location.href = 'admin.html';
+                return;
+            }
+            loadDashboard();
+        } else {
+            renderLogin();
+        }
+    }
 
-async function finishQuiz() {
-  const { data: total } = await supabase.rpc('finalizar_intento', { p_intento_id: state.intentoId });
-  app.innerHTML = `
-    <h1>Quiz terminado</h1>
-    <p class="subtitle">${state.quiz.titulo}</p>
-    <div class="score-stamp">${total} / ${state.sumaPuntos}</div>
-    <button class="btn-primary" id="backBtn">Volver a mis quizzes</button>
-  `;
-  document.getElementById('backBtn').onclick = loadDashboard;
-}
+    async function renderLogin(mode = 'login') {
+        const isSignup = mode === 'signup';
+        let grupos = [];
+        if (isSignup) {
+            const { data } = await supabase.from('grupos').select('id, nombre').order('nombre');
+            grupos = data || [];
+        }
 
-init();
+        app.innerHTML = `
+            <div class="login-hero">
+                <div class="logo-grande">🐸</div>
+                <h1>QuizApp</h1>
+                <p>${isSignup ? 'Crea tu cuenta de estudiante' : 'Aprende jugando'}</p>
+            </div>
+            ${isSignup ? `
+                <label>Nombre completo</label>
+                <input type="text" id="nombre" placeholder="Ej: Lucas Pérez">
+                <label>Grupo</label>
+                <select id="grupoSel">${grupos.map(g => `<option value="${g.id}">${g.nombre}</option>`).join('') || '<option value="">No hay grupos creados todavía</option>'}</select>
+            ` : ''}
+            <label>Usuario</label>
+            <input type="text" id="usuario" placeholder="tu usuario" autocomplete="username">
+            <label>Contraseña</label>
+            <input type="password" id="password" placeholder="••••••••" autocomplete="${isSignup ? 'new-password' : 'current-password'}">
+            <button class="btn-primary" id="submitBtn">${isSignup ? '✨ Crear cuenta' : '🚀 Entrar'}</button>
+            <button class="btn-link" id="toggleBtn">${isSignup ? 'Ya tengo cuenta' : 'Crear una cuenta nueva'}</button>
+            <div class="error" id="err"></div>
+        `;
+
+        document.getElementById('toggleBtn').onclick = () => renderLogin(isSignup ? 'login' : 'signup');
+        document.getElementById('submitBtn').onclick = async () => {
+            const usuario = sanitizarUsuario(document.getElementById('usuario').value);
+            const password = document.getElementById('password').value;
+            const errEl = document.getElementById('err');
+            errEl.style.color = '';
+            errEl.textContent = '';
+
+            if (isSignup) {
+                const nombre = document.getElementById('nombre').value.trim();
+                const grupoId = document.getElementById('grupoSel').value;
+                if (!usuario || !password || !nombre || !grupoId) { errEl.textContent = 'Completa todos los campos.'; return; }
+
+                const { data: existente } = await supabase.rpc('obtener_email_por_usuario', { p_usuario: usuario });
+                if (existente) { errEl.textContent = 'Ese usuario ya existe. Prueba con otro.'; return; }
+
+                const email = `${usuario}@${DOMINIO_INTERNO}`;
+                const { data, error } = await supabase.auth.signUp({ email, password });
+                if (error) { errEl.textContent = error.message; return; }
+
+                const { error: errEst } = await supabase.from('estudiantes').insert({
+                    perfil_id: data.user.id, grupo_id: grupoId, nombre
+                });
+                if (errEst) { errEl.textContent = 'Cuenta creada, pero no se pudo enlazar al grupo: ' + errEst.message; return; }
+                errEl.style.color = 'var(--success)';
+                errEl.textContent = '¡Cuenta creada! Ahora inicia sesión.';
+                setTimeout(() => renderLogin('login'), 1500);
+                return;
+            }
+
+            if (!usuario || !password) { errEl.textContent = 'Completa usuario y contraseña.'; return; }
+            const { data: emailReal } = await supabase.rpc('obtener_email_por_usuario', { p_usuario: usuario });
+            if (!emailReal) { errEl.textContent = 'Usuario o contraseña incorrectos.'; return; }
+            const { error } = await supabase.auth.signInWithPassword({ email: emailReal, password });
+            if (error) { errEl.textContent = 'Usuario o contraseña incorrectos.'; return; }
+
+            const { data: { user } } = await supabase.auth.getUser();
+            const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).single();
+            if (perfil && (perfil.rol === 'admin' || perfil.rol === 'profesor')) {
+                window.location.href = 'admin.html';
+                return;
+            }
+            loadDashboard();
+        };
+    }
+
+    async function loadDashboard() {
+        app.innerHTML = `<p class="subtitle">Cargando...</p>`;
+        const { data: { user } } = await supabase.auth.getUser();
+
+        const { data: estudiante } = await supabase
+            .from('estudiantes').select('id, grupo_id, nombre, avatar').eq('perfil_id', user.id).maybeSingle();
+
+        if (!estudiante) {
+            app.innerHTML = `
+                <div class="dashboard-header">
+                    <h1>QuizApp</h1>
+                    <button class="icon-btn" id="logout">🚪</button>
+                </div>
+                <p class="subtitle">Tu cuenta aún no está asignada a un grupo. Avísale a tu profesor.</p>`;
+            document.getElementById('logout').onclick = async () => { await supabase.auth.signOut(); renderLogin(); };
+            return;
+        }
+        state.estudiante = estudiante;
+
+        const { data: quizzes } = await supabase
+            .from('quizzes').select('id, titulo, modo, activo').eq('grupo_id', estudiante.grupo_id).eq('activo', true);
+
+        const { data: conteos } = await supabase.from('quiz_preguntas').select('quiz_id');
+        const mapaConteos = {};
+        (conteos || []).forEach(c => { mapaConteos[c.quiz_id] = (mapaConteos[c.quiz_id] || 0) + 1; });
+
+        // NOTA: la tabla intentos usa "iniciado_en" (no "created_at")
+        const { data: intentos } = await supabase.from('intentos')
+            .select('quiz_id, puntaje_total, estado, iniciado_en')
+            .eq('estudiante_id', estudiante.id)
+            .order('iniciado_en', { ascending: false });
+
+        const mapaUltimos = {};
+        (intentos || []).forEach(i => { if (!mapaUltimos[i.quiz_id]) mapaUltimos[i.quiz_id] = i; });
+
+        const intentosCompletados = (intentos || []).filter(i => i.estado === 'finalizado');
+        const promedio = intentosCompletados.length > 0
+            ? Math.round(intentosCompletados.reduce((a, i) => a + (Number(i.puntaje_total) || 0), 0) / intentosCompletados.length)
+            : 0;
+
+        const fechasUnicas = [...new Set((intentos || []).map(i => new Date(i.iniciado_en).toDateString()))];
+        let racha = 0;
+        const hoy = new Date();
+        for (let d = 0; d < 30; d++) {
+            const fecha = new Date(hoy);
+            fecha.setDate(hoy.getDate() - d);
+            if (fechasUnicas.includes(fecha.toDateString())) racha++;
+            else if (d > 0) break;
+        }
+
+        app.innerHTML = `
+            <div class="dashboard-header">
+                <div class="user-info">
+                    <div class="user-avatar">${estudiante.avatar || '🙂'}</div>
+                    <div class="user-greeting">
+                        <h2>¡Hola, ${estudiante.nombre.split(' ')[0]}!</h2>
+                        <p>¿Listo para aprender?</p>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button class="icon-btn" id="musicaBtn" title="Música">🎵</button>
+                    <button class="icon-btn" id="configBtn" title="Configuración">⚙️</button>
+                    <button class="icon-btn" id="logout" title="Salir">🚪</button>
+                </div>
+            </div>
+
+            <div class="stats-row">
+                <div class="stat-box"><div class="stat-icon">🏆</div><div class="stat-value">${intentosCompletados.length}</div><div class="stat-label">Completados</div></div>
+                <div class="stat-box"><div class="stat-icon">⭐</div><div class="stat-value">${promedio}</div><div class="stat-label">Promedio</div></div>
+                <div class="stat-box"><div class="stat-icon">🔥</div><div class="stat-value">${racha}</div><div class="stat-label">Racha</div></div>
+            </div>
+
+            <div class="section-title">📚 Tus Quizzes</div>
+            <div id="list">${(quizzes || []).length ? '' : '<p class="subtitle" style="text-align:center; padding:20px;">No hay quizzes activos por ahora.</p>'}</div>
+        `;
+
+        document.getElementById('logout').onclick = async () => { await supabase.auth.signOut(); renderLogin(); };
+        document.getElementById('musicaBtn').onclick = (e) => toggleMusica(e.currentTarget);
+        document.getElementById('configBtn').onclick = () => abrirConfigModal();
+
+        const list = document.getElementById('list');
+        (quizzes || []).forEach(q => {
+            const iconos = { practica: '🎯', examen: '📝', estudio: '🧠' };
+            const colores = {
+                practica: { bg: 'var(--primary-light)', color: 'var(--primary)' },
+                examen: { bg: 'var(--error-bg)', color: 'var(--error)' },
+                estudio: { bg: 'var(--warning-bg)', color: '#EA580C' }
+            };
+            const nombreModo = q.modo === 'practica' ? 'Práctica' : q.modo === 'examen' ? 'Examen' : 'Estudio';
+            const ultimo = mapaUltimos[q.id];
+            const numPreguntas = mapaConteos[q.id] || 0;
+
+            let lastScoreHtml = '';
+            if (ultimo && ultimo.puntaje_total != null) {
+                const pct = numPreguntas > 0 ? (ultimo.puntaje_total / numPreguntas) * 100 : 0;
+                const clase = pct >= 80 ? 'alta' : pct >= 50 ? 'media' : 'baja';
+                lastScoreHtml = `<div class="last-score ${clase}">${ultimo.puntaje_total}/${numPreguntas}</div>`;
+            }
+
+            const card = document.createElement('div');
+            card.className = 'quiz-card';
+            card.innerHTML = `
+                ${lastScoreHtml}
+                <div class="quiz-icon" style="background:${colores[q.modo].bg}; color:${colores[q.modo].color};">${iconos[q.modo] || '📝'}</div>
+                <div class="quiz-info">
+                    <div class="quiz-title">${q.titulo}</div>
+                    <div class="quiz-meta"><span class="quiz-badge ${q.modo}">${nombreModo}</span><span class="quiz-questions">${numPreguntas} preguntas</span></div>
+                </div>
+                <div class="quiz-arrow">›</div>
+            `;
+            card.onclick = () => { if (q.modo === 'estudio') pedirCantidadEstudio(q); else startQuiz(q); };
+            list.appendChild(card);
+        });
+    }
+
+    async function abrirConfigModal() {
+        const { data: grupos } = await supabase.from('grupos').select('id, nombre').order('nombre');
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.innerHTML = `
+            <div class="modal">
+                <h3>⚙️ Configuración</h3>
+                <label>Cambiar de grupo</label>
+                <select id="grupoCambio">${(grupos || []).map(g => `<option value="${g.id}" ${g.id === state.estudiante.grupo_id ? 'selected' : ''}>${g.nombre}</option>`).join('')}</select>
+                <div class="error" id="grupoErr" style="text-align:left;"></div>
+                <button class="btn-primary" id="guardarGrupoBtn">Guardar cambios</button>
+                <button class="btn-link" id="cerrarModalBtn">Cerrar</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('#cerrarModalBtn').onclick = () => overlay.remove();
+        overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+        overlay.querySelector('#guardarGrupoBtn').onclick = async () => {
+            const nuevoGrupo = overlay.querySelector('#grupoCambio').value;
+            const { error } = await supabase.from('estudiantes').update({ grupo_id: nuevoGrupo }).eq('id', state.estudiante.id);
+            if (error) { overlay.querySelector('#grupoErr').textContent = error.message; return; }
+            overlay.remove();
+            loadDashboard();
+        };
+    }
+
+    const AVATARES = ['😀','😎','🤓','🥳','🦁','🐱','🐶','🦊','🐼','🐸','🦄','🐵','👑','⭐','🚀','🎮','⚽','🎨','📚','🧠','💡','🔥','🌟','🍀','🎯','🐨','🐯','🦋','🐢','🌈'];
+
+    async function pedirCantidadEstudio(quiz) {
+        const { data: qp } = await supabase.from('quiz_preguntas').select('pregunta_id').eq('quiz_id', quiz.id);
+        const totalDisponibles = (qp || []).length;
+        const avatarActual = state.estudiante.avatar || '🙂';
+
+        app.innerHTML = `
+            <div class="dashboard-header">
+                <h1 style="font-size:22px;">🧠 ${quiz.titulo}</h1>
+                <button class="icon-btn" id="volverBtn">←</button>
+            </div>
+            <p class="subtitle">Modo estudio: preguntas al azar, con la respuesta correcta si te equivocas.</p>
+
+            <div class="setup-card">
+                <div class="setup-icon" style="background:var(--primary-light); color:var(--primary);">🧑‍🎤</div>
+                <div class="setup-content">
+                    <h3>Elige tu avatar</h3>
+                    <div class="avatar-grid" id="avatarGrid">${AVATARES.map(a => `<button type="button" class="avatar-option ${a === avatarActual ? 'selected' : ''}" data-emoji="${a}">${a}</button>`).join('')}</div>
+                </div>
+            </div>
+
+            <div class="setup-card">
+                <div class="setup-icon" style="background:#E0F2FE; color:#3B82F6;">💬</div>
+                <div class="setup-content">
+                    <h3>¿Cuántas preguntas?</h3>
+                    <p class="setup-subtitle">Mínimo 10, hay ${totalDisponibles} en total</p>
+                    <div class="counter-input">
+                        <button type="button" class="counter-btn" id="menosCantidad">−</button>
+                        <input type="number" id="cantidadInput" class="counter-value" min="10" max="${Math.max(totalDisponibles, 10)}" value="10">
+                        <button type="button" class="counter-btn" id="masCantidad">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setup-card">
+                <div class="setup-icon" style="background:#F3E8FF; color:#A855F7;">⏱️</div>
+                <div class="setup-content">
+                    <h3>Segundos por pregunta</h3>
+                    <div class="counter-input">
+                        <button type="button" class="counter-btn" id="menosSegundos">−</button>
+                        <input type="number" id="segundosInput" class="counter-value" min="5" value="20">
+                        <button type="button" class="counter-btn" id="masSegundos">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-primary" id="empezarEstudioBtn">▶ Empezar</button>
+            <div class="error" id="cantErr"></div>
+        `;
+
+        let avatarElegido = avatarActual;
+        document.querySelectorAll('.avatar-option').forEach(btn => {
+            btn.onclick = () => {
+                avatarElegido = btn.dataset.emoji;
+                document.querySelectorAll('.avatar-option').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+            };
+        });
+
+        function setupCounter(menosId, masId, inputId, min, max) {
+            const input = document.getElementById(inputId);
+            document.getElementById(menosId).onclick = () => { const v = parseInt(input.value) || min; if (v > min) input.value = v - 1; };
+            document.getElementById(masId).onclick = () => { const v = parseInt(input.value) || min; if (v < max) input.value = v + 1; };
+        }
+        setupCounter('menosCantidad', 'masCantidad', 'cantidadInput', 10, Math.max(totalDisponibles, 10));
+        setupCounter('menosSegundos', 'masSegundos', 'segundosInput', 5, 120);
+
+        document.getElementById('volverBtn').onclick = loadDashboard;
+        document.getElementById('empezarEstudioBtn').onclick = async () => {
+            const cantidad = parseInt(document.getElementById('cantidadInput').value, 10);
+            const segundos = parseInt(document.getElementById('segundosInput').value, 10);
+            const errEl = document.getElementById('cantErr');
+            if (!cantidad || cantidad < 10) { errEl.textContent = 'Mínimo 10 preguntas.'; return; }
+            if (totalDisponibles < 10) { errEl.textContent = 'Este quiz todavía no tiene al menos 10 preguntas.'; return; }
+            if (!segundos || segundos < 5) { errEl.textContent = 'Mínimo 5 segundos por pregunta.'; return; }
+
+            if (avatarElegido !== avatarActual) {
+                await supabase.from('estudiantes').update({ avatar: avatarElegido }).eq('id', state.estudiante.id);
+                state.estudiante.avatar = avatarElegido;
+            }
+            iniciarMusica();
+            startQuizEstudio(quiz, Math.min(cantidad, totalDisponibles), segundos);
+        };
+    }
+
+    async function startQuiz(quiz) {
+        state.quiz = quiz;
+        const { data: intento } = await supabase
+            .from('intentos').insert({ quiz_id: quiz.id, estudiante_id: state.estudiante.id }).select('id').single();
+        state.intentoId = intento.id;
+
+        const { data: qp } = await supabase
+            .from('quiz_preguntas')
+            .select('orden, preguntas(id, enunciado, puntos, tipo, imagen_url)')
+            .eq('quiz_id', quiz.id)
+            .order('orden');
+
+        state.preguntas = qp.map(r => r.preguntas);
+        state.sumaPuntos = state.preguntas.reduce((a, p) => a + Number(p.puntos || 1), 0);
+        state.index = 0;
+        state.correctas = 0;
+        state.segundosPorPregunta = null;
+        iniciarMusica();
+        renderQuestion();
+    }
+
+    function barajar(arr) {
+        const copia = [...arr];
+        for (let i = copia.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [copia[i], copia[j]] = [copia[j], copia[i]];
+        }
+        return copia;
+    }
+
+    async function startQuizEstudio(quiz, cantidad, segundosPorPregunta) {
+        state.quiz = quiz;
+        state.cantidadEstudio = cantidad;
+        state.segundosPorPregunta = segundosPorPregunta || state.segundosPorPregunta || 20;
+
+        const { data: qp } = await supabase.from('quiz_preguntas').select('pregunta_id').eq('quiz_id', quiz.id);
+        const poolIds = (qp || []).map(r => r.pregunta_id);
+        state.poolIds = poolIds;
+
+        const { data: intentosPrevios } = await supabase.from('intentos').select('id').eq('quiz_id', quiz.id).eq('estudiante_id', state.estudiante.id);
+        const idsIntentos = (intentosPrevios || []).map(i => i.id);
+        let vistasIds = [];
+        if (idsIntentos.length) {
+            const { data: respuestasPrevias } = await supabase.from('respuestas').select('pregunta_id').in('intento_id', idsIntentos);
+            vistasIds = [...new Set((respuestasPrevias || []).map(r => r.pregunta_id))];
+        }
+
+        const noVistas = poolIds.filter(id => !vistasIds.includes(id));
+        const origen = noVistas.length >= cantidad ? noVistas : poolIds;
+        const seleccionIds = barajar(origen).slice(0, cantidad);
+
+        const { data: intento } = await supabase
+            .from('intentos').insert({ quiz_id: quiz.id, estudiante_id: state.estudiante.id }).select('id').single();
+        state.intentoId = intento.id;
+
+        const { data: preguntas } = await supabase.from('preguntas').select('id, enunciado, puntos, tipo, imagen_url').in('id', seleccionIds);
+        const orden = {}; seleccionIds.forEach((id, i) => orden[id] = i);
+        state.preguntas = preguntas.sort((a, b) => orden[a.id] - orden[b.id]);
+        state.sumaPuntos = state.preguntas.reduce((a, p) => a + Number(p.puntos || 1), 0);
+        state.correctas = 0;
+        state.index = 0;
+        renderQuestion();
+    }
+
+    let intervaloTiempo = null;
+    let audioCtx = null;
+    let nodosMusica = null;
+    let musicaEncendida = false;
+    let elementoAudioReal = null;
+
+    function getAudioCtx() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        return audioCtx;
+    }
+
+    function reproducirTono(tipo) {
+        try {
+            const ctx = getAudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.frequency.value = tipo === 'correcto' ? 880 : 220;
+            gain.gain.value = 0.15;
+            osc.start();
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+            osc.stop(ctx.currentTime + 0.35);
+        } catch (e) { }
+    }
+
+    function reproducirTic(urgente) {
+        try {
+            const ctx = getAudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.type = 'square';
+            osc.frequency.value = urgente ? 1400 : 1000;
+            gain.gain.value = urgente ? 0.06 : 0.03;
+            osc.start();
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+            osc.stop(ctx.currentTime + 0.08);
+        } catch (e) {}
+    }
+
+    function iniciarMusica() {
+        if (musicaEncendida) return;
+        musicaEncendida = true;
+        if (!elementoAudioReal) {
+            elementoAudioReal = new Audio('musica-fondo.mp3');
+            elementoAudioReal.loop = true;
+            elementoAudioReal.volume = 0.35;
+        }
+        elementoAudioReal.play().catch(() => {
+            const ctx = getAudioCtx();
+            const osc1 = ctx.createOscillator();
+            const osc2 = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc1.type = 'sine'; osc1.frequency.value = 110;
+            osc2.type = 'sine'; osc2.frequency.value = 165;
+            gain.gain.value = 0.04;
+            osc1.connect(gain); osc2.connect(gain); gain.connect(ctx.destination);
+            osc1.start(); osc2.start();
+            nodosMusica = { osc1, osc2, gain };
+        });
+    }
+
+    function detenerMusica() {
+        musicaEncendida = false;
+        if (elementoAudioReal) { elementoAudioReal.pause(); elementoAudioReal.currentTime = 0; }
+        if (nodosMusica) { nodosMusica.osc1.stop(); nodosMusica.osc2.stop(); nodosMusica = null; }
+    }
+
+    function toggleMusica(btn) {
+        if (musicaEncendida) { detenerMusica(); btn.textContent = '🔇'; }
+        else { iniciarMusica(); btn.textContent = '🎵'; }
+    }
+
+    async function renderQuestion() {
+        if (intervaloTiempo) clearInterval(intervaloTiempo);
+        const pregunta = state.preguntas[state.index];
+        const imagenHtml = pregunta.imagen_url ? `<img src="${pregunta.imagen_url}" alt="" style="max-width:100%; border-radius:12px; margin-bottom:14px;">` : '';
+        const esEstudio = state.quiz.modo === 'estudio';
+        const circunferencia = 2 * Math.PI * 22;
+
+        app.innerHTML = `
+            <div class="quiz-top-header">
+                <div class="quiz-user-info">
+                    <div class="quiz-avatar">${state.estudiante.avatar || '🙂'}</div>
+                    <span class="quiz-username">${state.estudiante.nombre}</span>
+                </div>
+                <div class="score-badge">✅ ${state.correctas} / ${state.index}</div>
+            </div>
+            <div class="status-bar">
+                <span class="progress-text">Pregunta ${state.index + 1} de ${state.preguntas.length}</span>
+                ${esEstudio ? `
+                <div class="timer-container">
+                    <svg class="timer-svg" viewBox="0 0 50 50">
+                        <circle class="timer-circle-bg" cx="25" cy="25" r="22"></circle>
+                        <circle class="timer-circle-progress" id="circuloTiempo" cx="25" cy="25" r="22" stroke-dasharray="${circunferencia}" stroke-dashoffset="0"></circle>
+                    </svg>
+                    <span class="timer-text" id="tiempoRestante">${state.segundosPorPregunta}</span>
+                </div>` : ''}
+            </div>
+            ${imagenHtml}
+            <p class="question-text">${pregunta.enunciado}</p>
+            <div id="opts"></div>
+            <div class="feedback hidden" id="feedback"></div>
+            <button class="btn-primary hidden" id="nextBtn">${state.index + 1 === state.preguntas.length ? '🎉 Finalizar' : 'Siguiente →'}</button>
+        `;
+
+        const opts = document.getElementById('opts');
+
+        async function marcarTiempoAgotado() {
+            opts.querySelectorAll('button, input').forEach(el => el.disabled = true);
+            const fb = document.getElementById('feedback');
+            fb.classList.remove('hidden');
+            fb.classList.add('incorrect');
+            reproducirTono('incorrecto');
+            if (pregunta.tipo === 'completar') {
+                const { data } = await supabase.rpc('responder_pregunta_texto', {
+                    p_intento_id: state.intentoId, p_pregunta_id: pregunta.id, p_respuesta_texto: ''
+                });
+                const correcta = data && data[0] ? data[0].respuesta_correcta : '—';
+                fb.textContent = `⏰ Se acabó el tiempo. La respuesta correcta era: ${correcta}`;
+            } else {
+                fb.textContent = '⏰ Se acabó el tiempo.';
+            }
+            document.getElementById('nextBtn').classList.remove('hidden');
+        }
+
+        if (esEstudio) {
+            let restante = state.segundosPorPregunta;
+            const circulo = document.getElementById('circuloTiempo');
+            intervaloTiempo = setInterval(() => {
+                restante--;
+                const elTexto = document.getElementById('tiempoRestante');
+                if (elTexto) elTexto.textContent = restante;
+                if (circulo) circulo.setAttribute('stroke-dashoffset', circunferencia * (1 - restante / state.segundosPorPregunta));
+                if (restante <= 3 && restante > 0) { reproducirTic(true); if (circulo) circulo.style.stroke = 'var(--error)'; }
+                else if (restante > 0) { reproducirTic(false); }
+                if (restante <= 0) { clearInterval(intervaloTiempo); marcarTiempoAgotado(); }
+            }, 1000);
+        }
+
+        if (pregunta.tipo === 'completar') {
+            opts.innerHTML = `
+                <input type="text" id="respuestaTexto" placeholder="Escribe tu respuesta..." style="width:100%; padding:14px 16px; border:2px solid var(--border); border-radius:14px; font-size:15px; margin-bottom:12px; font-family:inherit; font-weight:600;">
+                <button class="btn-primary" id="responderTextoBtn" style="margin-top:0">Responder</button>
+            `;
+            document.getElementById('responderTextoBtn').onclick = async () => {
+                const valor = document.getElementById('respuestaTexto').value.trim();
+                if (!valor) return;
+                if (intervaloTiempo) clearInterval(intervaloTiempo);
+                document.getElementById('respuestaTexto').disabled = true;
+                document.getElementById('responderTextoBtn').disabled = true;
+                const { data } = await supabase.rpc('responder_pregunta_texto', {
+                    p_intento_id: state.intentoId, p_pregunta_id: pregunta.id, p_respuesta_texto: valor
+                });
+                const { es_correcta: esCorrecta, respuesta_correcta: correcta } = data[0];
+                if (esCorrecta) state.correctas++;
+                reproducirTono(esCorrecta ? 'correcto' : 'incorrecto');
+                if (state.quiz.modo === 'practica' || esEstudio) {
+                    const fb = document.getElementById('feedback');
+                    fb.classList.remove('hidden');
+                    fb.classList.add(esCorrecta ? 'correct' : 'incorrect');
+                    fb.textContent = esCorrecta ? '✅ ¡Correcto!' : `❌ Incorrecto. La respuesta correcta era: ${correcta}`;
+                }
+                document.getElementById('nextBtn').classList.remove('hidden');
+            };
+        } else {
+            const { data: opciones } = await supabase.rpc('obtener_opciones', { p_pregunta_id: pregunta.id });
+            (opciones || []).forEach(o => {
+                const b = document.createElement('button');
+                b.className = 'option';
+                b.textContent = o.texto;
+                b.onclick = async () => {
+                    if (intervaloTiempo) clearInterval(intervaloTiempo);
+                    opts.querySelectorAll('button').forEach(btn => btn.disabled = true);
+                    b.classList.add('selected');
+                    const { data } = await supabase.rpc('responder_pregunta', {
+                        p_intento_id: state.intentoId, p_pregunta_id: pregunta.id, p_opcion_id: o.id
+                    });
+                    const { es_correcta: esCorrecta, texto_correcto: correcto } = data[0];
+                    if (esCorrecta) state.correctas++;
+                    reproducirTono(esCorrecta ? 'correcto' : 'incorrecto');
+                    if (state.quiz.modo === 'practica' || esEstudio) {
+                        b.classList.add(esCorrecta ? 'correct' : 'incorrect');
+                        const fb = document.getElementById('feedback');
+                        fb.classList.remove('hidden');
+                        fb.classList.add(esCorrecta ? 'correct' : 'incorrect');
+                        fb.textContent = esCorrecta ? '✅ ¡Correcto!' : `❌ Incorrecto. La respuesta correcta era: ${correcto}`;
+                    }
+                    document.getElementById('nextBtn').classList.remove('hidden');
+                };
+                opts.appendChild(b);
+            });
+        }
+
+        document.getElementById('nextBtn').onclick = () => {
+            if (intervaloTiempo) clearInterval(intervaloTiempo);
+            state.index++;
+            if (state.index < state.preguntas.length) renderQuestion();
+            else finishQuiz();
+        };
+    }
+
+    async function finishQuiz() {
+        if (intervaloTiempo) clearInterval(intervaloTiempo);
+        const { data: total } = await supabase.rpc('finalizar_intento', { p_intento_id: state.intentoId });
+        const esEstudio = state.quiz.modo === 'estudio';
+        const nota = state.sumaPuntos > 0 ? ((total / state.sumaPuntos) * 10).toFixed(1) : '0.0';
+        const esNotaMaxima = state.sumaPuntos > 0 && total === state.sumaPuntos;
+        const porcentaje = state.sumaPuntos > 0 ? (total / state.sumaPuntos) * 100 : 0;
+
+        let estrellas = 0;
+        if (porcentaje >= 90) estrellas = 3;
+        else if (porcentaje >= 70) estrellas = 2;
+        else if (porcentaje >= 50) estrellas = 1;
+
+        const textoWhatsapp = `Resultado de "${state.quiz.titulo}": ${total}/${state.sumaPuntos} correctas (nota ${nota}/10) - ${state.estudiante.nombre}`;
+
+        app.innerHTML = `
+            <div class="resultado-container">
+                ${esNotaMaxima ? `
+                    <div class="resultado-emoji">🏆</div>
+                    <h1 style="color:var(--primary);">¡Perfecto!</h1>
+                    <p class="subtitle">Respondiste todo correctamente</p>
+                ` : `
+                    <div class="resultado-emoji">${porcentaje >= 70 ? '🎉' : porcentaje >= 50 ? '💪' : '📚'}</div>
+                    <h1>${porcentaje >= 70 ? '¡Excelente!' : porcentaje >= 50 ? '¡Buen intento!' : 'Sigue practicando'}</h1>
+                    <p class="subtitle">${state.quiz.titulo}</p>
+                `}
+                <div class="estrellas">
+                    <span class="estrella ${estrellas >= 1 ? 'activa' : ''}">⭐</span>
+                    <span class="estrella ${estrellas >= 2 ? 'activa' : ''}">⭐</span>
+                    <span class="estrella ${estrellas >= 3 ? 'activa' : ''}">⭐</span>
+                </div>
+                <div class="score-stamp">${total} / ${state.sumaPuntos}</div>
+                ${esEstudio ? `<p class="subtitle">Nota: <strong>${nota} / 10</strong></p>` : ''}
+                ${esEstudio ? `<button class="btn-primary" id="otroQuizBtn">🔄 Generar otro quiz</button>` : ''}
+                <button class="btn-whatsapp" id="whatsappBtn">📱 Compartir por WhatsApp</button>
+                <button class="btn-secondary" id="backBtn">← Volver a mis quizzes</button>
+            </div>
+        `;
+
+        document.getElementById('backBtn').onclick = loadDashboard;
+        document.getElementById('whatsappBtn').onclick = () => {
+            window.open(`https://wa.me/?text=${encodeURIComponent(textoWhatsapp)}`, '_blank');
+        };
+        if (esEstudio) {
+            document.getElementById('otroQuizBtn').onclick = () => startQuizEstudio(state.quiz, state.cantidadEstudio, state.segundosPorPregunta);
+        }
+
+        if (esNotaMaxima && window.confetti) {
+            const lanzar = (origenX) => confetti({ particleCount: 80, spread: 70, origin: { x: origenX, y: 0.6 } });
+            lanzar(0.2); setTimeout(() => lanzar(0.8), 250); setTimeout(() => lanzar(0.5), 500);
+        }
+    }
+
+    init();
 </script>
 </body>
 </html>
