@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Concurso</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
+<style>
+  :root {
+    --board: #F5F1FF; --board-line: #EDE6FF;
+    --paper: #FFFFFF; --paper-line: #EBE3FB;
+    --ink: #362F52; --ink-muted: #8E86AC;
+    --chalk-amber: #FFC857; --pen-red: #FF6F91; --pen-green: #4CD98A;
+    --primary: #7C6FF0; --primary-dark: #6C5CE7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    background: linear-gradient(135deg, #F5F1FF 0%, #FDECF5 50%, #EAF6FF 100%);
+    font-family: 'Nunito', sans-serif; color: var(--ink);
+    display: flex; justify-content: center; padding: 32px 16px;
+  }
+  .sheet { background: var(--paper); width: 100%; max-width: 480px; border-radius: 24px; padding: 32px 28px; box-shadow: 0 16px 40px rgba(124,111,240,0.18); align-self: flex-start; }
+  .sheet.ancho { max-width: 680px; }
+  h1 { font-family: 'Baloo 2', sans-serif; font-weight: 700; font-size: 26px; margin: 0 0 4px; }
+  h2 { font-family: 'Baloo 2', sans-serif; font-weight: 700; font-size: 18px; margin: 0 0 10px; }
+  .subtitle { color: var(--ink-muted); font-size: 14px; margin: 0 0 20px; font-weight: 600; }
+  label { display: block; font-size: 13px; color: var(--ink-muted); margin: 12px 0 4px; font-weight: 700; }
+  input, select, textarea {
+    width: 100%; padding: 11px 14px; border: 2px solid var(--paper-line); border-radius: 12px;
+    background: #FBFAFF; font-size: 15px; font-family: inherit;
+  }
+  input:focus, select:focus { outline: none; border-color: var(--primary); }
+  button { font-family: 'Baloo 2', sans-serif; font-weight: 700; font-size: 15px; cursor: pointer; border: none; border-radius: 14px; padding: 12px 18px; }
+  button:active { transform: scale(0.98); }
+  .btn-primary { background: linear-gradient(135deg, #8B7EF7, #6C5CE7); color: #fff; width: 100%; margin-top: 16px; box-shadow: 0 6px 16px rgba(108,92,231,0.3); }
+  .btn-outline { background: #fff; border: 2px solid var(--paper-line); color: var(--ink); width: 100%; margin-top: 10px; }
+  .btn-outline:hover { border-color: var(--primary); }
+  .btn-small { background: var(--chalk-amber); color: var(--ink); font-size: 13px; padding: 8px 14px; }
+  .btn-danger { background: #FFE4E9; color: var(--pen-red); font-size: 13px; padding: 8px 14px; }
+  .btn-link { background: none; color: var(--primary); text-decoration: underline; font-family: 'Nunito'; font-weight: 700; font-size: 13px; padding: 6px 0; width: 100%; text-align: center; }
+  .error { color: var(--pen-red); font-size: 13px; margin-top: 10px; min-height: 16px; font-weight: 700; }
+  .ok-msg { color: #2FAE6C; font-size: 13px; margin-top: 8px; font-weight: 700; }
+  .card { border: 2px solid var(--paper-line); border-radius: 16px; padding: 16px; margin-top: 12px; }
+  .item-lista { border: 2px solid var(--paper-line); border-radius: 14px; padding: 12px 14px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 10px; font-size: 11px; font-weight: 800; }
+  .badge.vivo { background: #FFE4E9; color: var(--pen-red); }
+  .badge.plazo { background: #EDE9FE; color: var(--primary); }
+  .badge.armado { background: #F1EEFB; color: var(--ink-muted); }
+  .badge.esperando { background: #FFF7ED; color: #EA580C; }
+  .badge.en_curso { background: #E6FBF0; color: #2FAE6C; }
+  .badge.finalizado { background: #F1EEFB; color: var(--ink-muted); }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13.5px; }
+  th, td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--paper-line); }
+  .check-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--paper-line); }
+  .check-row input[type="checkbox"] { width: auto; }
+  .check-row input[type="number"] { width: 60px; padding: 6px 8px; }
+  .check-row .texto { flex: 1; font-size: 13.5px; }
+  .pos-1 { background: linear-gradient(135deg,#FFF3D6,#FFE7A8); }
+  .pos-2 { background: #F1EEFB; }
+  .pos-3 { background: #FFEFE5; }
+  .fila-pos { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; margin-top: 8px; font-weight: 700; }
+  .fila-pos .num { font-family: 'Baloo 2', sans-serif; font-size: 18px; width: 28px; }
+  .fila-pos .nombre { flex: 1; }
+  .fila-pos .pts { color: var(--primary); }
+  .option { display: block; width: 100%; text-align: left; background: #FBFAFF; border: 2px solid var(--paper-line); border-radius: 14px; padding: 13px 16px; margin-bottom: 10px; font-weight: 700; font-size: 15px; cursor: pointer; }
+  .option.selected { border-color: var(--primary); }
+  .option.correct { border-color: var(--pen-green); background: #E6FBF0; }
+  .option.incorrect { border-color: var(--pen-red); background: #FFE4E9; }
+  .option:disabled { cursor: default; }
+  .feedback { font-size: 14px; font-weight: 800; margin: 10px 0; padding: 10px 14px; border-radius: 10px; }
+  .feedback.correct { color: #2FAE6C; background: #E6FBF0; }
+  .feedback.incorrect { color: #E14D72; background: #FFE4E9; }
+  .hidden { display: none; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .contador-grande { font-family: 'Baloo 2', sans-serif; font-size: 40px; font-weight: 800; color: var(--primary); text-align: center; margin: 10px 0; }
+</style>
+</head>
+<body>
+<div class="sheet" id="app"></div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+const SUPABASE_URL = 'https://qiawcxkmszgwvxlbbcdw.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpYXdjeGttc3pnd3Z4bGJiY2R3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyNDU2NjgsImV4cCI6MjEwNDgyMTY2OH0.Yw57xGupEs2f7s1lYIw9Gx1UUP2gg18FbgKj8LVzMfY';
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const app = document.getElementById('app');
+
+function sanitizarUsuario(u) { return (u || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, ''); }
+function anchoSheet(ancho) { document.getElementById('app').className = ancho ? 'sheet ancho' : 'sheet'; }
+
+let state = {
+  perfil: null, estudiante: null, alias: null, grupoId: null,
+  concurso: null, participante: null, preguntas: [], index: 0,
+  inicioPregunta: null, canal: null, cronometro: null
+};
+
+async function init() {
+  const idDirecto = new URLSearchParams(window.location.search).get('unirse');
+  if (idDirecto) { await renderUnionDirecta(idDirecto); return; }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) {
+    const { data: perfil } = await supabase.from('perfiles').select('id, rol, usuario').eq('id', session.user.id).single();
+    state.perfil = perfil;
+    if (perfil.rol === 'admin' || perfil.rol === 'profesor') { renderProfesorHome(); return; }
+    const { data: estudiante } = await supabase.from('estudiantes').select('id, nombre, grupo_id, avatar').eq('perfil_id', session.user.id).maybeSingle();
+    if (estudiante) { state.estudiante = estudiante; state.grupoId = estudiante.grupo_id; renderListaConcursosAlumno(); return; }
+  }
+  renderPortada();
+}
+
+async function renderUnionDirecta(concursoId) {
+  anchoSheet(false);
+  const { data: concurso, error } = await supabase.from('concursos').select('*').eq('id', concursoId).maybeSingle();
+  if (error || !concurso) { app.innerHTML = `<h1>Enlace inválido</h1><p class="subtitle">Este concurso ya no existe.</p>`; return; }
+  if (!['esperando', 'en_curso'].includes(concurso.estado)) {
+    app.innerHTML = `<h1>${concurso.titulo}</h1><p class="subtitle">Este concurso todavía no está abierto para unirse, o ya terminó. Avísale al profesor.</p>`;
+    return;
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) {
+    const { data: estudiante } = await supabase.from('estudiantes').select('id, nombre, grupo_id, avatar').eq('perfil_id', session.user.id).maybeSingle();
+    if (estudiante) {
+      state.estudiante = estudiante;
+      app.innerHTML = `<h1>${concurso.titulo}</h1><p class="subtitle">Entrar como ${estudiante.nombre}</p><button class="btn-primary" id="unirseBtn">Unirme ahora</button>`;
+      document.getElementById('unirseBtn').onclick = () => unirseAConcurso(concurso);
+      return;
+    }
+  }
+
+  if (!concurso.permite_invitados) {
+    app.innerHTML = `<h1>${concurso.titulo}</h1><p class="subtitle">Este concurso solo admite alumnos con cuenta. Inicia sesión primero.</p><button class="btn-primary" id="loginBtn">Iniciar sesión</button>`;
+    document.getElementById('loginBtn').onclick = renderLoginAlumno;
+    return;
+  }
+
+  app.innerHTML = `
+    <h1>${concurso.titulo}</h1>
+    <p class="subtitle">Escribe tu nombre para unirte</p>
+    <label>Tu nombre o alias</label><input type="text" id="alias" placeholder="Ej: Lucas">
+    <button class="btn-primary" id="unirseBtn">Unirme</button>
+    <div class="error" id="err"></div>
+  `;
+  document.getElementById('unirseBtn').onclick = () => {
+    const alias = document.getElementById('alias').value.trim();
+    if (!alias) { document.getElementById('err').textContent = 'Escribe un nombre o alias.'; return; }
+    state.alias = alias;
+    unirseAConcurso(concurso);
+  };
+}
+
+function renderPortada() {
+  anchoSheet(false);
+  app.innerHTML = `
+    <h1>🏆 Concurso</h1>
+    <p class="subtitle">Un quiz en vivo o contrarreloj para todo el grupo.</p>
+    <button class="btn-primary" id="btnProfesor">Soy profesor</button>
+    <button class="btn-outline" id="btnAlumno">Unirme a un concurso</button>
+  `;
+  document.getElementById('btnProfesor').onclick = renderLoginProfesor;
+  document.getElementById('btnAlumno').onclick = renderEntradaAlumno;
+}
+
+// ====================================================================
+// LOGIN PROFESOR
+// ====================================================================
+function renderLoginProfesor() {
+  anchoSheet(false);
+  app.innerHTML = `
+    <h1>Panel del profesor</h1>
+    <p class="subtitle">Inicia sesión con tu cuenta habitual.</p>
+    <label>Usuario</label><input type="text" id="usuario" autocomplete="username">
+    <label>Contraseña</label><input type="password" id="password" autocomplete="current-password">
+    <button class="btn-primary" id="loginBtn">Entrar</button>
+    <button class="btn-link" id="volverBtn">Volver</button>
+    <div class="error" id="err"></div>
+  `;
+  document.getElementById('volverBtn').onclick = renderPortada;
+  document.getElementById('loginBtn').onclick = async () => {
+    const usuario = sanitizarUsuario(document.getElementById('usuario').value);
+    const password = document.getElementById('password').value;
+    const errEl = document.getElementById('err');
+    const { data: emailReal } = await supabase.rpc('obtener_email_por_usuario', { p_usuario: usuario });
+    if (!emailReal) { errEl.textContent = 'Usuario o contraseña incorrectos.'; return; }
+    const { error } = await supabase.auth.signInWithPassword({ email: emailReal, password });
+    if (error) { errEl.textContent = 'Usuario o contraseña incorrectos.'; return; }
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: perfil } = await supabase.from('perfiles').select('id, rol, usuario').eq('id', user.id).single();
+    if (perfil.rol !== 'admin' && perfil.rol !== 'profesor') { errEl.textContent = 'Esta cuenta no es de profesor.'; await supabase.auth.signOut(); return; }
+    state.perfil = perfil;
+    renderProfesorHome();
+  };
+}
+
+// ====================================================================
+// ENTRADA ALUMNO / INVITADO
+// ====================================================================
+function renderEntradaAlumno() {
+  anchoSheet(false);
+  app.innerHTML = `
+    <h1>Unirme a un concurso</h1>
+    <p class="subtitle">¿Ya tienes cuenta de alumno?</p>
+    <button class="btn-primary" id="btnTengoCuenta">Sí, iniciar sesión</button>
+    <button class="btn-outline" id="btnInvitado">No, entrar como invitado</button>
+    <button class="btn-link" id="volverBtn">Volver</button>
+  `;
+  document.getElementById('volverBtn').onclick = renderPortada;
+  document.getElementById('btnTengoCuenta').onclick = renderLoginAlumno;
+  document.getElementById('btnInvitado').onclick = renderEntradaInvitado;
+}
+
+function renderLoginAlumno() {
+  anchoSheet(false);
+  app.innerHTML = `
+    <h1>Inicia sesión</h1>
+    <label>Usuario</label><input type="text" id="usuario" autocomplete="username">
+    <label>Contraseña</label><input type="password" id="password" autocomplete="current-password">
+    <button class="btn-primary" id="loginBtn">Entrar</button>
+    <button class="btn-link" id="volverBtn">Volver</button>
+    <div class="error" id="err"></div>
+  `;
+  document.getElementById('volverBtn').onclick = renderEntradaAlumno;
+  document.getElementById('loginBtn').onclick = async () => {
+    const usuario = sanitizarUsuario(document.getElementById('usuario').value);
+    const password = document.getElementById('password').value;
+    const errEl = document.getElementById('err');
+    const { data: emailReal } = await supabase.rpc('obtener_email_por_usuario', { p_usuario: usuario });
+    if (!emailReal) { errEl.textContent = 'Usuario o contraseña incorrectos.'; return; }
+    const { error } = await supabase.auth.signInWithPassword({ email: emailReal, password });
+    if (error) { errEl.textContent = 'Usuario o contraseña incorrectos.'; return; }
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: estudiante } = await supabase.from('estudiantes').select('id, nombre, grupo_id, avatar').eq('perfil_id', user.id).maybeSingle();
+    if (!estudiante) { errEl.textContent = 'Tu cuenta no tiene un grupo asignado.'; return; }
+    state.estudiante = estudiante;
+    state.grupoId = estudiante.grupo_id;
+    renderListaConcursosAlumno();
+  };
+}
+
+async function renderEntradaInvitado() {
+  anchoSheet(false);
+  const { data: grupos } = await supabase.from('grupos').select('id, nombre').order('nombre');
+  app.innerHTML = `
+    <h1>Entrar como invitado</h1>
+    <label>Tu nombre o alias</label><input type="text" id="alias" placeholder="Ej: Lucas">
+    <label>Grupo</label><select id="grupoSel">${(grupos || []).map(g => `<option value="${g.id}">${g.nombre}</option>`).join('') || '<option value="">No hay grupos</option>'}</select>
+    <button class="btn-primary" id="continuarBtn">Continuar</button>
+    <button class="btn-link" id="volverBtn">Volver</button>
+    <div class="error" id="err"></div>
+  `;
+  document.getElementById('volverBtn').onclick = renderEntradaAlumno;
+  document.getElementById('continuarBtn').onclick = () => {
+    const alias = document.getElementById('alias').value.trim();
+    const grupoId = document.getElementById('grupoSel').value;
+    const errEl = document.getElementById('err');
+    if (!alias) { errEl.textContent = 'Escribe un nombre o alias.'; return; }
+    if (!grupoId) { errEl.textContent = 'Elige un grupo.'; return; }
+    state.alias = alias;
+    state.grupoId = grupoId;
+    renderListaConcursosAlumno();
+  };
+}
+
+// ====================================================================
+// ALUMNO/INVITADO: lista de concursos disponibles
+// ====================================================================
+async function renderListaConcursosAlumno() {
+  anchoSheet(false);
+  const { data: concursos } = await supabase.from('concursos').select('id, titulo, modo, estado')
+    .eq('grupo_id', state.grupoId).in('estado', ['esperando', 'en_curso']).order('created_at', { ascending: false });
+
+  const nombreMostrado = state.estudiante ? state.estudiante.nombre : state.alias;
+  app.innerHTML = `
+    <div class="topbar"><h1>Hola, ${nombreMostrado}</h1><button class="btn-link" id="salirBtn" style="width:auto;">Salir</button></div>
+    <p class="subtitle">Concursos disponibles en tu grupo</p>
+    <div id="lista">${(concursos || []).length ? '' : '<p class="subtitle" style="text-align:center;">No hay concursos abiertos por ahora.</p>'}</div>
+  `;
+  document.getElementById('salirBtn').onclick = async () => { if (state.estudiante) await supabase.auth.signOut(); state = {}; renderPortada(); };
+
+  const lista = document.getElementById('lista');
+  (concursos || []).forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'item-lista';
+    div.innerHTML = `<div><strong>${c.titulo}</strong><div><span class="badge ${c.modo}">${c.modo === 'vivo' ? 'En vivo' : 'Por plazo'}</span> <span class="badge ${c.estado}">${c.estado === 'esperando' ? 'Esperando' : 'En curso'}</span></div></div><button class="btn-small">Unirme</button>`;
+    div.querySelector('button').onclick = () => unirseAConcurso(c);
+    lista.appendChild(div);
+  });
+}
+
+async function unirseAConcurso(concurso) {
+  const { data: participante, error } = await supabase.from('concurso_participantes').insert({
+    concurso_id: concurso.id,
+    estudiante_id: state.estudiante ? state.estudiante.id : null,
+    alias: state.estudiante ? state.estudiante.nombre : state.alias
+  }).select('*').single();
+  if (error) { alert('No se pudo unir: ' + error.message); return; }
+  state.concurso = concurso;
+  state.participante = participante;
+  if (concurso.modo === 'vivo') renderSalaEsperaAlumno();
+  else renderPantallaEmpezarPlazo();
+}
+
+// ---------------- Modo vivo: sala de espera del alumno ----------------
+function renderSalaEsperaAlumno() {
+  anchoSheet(false);
+  app.innerHTML = `
+    <h1>🕒 ${state.concurso.titulo}</h1>
+    <p class="subtitle">Esperando a que el profesor inicie el concurso...</p>
+    <div class="card" style="text-align:center;">
+      <p style="font-weight:800; font-size:15px;">Ya estás dentro. No cierres esta pantalla.</p>
+    </div>
+  `;
+  suscribirseAConcurso(async (payload) => {
+    const nuevoEstado = payload.new.estado;
+    if (nuevoEstado === 'en_curso') {
+      await cargarPreguntasConcurso();
+      state.index = payload.new.pregunta_actual_index || 0;
+      renderPreguntaConcursoVivo();
+    }
+  });
+}
+
+function suscribirseAConcurso(onChange) {
+  if (state.canal) supabase.removeChannel(state.canal);
+  state.canal = supabase.channel('concurso-' + state.concurso.id)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'concursos', filter: `id=eq.${state.concurso.id}` }, onChange)
+    .subscribe();
+}
+
+async function cargarPreguntasConcurso() {
+  const { data } = await supabase.from('concurso_preguntas')
+    .select('orden, puntos, preguntas(id, enunciado, imagen_url)')
+    .eq('concurso_id', state.concurso.id).order('orden');
+  state.preguntas = (data || []).map(r => ({ ...r.preguntas, puntos: r.puntos }));
+}
+
+async function renderPreguntaConcursoVivo() {
+  const pregunta = state.preguntas[state.index];
+  if (!pregunta) { renderTablaPosicionesAlumno(); return; }
+  state.inicioPregunta = Date.now();
+
+  app.innerHTML = `
+    <p class="subtitle">Pregunta ${state.index + 1} de ${state.preguntas.length}</p>
+    ${pregunta.imagen_url ? `<img src="${pregunta.imagen_url}" style="max-width:100%; border-radius:12px; margin-bottom:12px;">` : ''}
+    <h2>${pregunta.enunciado}</h2>
+    <div id="opts"></div>
+    <div class="feedback hidden" id="feedback"></div>
+    <p class="subtitle" id="esperaTexto" style="display:none;">Esperando a que el profesor avance...</p>
+  `;
+  const { data: opciones } = await supabase.rpc('obtener_opciones', { p_pregunta_id: pregunta.id });
+  const opts = document.getElementById('opts');
+  (opciones || []).forEach(o => {
+    const b = document.createElement('button');
+    b.className = 'option';
+    b.textContent = o.texto;
+    b.onclick = async () => {
+      opts.querySelectorAll('button').forEach(x => x.disabled = true);
+      b.classList.add('selected');
+      const tiempoSeg = (Date.now() - state.inicioPregunta) / 1000;
+      const { data } = await supabase.rpc('responder_concurso', {
+        p_participante_id: state.participante.id, p_token: state.participante.token_sesion,
+        p_pregunta_id: pregunta.id, p_opcion_id: o.id, p_tiempo_seg: tiempoSeg
+      });
+      const { es_correcta, texto_correcto } = data[0];
+      b.classList.add(es_correcta ? 'correct' : 'incorrect');
+      const fb = document.getElementById('feedback');
+      fb.classList.remove('hidden'); fb.classList.add(es_correcta ? 'correct' : 'incorrect');
+      fb.textContent = es_correcta ? '¡Correcto!' : `Incorrecto. Era: ${texto_correcto}`;
+      document.getElementById('esperaTexto').style.display = 'block';
+    };
+    opts.appendChild(b);
+  });
+
+  suscribirseAConcurso(async (payload) => {
+    if (payload.new.estado === 'finalizado') { renderTablaPosicionesAlumno(); return; }
+    if (payload.new.pregunta_actual_index !== state.index) {
+      state.index = payload.new.pregunta_actual_index;
+      renderPreguntaConcursoVivo();
+    }
+  });
+}
+
+// ---------------- Modo plazo: el alumno controla su propio tiempo ----------------
+async function renderPantallaEmpezarPlazo() {
+  await cargarPreguntasConcurso();
+  anchoSheet(false);
+  app.innerHTML = `
+    <h1>🕒 ${state.concurso.titulo}</h1>
+    <p class="subtitle">${state.preguntas.length} preguntas · ${Math.round((state.concurso.tiempo_total_seg || 0) / 60)} min en total</p>
+    <div class="card"><p style="font-weight:700;">Cuando le des a "Empezar" arranca tu cronómetro. No se puede pausar.</p></div>
+    <button class="btn-primary" id="empezarBtn">▶ Empezar</button>
+  `;
+  document.getElementById('empezarBtn').onclick = async () => {
+    await supabase.rpc('iniciar_concurso_participante', { p_participante_id: state.participante.id, p_token: state.participante.token_sesion });
+    state.index = 0;
+    iniciarCronometroPlazo();
+    renderPreguntaConcursoPlazo();
+  };
+}
+
+function iniciarCronometroPlazo() {
+  const total = state.concurso.tiempo_total_seg;
+  if (!total) return;
+  const fin = Date.now() + total * 1000;
+  state.cronometro = setInterval(() => {
+    const restante = Math.max(0, Math.round((fin - Date.now()) / 1000));
+    const el = document.getElementById('tiempoRestantePlazo');
+    if (el) el.textContent = `${Math.floor(restante / 60)}:${String(restante % 60).padStart(2, '0')}`;
+    if (restante <= 0) { clearInterval(state.cronometro); finalizarConcursoAlumno(); }
+  }, 1000);
+}
+
+async function renderPreguntaConcursoPlazo() {
+  const pregunta = state.preguntas[state.index];
+  if (!pregunta) { finalizarConcursoAlumno(); return; }
+  state.inicioPregunta = Date.now();
+
+  app.innerHTML = `
+    <div class="topbar"><p class="subtitle" style="margin:0;">Pregunta ${state.index + 1} de ${state.preguntas.length}</p>${state.concurso.tiempo_total_seg ? '<strong id="tiempoRestantePlazo"></strong>' : ''}</div>
+    ${pregunta.imagen_url ? `<img src="${pregunta.imagen_url}" style="max-width:100%; border-radius:12px; margin-bottom:12px;">` : ''}
+    <h2>${pregunta.enunciado}</h2>
+    <div id="opts"></div>
+    <div class="feedback hidden" id="feedback"></div>
+    <button class="btn-primary hidden" id="siguienteBtn">${state.index + 1 === state.preguntas.length ? 'Finalizar' : 'Siguiente →'}</button>
+  `;
+  const { data: opciones } = await supabase.rpc('obtener_opciones', { p_pregunta_id: pregunta.id });
+  const opts = document.getElementById('opts');
+  (opciones || []).forEach(o => {
+    const b = document.createElement('button');
+    b.className = 'option';
+    b.textContent = o.texto;
+    b.onclick = async () => {
+      opts.querySelectorAll('button').forEach(x => x.disabled = true);
+      b.classList.add('selected');
+      const tiempoSeg = (Date.now() - state.inicioPregunta) / 1000;
+      const { data } = await supabase.rpc('responder_concurso', {
+        p_participante_id: state.participante.id, p_token: state.participante.token_sesion,
+        p_pregunta_id: pregunta.id, p_opcion_id: o.id, p_tiempo_seg: tiempoSeg
+      });
+      const { es_correcta, texto_correcto } = data[0];
+      b.classList.add(es_correcta ? 'correct' : 'incorrect');
+      const fb = document.getElementById('feedback');
+      fb.classList.remove('hidden'); fb.classList.add(es_correcta ? 'correct' : 'incorrect');
+      fb.textContent = es_correcta ? '¡Correcto!' : `Incorrecto. Era: ${texto_correcto}`;
+      document.getElementById('siguienteBtn').classList.remove('hidden');
+    };
+    opts.appendChild(b);
+  });
+  document.getElementById('siguienteBtn').onclick = () => {
+    state.index++;
+    if (state.index < state.preguntas.length) renderPreguntaConcursoPlazo();
+    else finalizarConcursoAlumno();
+  };
+}
+
+async function finalizarConcursoAlumno() {
+  if (state.cronometro) clearInterval(state.cronometro);
+  const { data: total } = await supabase.rpc('finalizar_concurso_participante', { p_participante_id: state.participante.id, p_token: state.participante.token_sesion });
+  renderResultadoPersonal(total);
+}
+
+function renderResultadoPersonal(puntaje) {
+  anchoSheet(false);
+  const sumaPuntos = state.preguntas.reduce((a, p) => a + Number(p.puntos || 1), 0);
+  app.innerHTML = `
+    <h1>🎉 ¡Terminaste!</h1>
+    <p class="subtitle">${state.concurso.titulo}</p>
+    <div class="contador-grande">${puntaje} / ${sumaPuntos}</div>
+    <button class="btn-primary" id="verPosicionesBtn">Ver tabla de posiciones</button>
+    <button class="btn-link" id="salirBtn">Volver al inicio</button>
+  `;
+  if (sumaPuntos > 0 && puntaje === sumaPuntos && window.confetti) {
+    confetti({ particleCount: 100, spread: 80, origin: { y: 0.6 } });
+  }
+  document.getElementById('verPosicionesBtn').onclick = renderTablaPosicionesAlumno;
+  document.getElementById('salirBtn').onclick = async () => { if (state.estudiante) await supabase.auth.signOut(); state = {}; renderPortada(); };
+}
+
+async function renderTablaPosicionesAlumno() {
+  if (state.canal) supabase.removeChannel(state.canal);
+  anchoSheet(false);
+  const { data: participantes } = await supabase.from('concurso_participantes')
+    .select('alias, puntaje_total, tiempo_total_seg, estado')
+    .eq('concurso_id', state.concurso.id).eq('estado', 'finalizado')
+    .order('puntaje_total', { ascending: false }).order('tiempo_total_seg', { ascending: true });
+
+  app.innerHTML = `
+    <h1>🏆 Tabla de posiciones</h1>
+    <p class="subtitle">${state.concurso.titulo}</p>
+    <div id="posiciones"></div>
+    <button class="btn-link" id="salirBtn">Volver al inicio</button>
+  `;
+  const cont = document.getElementById('posiciones');
+  (participantes || []).forEach((p, i) => {
+    const div = document.createElement('div');
+    div.className = 'fila-pos ' + (i === 0 ? 'pos-1' : i === 1 ? 'pos-2' : i === 2 ? 'pos-3' : '');
+    div.innerHTML = `<span class="num">${i + 1}</span><span class="nombre">${p.alias}</span><span class="pts">${p.puntaje_total ?? 0} pts</span>`;
+    cont.appendChild(div);
+  });
+  if (!participantes || !participantes.length) cont.innerHTML = '<p class="subtitle">Todavía nadie ha terminado.</p>';
+  document.getElementById('salirBtn').onclick = async () => { if (state.estudiante) await supabase.auth.signOut(); state = {}; renderPortada(); };
+}
+
+// ====================================================================
+// ============================  PROFESOR  ============================
+// ====================================================================
+async function renderProfesorHome() {
+  anchoSheet(true);
+  const { data: grupos } = await supabase.from('grupos').select('id, nombre').order('nombre');
+  app.innerHTML = `
+    <div class="topbar"><h1>Concursos</h1><button class="btn-link" id="salirBtn" style="width:auto;">Salir</button></div>
+    <p class="subtitle">${state.perfil.usuario}</p>
+    <label>Grupo</label>
+    <select id="grupoSelect">${(grupos || []).map(g => `<option value="${g.id}">${g.nombre}</option>`).join('') || '<option value="">No tienes grupos</option>'}</select>
+    <button class="btn-primary" id="crearBtn">➕ Crear nuevo concurso</button>
+    <div id="listaConcursos"></div>
+  `;
+  document.getElementById('salirBtn').onclick = async () => { await supabase.auth.signOut(); state = {}; renderPortada(); };
+  const sel = document.getElementById('grupoSelect');
+  state.grupoId = sel.value;
+  sel.onchange = () => { state.grupoId = sel.value; renderListaConcursosProfesor(); };
+  document.getElementById('crearBtn').onclick = renderCrearConcurso;
+  if (state.grupoId) renderListaConcursosProfesor();
+}
+
+async function renderListaConcursosProfesor() {
+  const { data: concursos } = await supabase.from('concursos').select('id, titulo, modo, estado').eq('grupo_id', state.grupoId).order('created_at', { ascending: false });
+  const cont = document.getElementById('listaConcursos');
+  cont.innerHTML = `<h2 style="margin-top:20px;">Concursos de este grupo</h2>` +
+    (concursos || []).map(c => `<div class="item-lista">
+      <div><strong>${c.titulo}</strong><div><span class="badge ${c.modo}">${c.modo === 'vivo' ? 'En vivo' : 'Por plazo'}</span> <span class="badge ${c.estado}">${c.estado}</span></div></div>
+      <button class="btn-small" data-id="${c.id}">Gestionar</button>
+    </div>`).join('') || '<p class="subtitle">Todavía no hay concursos.</p>';
+  cont.querySelectorAll('button[data-id]').forEach(btn => {
+    btn.onclick = () => renderGestionarConcurso(btn.dataset.id);
+  });
+}
+
+async function renderCrearConcurso() {
+  const { data: cortes } = await supabase.from('cortes').select('id, numero, nombre').order('numero');
+  const { data: preguntas } = await supabase.from('preguntas').select('id, enunciado, tipo').eq('grupo_id', state.grupoId).eq('tipo', 'opcion_unica').order('created_at', { ascending: false });
+
+  app.innerHTML = `
+    <div class="topbar"><h1>Nuevo concurso</h1><button class="btn-link" id="volverBtn" style="width:auto;">Volver</button></div>
+    <p class="subtitle">Por ahora solo preguntas de opción única (las de completar no aplican al concurso).</p>
+    <label>Título</label><input type="text" id="cTitulo" placeholder="Repaso general - física">
+    <label>Modo</label>
+    <select id="cModo">
+      <option value="vivo">En vivo (el profesor controla el avance)</option>
+      <option value="plazo">Por plazo (cada alumno a su ritmo)</option>
+    </select>
+    <div id="campoTiempoVivo"><label>Segundos por pregunta (opcional)</label><input type="number" id="cTiempoPregunta" min="5" placeholder="Ej: 20"></div>
+    <div id="campoTiempoPlazo" class="hidden"><label>Tiempo total del quiz (minutos)</label><input type="number" id="cTiempoTotal" min="1" placeholder="Ej: 15"></div>
+    <label><input type="checkbox" id="cInvitados" checked style="width:auto; display:inline-block; margin-right:6px;"> Permitir invitados sin cuenta</label>
+    <label>¿Cuántas preguntas en total quieres en el concurso?</label>
+    <input type="number" id="cCantidadTotal" min="1" value="10">
+    <label style="margin-top:16px;">Preguntas del banco (marca "fija" para que sí o sí aparezca; el resto se completa al azar hasta la cantidad de arriba)</label>
+    <div class="card" style="max-height:320px; overflow-y:auto;" id="listaPreguntasCrear"></div>
+    <button class="btn-primary" id="crearConcursoBtn">Crear concurso</button>
+    <div class="error" id="err"></div>
+  `;
+  document.getElementById('volverBtn').onclick = renderProfesorHome;
+  document.getElementById('cModo').onchange = (e) => {
+    document.getElementById('campoTiempoVivo').classList.toggle('hidden', e.target.value !== 'vivo');
+    document.getElementById('campoTiempoPlazo').classList.toggle('hidden', e.target.value !== 'plazo');
+  };
+
+  const listaEl = document.getElementById('listaPreguntasCrear');
+  listaEl.innerHTML = (preguntas || []).map(p => `
+    <div class="check-row">
+      <input type="checkbox" class="chkFija" value="${p.id}">
+      <span class="texto">${p.enunciado}</span>
+      <input type="number" class="inpPuntos" data-id="${p.id}" value="1" min="1" title="Puntos">
+    </div>`).join('') || '<p class="subtitle">Este grupo todavía no tiene preguntas de opción única.</p>';
+
+  document.getElementById('crearConcursoBtn').onclick = async () => {
+    const errEl = document.getElementById('err');
+    errEl.textContent = '';
+    const titulo = document.getElementById('cTitulo').value.trim();
+    const modo = document.getElementById('cModo').value;
+    const cantidadTotal = parseInt(document.getElementById('cCantidadTotal').value, 10);
+    const permiteInvitados = document.getElementById('cInvitados').checked;
+    const tiempoPregunta = parseInt(document.getElementById('cTiempoPregunta').value, 10) || null;
+    const tiempoTotalMin = parseInt(document.getElementById('cTiempoTotal').value, 10) || null;
+
+    if (!titulo) { errEl.textContent = 'Ponle un título al concurso.'; return; }
+    if (!cantidadTotal || cantidadTotal < 1) { errEl.textContent = 'Indica cuántas preguntas quieres en total.'; return; }
+
+    const fijasIds = new Set(Array.from(listaEl.querySelectorAll('.chkFija:checked')).map(c => c.value));
+    if (fijasIds.size > cantidadTotal) { errEl.textContent = 'Marcaste más preguntas fijas que el total permitido.'; return; }
+
+    const puntosPorId = {};
+    listaEl.querySelectorAll('.inpPuntos').forEach(inp => { puntosPorId[inp.dataset.id] = Math.max(1, parseInt(inp.value, 10) || 1); });
+
+    const todasIds = (preguntas || []).map(p => p.id);
+    const noFijasIds = todasIds.filter(id => !fijasIds.has(id));
+    const necesarias = cantidadTotal - fijasIds.size;
+    if (necesarias > noFijasIds.length) { errEl.textContent = `No hay suficientes preguntas: te faltan ${necesarias - noFijasIds.length} para completar el total.`; return; }
+
+    const aleatoriasElegidas = barajar(noFijasIds).slice(0, necesarias);
+    const idsFinal = [...fijasIds, ...aleatoriasElegidas];
+
+    const { data: concurso, error: errC } = await supabase.from('concursos').insert({
+      grupo_id: state.grupoId, titulo, modo,
+      tiempo_por_pregunta_seg: modo === 'vivo' ? tiempoPregunta : null,
+      tiempo_total_seg: modo === 'plazo' && tiempoTotalMin ? tiempoTotalMin * 60 : null,
+      permite_invitados: permiteInvitados, estado: 'armado'
+    }).select('id').single();
+    if (errC) { errEl.textContent = errC.message; return; }
+
+    const filas = idsFinal.map((pid, i) => ({ concurso_id: concurso.id, pregunta_id: pid, es_fija: fijasIds.has(pid), puntos: puntosPorId[pid] || 1, orden: i + 1 }));
+    await supabase.from('concurso_preguntas').insert(filas);
+
+    renderGestionarConcurso(concurso.id);
+  };
+}
+
+function bloqueCompartirHtml(concursoId) {
+  return `
+    <div class="card">
+      <h2>📲 Invitar a unirse</h2>
+      <p class="subtitle" style="margin-bottom:10px;">Comparte este enlace o que escaneen el QR — no necesitan cuenta.</p>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input type="text" id="enlaceUnirse" readonly style="font-size:12.5px;">
+        <button class="btn-small" id="copiarEnlaceBtn" style="white-space:nowrap;">Copiar</button>
+      </div>
+      <div style="text-align:center; margin-top:14px;"><div id="qrCanvas" style="display:inline-block;"></div></div>
+      <p class="ok-msg hidden" id="copiadoMsg" style="text-align:center;">¡Enlace copiado!</p>
+    </div>`;
+}
+
+function activarBloqueCompartir(concursoId) {
+  const url = window.location.origin + window.location.pathname + '?unirse=' + concursoId;
+  const input = document.getElementById('enlaceUnirse');
+  if (!input) return;
+  input.value = url;
+  document.getElementById('copiarEnlaceBtn').onclick = async () => {
+    await navigator.clipboard.writeText(url);
+    const msg = document.getElementById('copiadoMsg');
+    msg.classList.remove('hidden');
+    setTimeout(() => msg.classList.add('hidden'), 2000);
+  };
+  if (window.QRCode) new QRCode(document.getElementById('qrCanvas'), { text: url, width: 180, height: 180 });
+  else document.getElementById('qrCanvas').textContent = 'No se pudo generar el QR, usa el enlace de arriba.';
+}
+
+function barajar(arr) {
+  const copia = [...arr];
+  for (let i = copia.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [copia[i], copia[j]] = [copia[j], copia[i]]; }
+  return copia;
+}
+
+async function renderGestionarConcurso(concursoId) {
+  const { data: concurso } = await supabase.from('concursos').select('*').eq('id', concursoId).single();
+  state.concurso = concurso;
+  const { data: totalPreguntas } = await supabase.from('concurso_preguntas').select('id', { count: 'exact', head: true }).eq('concurso_id', concursoId);
+
+  app.innerHTML = `
+    <div class="topbar"><h1>${concurso.titulo}</h1><button class="btn-link" id="volverBtn" style="width:auto;">Volver</button></div>
+    <p class="subtitle"><span class="badge ${concurso.modo}">${concurso.modo === 'vivo' ? 'En vivo' : 'Por plazo'}</span> <span class="badge ${concurso.estado}">${concurso.estado}</span></p>
+    <div id="panelEstado"></div>
+  `;
+  document.getElementById('volverBtn').onclick = renderProfesorHome;
+
+  const panel = document.getElementById('panelEstado');
+
+  if (concurso.estado === 'armado') {
+    panel.innerHTML = `<div class="card"><p>El concurso está armado pero los alumnos todavía no pueden verlo.</p><button class="btn-primary" id="abrirBtn">Abrir sala de espera</button></div>`;
+    document.getElementById('abrirBtn').onclick = async () => {
+      await supabase.from('concursos').update({ estado: 'esperando' }).eq('id', concursoId);
+      renderGestionarConcurso(concursoId);
+    };
+    return;
+  }
+
+  if (concurso.estado === 'esperando') {
+    panel.innerHTML = `
+      <div class="card">
+        <p style="font-weight:800;">Conectados: <span id="numConectados">0</span></p>
+        <div id="listaConectados"></div>
+        <button class="btn-primary" id="iniciarBtn">▶ Iniciar concurso</button>
+      </div>
+      ${bloqueCompartirHtml(concursoId)}
+    `;
+    activarBloqueCompartir(concursoId);
+    const refrescarConectados = async () => {
+      const { data: participantes } = await supabase.from('concurso_participantes').select('alias').eq('concurso_id', concursoId);
+      document.getElementById('numConectados').textContent = (participantes || []).length;
+      document.getElementById('listaConectados').innerHTML = (participantes || []).map(p => `<div>👤 ${p.alias}</div>`).join('');
+    };
+    refrescarConectados();
+    if (state.canal) supabase.removeChannel(state.canal);
+    state.canal = supabase.channel('sala-' + concursoId)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'concurso_participantes', filter: `concurso_id=eq.${concursoId}` }, refrescarConectados)
+      .subscribe();
+    document.getElementById('iniciarBtn').onclick = async () => {
+      await supabase.from('concursos').update({ estado: 'en_curso', pregunta_actual_index: 0 }).eq('id', concursoId);
+      renderGestionarConcurso(concursoId);
+    };
+    return;
+  }
+
+  if (concurso.estado === 'en_curso') {
+    if (concurso.modo === 'vivo') {
+      panel.innerHTML = `<div class="card"><p style="font-weight:800;">Pregunta ${concurso.pregunta_actual_index + 1} de ${totalPreguntas}</p><button class="btn-primary" id="siguienteBtn">Siguiente pregunta →</button><button class="btn-danger" id="terminarBtn" style="width:100%; margin-top:10px;">Terminar concurso ahora</button></div>`;
+      document.getElementById('siguienteBtn').onclick = async () => {
+        const esUltima = concurso.pregunta_actual_index + 1 >= totalPreguntas;
+        if (esUltima) { await terminarConcursoProfesor(concursoId); }
+        else { await supabase.from('concursos').update({ pregunta_actual_index: concurso.pregunta_actual_index + 1 }).eq('id', concursoId); renderGestionarConcurso(concursoId); }
+      };
+      document.getElementById('terminarBtn').onclick = () => terminarConcursoProfesor(concursoId);
+    } else {
+      const { data: participantes } = await supabase.from('concurso_participantes').select('estado').eq('concurso_id', concursoId);
+      const finalizados = (participantes || []).filter(p => p.estado === 'finalizado').length;
+      panel.innerHTML = `
+        <div class="card"><p style="font-weight:800;">Terminaron: ${finalizados} de ${(participantes || []).length}</p><button class="btn-danger" id="terminarBtn" style="width:100%;">Terminar concurso para todos ahora</button></div>
+        ${bloqueCompartirHtml(concursoId)}
+      `;
+      activarBloqueCompartir(concursoId);
+      document.getElementById('terminarBtn').onclick = () => terminarConcursoProfesor(concursoId);
+    }
+    return;
+  }
+
+  if (concurso.estado === 'finalizado') {
+    const { data: participantes } = await supabase.from('concurso_participantes')
+      .select('id, alias, puntaje_total, tiempo_total_seg, estudiante_id')
+      .eq('concurso_id', concursoId).order('puntaje_total', { ascending: false }).order('tiempo_total_seg', { ascending: true });
+    panel.innerHTML = `<div class="card"><h2>🏆 Tabla de posiciones</h2><div id="posicionesProf"></div>
+      <button class="btn-danger" id="eliminarInvitadosBtn" style="width:100%; margin-top:14px;">Eliminar invitados en conjunto</button></div>`;
+    const cont = document.getElementById('posicionesProf');
+    (participantes || []).forEach((p, i) => {
+      const div = document.createElement('div');
+      div.className = 'fila-pos ' + (i === 0 ? 'pos-1' : i === 1 ? 'pos-2' : i === 2 ? 'pos-3' : '');
+      div.innerHTML = `<span class="num">${i + 1}</span><span class="nombre">${p.alias}${!p.estudiante_id ? ' (invitado)' : ''}</span><span class="pts">${p.puntaje_total ?? 0} pts</span>`;
+      cont.appendChild(div);
+    });
+    if (!participantes || !participantes.length) cont.innerHTML = '<p class="subtitle">Nadie participó.</p>';
+    document.getElementById('eliminarInvitadosBtn').onclick = async () => {
+      if (!confirm('¿Eliminar a todos los invitados de este concurso? Los alumnos con cuenta no se tocan.')) return;
+      await supabase.from('concurso_participantes').delete().eq('concurso_id', concursoId).is('estudiante_id', null);
+      renderGestionarConcurso(concursoId);
+    };
+  }
+}
+
+async function terminarConcursoProfesor(concursoId) {
+  const { data: participantes } = await supabase.from('concurso_participantes').select('id').eq('concurso_id', concursoId).neq('estado', 'finalizado');
+  for (const p of (participantes || [])) {
+    const { data: respuestas } = await supabase.from('concurso_respuestas').select('puntos_obtenidos').eq('participante_id', p.id);
+    const total = (respuestas || []).reduce((a, r) => a + Number(r.puntos_obtenidos || 0), 0);
+    await supabase.from('concurso_participantes').update({ puntaje_total: total, estado: 'finalizado', finalizado_en: new Date().toISOString() }).eq('id', p.id);
+  }
+  await supabase.from('concursos').update({ estado: 'finalizado' }).eq('id', concursoId);
+  renderGestionarConcurso(concursoId);
+}
+
+init();
+</script>
+</body>
+</html>
