@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Quiz de Estudio - Biología, Química y Física</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+        }
+        .app-container {
+            background: #fff;
+            width: 100%;
+            max-width: 600px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            max-height: 95vh;
+        }
+        .header {
+            background: #4a3f8a;
+            color: white;
+            padding: 12px 15px;
+            text-align: center;
+            position: relative;
+        }
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .header-top h1 {
+            font-size: 1.1rem;
+            margin: 0;
+        }
+        .header-top .user-name {
+            font-size: 0.9rem;
+            background: rgba(255,255,255,0.2);
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-weight: bold;
+        }
+        .score-board {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            font-size: 0.85rem;
+            background: rgba(255,255,255,0.15);
+            padding: 5px 10px;
+            border-radius: 20px;
+            margin-top: 5px;
+        }
+        .score-board span {
+            font-weight: bold;
+        }
+        .correct-count { color: #a5d6a7; }
+        .incorrect-count { color: #ef9a9a; }
+
+        .content {
+            padding: 20px;
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Pantalla de inicio */
+        .start-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            gap: 20px;
+            height: 100%;
+        }
+        .start-screen input {
+            padding: 12px;
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            width: 80%;
+            font-size: 1rem;
+            text-align: center;
+        }
+        .btn {
+            background: #4a3f8a;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 30px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn:hover {
+            background: #3b3270;
+            transform: scale(1.02);
+        }
+        .btn:active {
+            transform: scale(0.98);
+        }
+        .btn-wa {
+            background: #25D366;
+            margin-top: 10px;
+        }
+        .btn-wa:hover {
+            background: #1ebe5d;
+        }
+
+        /* Pantalla de pregunta */
+        .question-screen {
+            display: none;
+            flex-direction: column;
+            gap: 15px;
+            height: 100%;
+        }
+        .question-text {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+        .options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .option-btn {
+            background: #f0f0f0;
+            border: 2px solid #ddd;
+            border-radius: 12px;
+            padding: 12px 15px;
+            text-align: left;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+            color: #333;
+        }
+        .option-btn:hover:not(:disabled) {
+            background: #e0e0ff;
+            border-color: #4a3f8a;
+        }
+        .option-btn.correct {
+            background: #c8e6c9;
+            border-color: #2e7d32;
+            color: #1b5e20;
+        }
+        .option-btn.incorrect {
+            background: #ffcdd2;
+            border-color: #c62828;
+            color: #b71c1c;
+        }
+        .option-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.8;
+        }
+        .feedback {
+            margin-top: 10px;
+            font-weight: bold;
+            text-align: center;
+            min-height: 24px;
+            font-size: 1rem;
+        }
+        .feedback.correct { color: #2e7d32; }
+        .feedback.incorrect { color: #c62828; }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4a3f8a;
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        /* Reporte final */
+        .end-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 15px;
+            height: 100%;
+        }
+        .report-list {
+            width: 100%;
+            text-align: left;
+            max-height: 350px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            border-radius: 10px;
+            padding: 10px;
+            background: #fafafa;
+            margin-bottom: 10px;
+        }
+        .report-item {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            font-size: 0.85rem;
+        }
+        .report-item:last-child {
+            border-bottom: none;
+        }
+        .report-item .q {
+            font-weight: bold;
+            color: #333;
+        }
+        .report-item .a {
+            margin-top: 4px;
+        }
+        .report-item .a.correct {
+            color: #2e7d32;
+        }
+        .report-item .a.incorrect {
+            color: #c62828;
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .app-container { border-radius: 0; max-height: 100vh; }
+            body { padding: 0; }
+            .header-top h1 { font-size: 0.95rem; }
+            .header-top .user-name { font-size: 0.8rem; padding: 3px 8px; }
+            .question-text { font-size: 1rem; }
+            .option-btn { font-size: 0.9rem; padding: 10px; }
+            .score-board { font-size: 0.75rem; gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container" id="app">
+    <!-- Encabezado con Nombre y Marcador -->
+    <div class="header">
+        <div class="header-top">
+            <h1>🧠 Quiz de Estudio</h1>
+            <div class="user-name" id="userNameDisplay">Invitado</div>
+        </div>
+        <div class="score-board">
+            <span>✅ <span class="correct-count" id="liveCorrect">0</span></span>
+            <span>❌ <span class="incorrect-count" id="liveIncorrect">0</span></span>
+            <span>📊 <span id="liveProgress">0/10</span></span>
+        </div>
+    </div>
+
+    <!-- Contenido Dinámico -->
+    <div class="content" id="content"></div>
+</div>
+
+<script>
+    // ============================================================
+    // BANCO DE PREGUNTAS (Extraído de los PDFs)
+    // ============================================================
+    const questionBank = [
+        // --- BIOLOGÍA ---
+        { tema: "biologia", pregunta: "Es el proceso continuo de transformación de las especies:", opciones: ["reproducción", "evolución", "crecimiento", "metabolismo"], correcta: 1 },
+        { tema: "biologia", pregunta: "La ____ es la función más importante de los seres vivos.", opciones: ["adaptación", "reproducción", "evolución", "irritabilidad"], correcta: 1 },
+        { tema: "biologia", pregunta: "Son macroscópicos y contienen factores bióticos y abióticos:", opciones: ["Biomoléculas", "Sistema", "Individuo", "Comunidad"], correcta: 3 },
+        { tema: "biologia", pregunta: "Es un conjunto de átomos y moléculas que forman una estructura material:", opciones: ["Metabolismo", "Ser vivo", "Ninguno", "Tejido"], correcta: 1 },
+        { tema: "biologia", pregunta: "El agua y el monóxido de carbono son:", opciones: ["Elementos", "Moléculas", "Unicelulares", "Bioelementos"], correcta: 1 },
+        { tema: "biologia", pregunta: "El carbono, el oro, la plata y el oxígeno son:", opciones: ["Elementos", "Moléculas", "Unicelulares", "Bioelementos"], correcta: 0 },
+        { tema: "biologia", pregunta: "Están formados por una sola célula:", opciones: ["Elementos", "Moléculas", "Unicelulares", "Bioelementos"], correcta: 2 },
+        { tema: "biologia", pregunta: "La homeostasis consiste en mantener el equilibrio interno de un organismo.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "biologia", pregunta: "La adaptación es la respuesta apropiada de un ser vivo a un estímulo momentáneo.", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "biologia", pregunta: "El agua es un bioelemento.", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "biologia", pregunta: "Las bacterias y virus son seres vivos.", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "biologia", pregunta: "Las plantas y los animales son seres vivos multicelulares.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "biologia", pregunta: "Es la estructura que envuelve al citoplasma, y es lipoproteica, permeable y selectiva:", opciones: ["Núcleo", "Envoltura", "Citoplasma", "Membrana"], correcta: 3 },
+        { tema: "biologia", pregunta: "Es la célula típica de todos los organismos pluricelulares:", opciones: ["Eucariota", "Ninguna", "Plasmatica", "Procariota"], correcta: 0 },
+        { tema: "biologia", pregunta: "Parte del microscopio que sostiene las lentes de aumento:", opciones: ["Brazo", "Objetivos", "Diafragma", "Base"], correcta: 1 },
+        { tema: "biologia", pregunta: "Es la difusión del agua a través de una membrana selectivamente permeable:", opciones: ["Membrana", "Osmosis", "Ninguno", "Citoplasma"], correcta: 1 },
+        { tema: "biologia", pregunta: "1 micrómetro (μm) es la milésima parte de 1 milímetro.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "biologia", pregunta: "El microscopio utiliza lentes, generalmente elaboradas a partir de cristales.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "biologia", pregunta: "El diafragma es parte de una célula.", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "biologia", pregunta: "En qué se diferencian las células de los animales y de las plantas?", opciones: ["La célula animal tiene pared celular y la vegetal no.", "La célula vegetal tiene cloroplastos y la animal no.", "La célula animal tiene vacuolas grandes y la vegetal no.", "No tienen diferencias."], correcta: 1 },
+        { tema: "biologia", pregunta: "La célula procariota no tiene flagelo.", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "biologia", pregunta: "Todo ser vivo (animal o vegetal) tiene un ADN diferente.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "biologia", pregunta: "Es el reino que incluye musgos, helechos y plantas superiores:", opciones: ["Metafitas", "Metazoos", "Protistas", "Monera"], correcta: 0 },
+        { tema: "biologia", pregunta: "Es la disciplina que se ocupa de crear la clasificación de los seres vivos:", opciones: ["Taxonomia", "Biología", "Ninguna", "Zoología"], correcta: 0 },
+        { tema: "biologia", pregunta: "Son capaces de reproducirse solo en el interior de células de otros organismos:", opciones: ["Bacterias", "Virus", "Ninguno", "Cianobacterias"], correcta: 1 },
+        { tema: "biologia", pregunta: "Algunas causan enfermedades y se llaman por ello patógenas:", opciones: ["Bacterias", "Virus", "Ninguno", "Cianobacterias"], correcta: 0 },
+        { tema: "biologia", pregunta: "Son del reino monera con forma de bastoncillo:", opciones: ["Vibrios", "Bacilos", "Cocos", "Espirilos"], correcta: 1 },
+        { tema: "biologia", pregunta: "Son del reino monera con forma redondeada:", opciones: ["Vibrios", "Bacilos", "Cocos", "Espirilos"], correcta: 2 },
+        { tema: "biologia", pregunta: "Son del reino monera con forma de coma:", opciones: ["Vibrios", "Bacilos", "Cocos", "Espirilos"], correcta: 0 },
+        { tema: "biologia", pregunta: "Los virus se relacionan, nutren y reproducen por sí mismos.", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "biologia", pregunta: "El reino protista tiene una organización unicelular y pluricelular.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "biologia", pregunta: "Los seres vivos se dividen en cinco reinos.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "biologia", pregunta: "Las cianobacterias son autótrofas.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "biologia", pregunta: "Nos podemos infectar de COVID19 si nos tocamos los ojos con las manos sucias.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "biologia", pregunta: "Son arbustos o árboles que se extienden por todo el planeta, en especial, en las zonas más frías:", opciones: ["Gimnospermas", "Angiospermas", "Briofitas", "Pteridofitas"], correcta: 0 },
+        { tema: "biologia", pregunta: "Los helechos son los representantes más conocidos de este grupo:", opciones: ["Gimnospermas", "Angiospermas", "Briofitas", "Pteridofitas"], correcta: 3 },
+        { tema: "biologia", pregunta: "Son especies de seres vivos sensibles a grandes cambios en la calidad del medio:", opciones: ["Plantas", "Células", "Bioindicadores", "Otro"], correcta: 2 },
+        { tema: "biologia", pregunta: "Se clasifican en monocotiledóneas y dicotiledóneas, estamos hablando de:", opciones: ["Gimnospermas", "Angiospermas", "Briofitas", "Pteridofitas"], correcta: 1 },
+        { tema: "biologia", pregunta: "Los musgos son unas plantas muy pequeñas.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "biologia", pregunta: "Las plantas sin flores se reproducen mediante esporas.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "biologia", pregunta: "Tejidos especializados que transportan el agua y las sales minerales:", opciones: ["Estomas", "Xilema", "Floema", "Hojas"], correcta: 1 },
+        { tema: "biologia", pregunta: "Es un proceso anabólico cuya función es convertir la energía luminosa en energía química:", opciones: ["Transporte", "Respiración", "Transpiración", "Fotosíntesis"], correcta: 3 },
+        { tema: "biologia", pregunta: "La absorción de sales minerales se realiza en forma de:", opciones: ["Elementos", "Iones", "Sustancias", "Compuestos"], correcta: 1 },
+        { tema: "biologia", pregunta: "En la nutrición de las plantas, las sales minerales y el agua forman la savia:", opciones: ["Bruta", "Elaborada", "Ninguna", "Las dos"], correcta: 0 },
+        { tema: "biologia", pregunta: "El movimiento de apertura y cierre de algunas flores, ante la luz o su ausencia, es un ejemplo de:", opciones: ["Fotonastia", "Sismonastia", "Tigmonastia", "Fototropismo"], correcta: 0 },
+        { tema: "biologia", pregunta: "Las raíces tienen ____ positivo, puesto que crecen buscando las zonas más húmedas.", opciones: ["hidrotropismo", "gravitropismo", "fototropismo", "nastia"], correcta: 0 },
+        { tema: "biologia", pregunta: "Las raíces de las plantas tienen ____ positivo, porque crecen hacia el centro de la Tierra.", opciones: ["hidrotropismo", "gravitropismo", "fototropismo", "nastia"], correcta: 1 },
+        { tema: "biologia", pregunta: "Se localizan en los meristemos, en los ápices radiculares y en las semillas en germinación:", opciones: ["Auxinas", "Giberelinas", "Citoquininas", "Etileno"], correcta: 2 },
+        { tema: "biologia", pregunta: "Cuando las raíces crecen hacia abajo y los tallos hacia arriba, este tropismo recibe el nombre de:", opciones: ["Nastias", "Gravitropismo", "Hidrotropismo", "Fototropismo"], correcta: 1 },
+
+        // --- QUÍMICA ---
+        { tema: "quimica", pregunta: "Son bioelementos que constituyen el 99% de la masa de las células:", opciones: ["Primarios", "Oligoelementos", "Ninguno", "Secundarios"], correcta: 0 },
+        { tema: "quimica", pregunta: "Aparecen en proporciones inferiores al 0.1%, estamos hablando de los:", opciones: ["Primarios", "Oligoelementos", "Bioelementos", "Glucidos"], correcta: 1 },
+        { tema: "quimica", pregunta: "Las propiedades extrañas que tiene el agua se explican por la existencia de los enlaces de puente de:", opciones: ["Hidrogeno", "Oxigeno", "Nitrogeno", "Carbono"], correcta: 0 },
+        { tema: "quimica", pregunta: "Las podemos encontrar en los seres vivos tanto en estado líquido o en estado sólido:", opciones: ["Sales minerales", "Aguas", "Glucosa", "Proteínas"], correcta: 0 },
+        { tema: "quimica", pregunta: "El potasio es un bioelemento:", opciones: ["Primario", "Secundario", "Agua", ""], correcta: 1 },
+        { tema: "quimica", pregunta: "Es la molécula más importante de la vida:", opciones: ["Primario", "Secundario", "Agua", ""], correcta: 2 },
+        { tema: "quimica", pregunta: "El azufre es un bioelemento:", opciones: ["Primario", "Secundario", "Agua", ""], correcta: 0 },
+        { tema: "quimica", pregunta: "El iodo es un oligoelemento.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "quimica", pregunta: "El agua tiene dos átomos de hidrogeno unidos a dos átomos de oxígeno.", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "quimica", pregunta: "La materia existe en su forma ____, como carbono, mercurio, hierro, cobre, oro, plata etc.", opciones: ["Regular", "Celular", "Elemental", "Superior"], correcta: 2 },
+        { tema: "quimica", pregunta: "La materia viva llamada también materia ____, está formada principalmente por C, H, O, N, P y S.", opciones: ["Organico", "Inorganico", "Inerte", "Ninguno"], correcta: 0 },
+        { tema: "quimica", pregunta: "Nuestros cuerpos y el agua que tomamos están hechos de:", opciones: ["Energia", "Sustancias", "Celulas", "Materia"], correcta: 3 },
+        { tema: "quimica", pregunta: "Materia es todo lo que nos rodea y ocupa un lugar en el:", opciones: ["Cuerpo", "Sistema", "Planeta", "Espacio"], correcta: 3 },
+        { tema: "quimica", pregunta: "La célula no es la unidad básica de todos los seres vivos.", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "quimica", pregunta: "En los organismos multicelulares, generalmente las células se especializan.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "quimica", pregunta: "El oxígeno en el aire es un elemento.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "quimica", pregunta: "El oxígeno molecular no es materia.", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "quimica", pregunta: "El agua y la sal de casa pueden ser ejemplo de materia molecular.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "quimica", pregunta: "Cuál de las siguientes sustancias es un elemento?", opciones: ["Aire", "Cobre (Cu)", "Agua de mar", "Acero"], correcta: 1 },
+        { tema: "quimica", pregunta: "Cuál de las siguientes sustancias es un compuesto?", opciones: ["Ozono (O)", "Glucosa (CHO)", "Mercurio (Hg)", "Oro (Au)"], correcta: 1 },
+        { tema: "quimica", pregunta: "En qué alternativa existen solamente elementos?", opciones: ["Agua y alcohol", "Propano y gasolina", "Metano y agua", "Hidrogeno y carbono"], correcta: 3 },
+        { tema: "quimica", pregunta: "Formados por la misma clase de átomos.", opciones: ["Sustancia simple", "Sustancia compuesta", "Mezcla", "Solución"], correcta: 0 },
+        { tema: "quimica", pregunta: "Es un ejemplo de sustancias elementales.", opciones: ["aluminio", "azúcar", "bronce", ""], correcta: 0 },
+        { tema: "quimica", pregunta: "Es un ejemplo de mezcla homogénea.", opciones: ["aluminio", "azúcar", "bronce", ""], correcta: 2 },
+        { tema: "quimica", pregunta: "Es un ejemplo de sustancias compuestas.", opciones: ["aluminio", "azúcar", "bronce", ""], correcta: 1 },
+        { tema: "quimica", pregunta: "El H2O2 (Peróxido de hidrogeno) es un compuesto.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "quimica", pregunta: "Un elemento se representa por símbolos químicos.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "quimica", pregunta: "El oxígeno (O2) es un compuesto.", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "quimica", pregunta: "El radón es un compuesto.", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "quimica", pregunta: "Al combinar agua con alcohol, estos no se mezclan.", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "quimica", pregunta: "Estado de la materia donde las fuerzas de repulsión son mayores a las fuerzas de atracción molecular:", opciones: ["Solido", "Liquido", "Gaseosos", "Plasma"], correcta: 2 },
+        { tema: "quimica", pregunta: "Estado de la materia que se caracteriza por ser muy comprensible:", opciones: ["Solido", "Liquido", "Gaseosos", "Plasma"], correcta: 2 },
+        { tema: "quimica", pregunta: "Se llama ____ al cambio del estado sólido al gaseoso.", opciones: ["solidificación", "sublimación directa", "licuación", "sublimación inversa"], correcta: 1 },
+        { tema: "quimica", pregunta: "El cambio de estado físico gaseoso al líquido se denomina:", opciones: ["Condensación", "Vaporización", "Fusión", "Sublimación"], correcta: 0 },
+        { tema: "quimica", pregunta: "No se adaptan al volumen del recipiente.", opciones: ["gas", "líquido", "sólido", ""], correcta: 2 },
+        { tema: "quimica", pregunta: "Se adaptan al volumen del recipiente.", opciones: ["gas", "líquido", "sólido", ""], correcta: 0 },
+        { tema: "quimica", pregunta: "No se adaptan a la forma del recipiente.", opciones: ["gas", "líquido", "sólido", ""], correcta: 2 },
+        { tema: "quimica", pregunta: "Las siguientes sustancias químicas: aire, agua, titanio y acero, se clasifican, respectivamente, como:", opciones: ["Mezcla, elemento, átomo, aleación.", "Compuesto, elemento, átomo y aleación", "Mezcla, compuesto, átomo, elemento", "Compuesto, mezcla, átomo y elemento", "Mezcla, compuesto, elemento y aleación"], correcta: 4 },
+        { tema: "quimica", pregunta: "El estado sólido tiene forma y volumen variable.", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "quimica", pregunta: "El estado líquido tiene forma y volumen definido.", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "quimica", pregunta: "El estado gaseoso tiene forma definida.", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "quimica", pregunta: "La materia está formada por: agua, aire, tierra y fuego o la combinación de estas sustancias.", opciones: ["Thomson", "Dalton", "Demócrito", "Aristóteles"], correcta: 3 },
+        { tema: "quimica", pregunta: "Hoy se sabe que el protón y el neutrón no son esencialmente:", opciones: ["Pequeños", "Iguales", "Grandes", "Distintos"], correcta: 3 },
+        { tema: "quimica", pregunta: "Cada elemento químico contiene un número diferente de:", opciones: ["Electrones", "Protones", "Ninguno", "Neutrones"], correcta: 1 },
+        { tema: "quimica", pregunta: "La palabra «átomo» viene de la palabra griega que significa:", opciones: ["Indivisible", "Divisible", "Unido", "Particular"], correcta: 0 },
+        { tema: "quimica", pregunta: "El átomo es la partícula más pequeño de un elemento químico.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "quimica", pregunta: "Los componentes de un átomo se mantienen unidos por tres fuerzas.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "quimica", pregunta: "masa (n°) < masa (p°) < masa (e°)", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "quimica", pregunta: "Zona que envuelve al núcleo.", opciones: ["Thomson", "Extranuclear", "Núcleo", ""], correcta: 1 },
+        { tema: "quimica", pregunta: "Parte central densa, muy pequeña.", opciones: ["Thomson", "Extranuclear", "Núcleo", ""], correcta: 2 },
+        { tema: "quimica", pregunta: "Llegó a descubrir el electrón.", opciones: ["Thomson", "Extranuclear", "Núcleo", ""], correcta: 0 },
+        { tema: "quimica", pregunta: "Los átomos de hidrógeno tienen 1 protón.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "quimica", pregunta: "Leucipo y Demócrito: ambos no coinciden en que la materia está formada por átomos.", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "quimica", pregunta: "Si un elemento presenta número atómico 24 y masa atómica 52. ¿Cuántos electrones tiene el núcleo?", opciones: ["28", "26", "30", "24"], correcta: 3 },
+        { tema: "quimica", pregunta: "Poseen igual número de masa, diferente número atómico y diferente número de protones:", opciones: ["Isóbaros", "Isotopos", "Isoelectrónicos", "Isotonos"], correcta: 0 },
+        { tema: "quimica", pregunta: "Se forma cuando un átomo puede predecir un más electrones:", opciones: ["Catión", "Anión", "Ninguno", "Elemento"], correcta: 1 },
+        { tema: "quimica", pregunta: "Es la representación de todo átomo de un elemento que posee una composición nuclear definida:", opciones: ["Ion", "Sustancia", "Núclido", "Partícula"], correcta: 2 },
+        { tema: "quimica", pregunta: "Catión: Número de protones < Número de electrones.", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "quimica", pregunta: "Anión: Número de protones > Número de electrones.", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "quimica", pregunta: "Ca+2, Mg+2, Na+1, K+1, son iones.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "quimica", pregunta: "El ion es la especie química que posee carga eléctrica neta Positivos o negativos.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "quimica", pregunta: "Protio deuterio y tritio son especies.", opciones: ["Isóbaros", "Isotonos", "Isotopos", ""], correcta: 2 },
+        { tema: "quimica", pregunta: "El calcio y el argón son especies.", opciones: ["Isóbaros", "Isotonos", "Isotopos", ""], correcta: 0 },
+        { tema: "quimica", pregunta: "El magnesio y el sodio son especies.", opciones: ["Isóbaros", "Isotonos", "Isotopos", ""], correcta: 1 },
+        { tema: "quimica", pregunta: "Cuántos números cuánticos tienen los elementos químicos?", opciones: ["3", "4", "5", "2"], correcta: 1 },
+        { tema: "quimica", pregunta: "Indica la orientación espacial del orbital y nos da a conocer en que orbital se encuentra un electrón:", opciones: ["Spin", "Principal", "Magnético", "Secundario"], correcta: 2 },
+        { tema: "quimica", pregunta: "Determinar el N.C. magnético para el último electrón de 3d4.", opciones: ["-1", "+2", "+1", "-2"], correcta: 2 },
+        { tema: "quimica", pregunta: "Indicar la cantidad de orbitales apareados que presenta 5p4:", opciones: ["1", "2", "3", "0"], correcta: 1 },
+        { tema: "quimica", pregunta: "El subnivel fundamental tiene una forma tetrabular.", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "quimica", pregunta: "El subnivel principal tiene una forma compleja.", opciones: ["Verdadero", "Falso"], correcta: 1 },
+        { tema: "quimica", pregunta: "El valor de (1) para «difuso» es 2.", opciones: ["Verdadero", "Falso"], correcta: 0 },
+        { tema: "quimica", pregunta: "Un orbital tiene como máximo:", opciones: ["f", "s", "2 electrones", ""], correcta: 2 },
+        { tema: "quimica", pregunta: "El subnivel fundamental se representa.", opciones: ["f", "s", "2 electrones", ""], correcta: 1 },
+        { tema: "quimica", pregunta: "El subnivel sharp se representa.", opciones: ["f", "s", "2 electrones", ""], correcta: 1 },
+
+        // --- FÍSICA ---
+        { tema: "fisica", pregunta: "Señalamos las velocidades de cuatro móviles en MRU, al cabo de 10 s, qué alternativa se cumple si salen del mismo punto.", opciones: ["A dista de B 40 m.", "C dista de D 55 m.", "A dista de B 30 m.", "C dista de D 40 m."], correcta: 1 },
+        { tema: "fisica", pregunta: "El gráfico muestra dos móviles en MRU que parten del mismo punto. Al cabo de 6 s, ¿qué distancia los separa?", opciones: ["78 m", "48 m", "30 m", "13 m"], correcta: 0 },
+        { tema: "fisica", pregunta: "Para el movimiento de la partícula en MRU en el gráfico podemos decir que su velocidad media es", opciones: ["4 m/s", "2 m/s", "8 m/s", "5 m/s"], correcta: 0 },
+        { tema: "fisica", pregunta: "Un móvil sale del reposo y aumenta su velocidad 120 m/s en 20 segundos. Cuanto vale su aceleración?", opciones: ["1 m/s²", "2 m/s²", "4 m/s²", "6 m/s²"], correcta: 3 },
+        { tema: "fisica", pregunta: "Un móvil sale del reposo y aumenta su velocidad a 10 m/s en 2 segundos. ¿Cuánto vale su aceleración?", opciones: ["2 m/s²", "5 m/s²", "7 m/s²", "9 m/s²"], correcta: 1 },
+        { tema: "fisica", pregunta: "Un móvil sale del reposo y aumenta su velocidad a 12,5 m/s en 10 segundos. ¿Cuánto vale su aceleración?", opciones: ["1,25 m/s²", "1,50 m/s²", "2,00 m/s²", "2,25 m/s²"], correcta: 0 },
+        { tema: "fisica", pregunta: "Calcula la rapidez final de un auto que se mueve con MRUV, como se muestra en la figura (v=6 m/s, a=2 m/s², t=7 s).", opciones: ["20 m/s", "10 m/s", "15 m/s", "25 m/s"], correcta: 0 },
+        { tema: "fisica", pregunta: "Si un móvil parte del reposo con MRUV y después de 5 segundos su rapidez es de 35 m/s, calcula el módulo de aceleración.", opciones: ["5 m/s²", "6 m/s²", "7 m/s²", "8 m/s²"], correcta: 2 },
+        { tema: "fisica", pregunta: "En el MRUV decimos que la aceleración es constante porque en iguales ____ la velocidad varía cantidades ____.", opciones: ["tiempos - iguales", "distancias - iguales", "distancias - diferentes", "condiciones - diferentes"], correcta: 0 },
+        { tema: "fisica", pregunta: "Un móvil parte del reposo y viaja durante 20 s. En ese instante tiene una velocidad de 30 m/s. Halle que velocidad tenía a los 8 segundos de iniciado su recorrido.", opciones: ["12 m/s", "15 m/s", "10 m/s", "18 m/s"], correcta: 0 },
+        { tema: "fisica", pregunta: "Un auto viaja con MRUV retardado si tiene en cierto instante la velocidad de 40 m/s y desacelera a 3 m/s². ¿Qué velocidad tendrá al cabo de 8 s?", opciones: ["12 m/s", "18 m/s", "14 m/s", "16 m/s"], correcta: 3 },
+        { tema: "fisica", pregunta: "Un móvil parte del reposo y acelera uniformemente, tal que en los dos primeros segundos de su movimiento recorre 6 m. ¿Qué espacio logra recorrer en los 4 segundos siguientes?", opciones: ["32 m", "27 m", "35 m", "40 m"], correcta: 3 },
+        { tema: "fisica", pregunta: "Un auto viaja con MRUV y aumenta su velocidad desde 10 m/s hasta 30 m/s, si recorre una distancia de 20 m. ¿Cuánto vale su aceleración?", opciones: ["5 m/s²", "20 m/s²", "10 m/s²", "15 m/s²"], correcta: 1 }
+    ];
+
+    // ============================================================
+    // LÓGICA DEL QUIZ
+    // ============================================================
+    const QUESTIONS_PER_ROUND = 10;
+    let currentQuestions = [];
+    let currentIndex = 0;
+    let correctCount = 0;
+    let incorrectCount = 0;
+    let userAnswers = [];
+    let userName = "";
+
+    const content = document.getElementById('content');
+    const liveCorrect = document.getElementById('liveCorrect');
+    const liveIncorrect = document.getElementById('liveIncorrect');
+    const liveProgress = document.getElementById('liveProgress');
+    const userNameDisplay = document.getElementById('userNameDisplay');
+
+    function shuffleArray(arr) {
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    }
+
+    function getRandomQuestions(n) {
+        const shuffled = shuffleArray([...questionBank]);
+        return shuffled.slice(0, n);
+    }
+
+    function updateScoreBoard() {
+        liveCorrect.textContent = correctCount;
+        liveIncorrect.textContent = incorrectCount;
+        liveProgress.textContent = `${currentIndex}/${QUESTIONS_PER_ROUND}`;
+    }
+
+    // Pantalla de inicio (solo pide nombre si no está definido)
+    function renderStart() {
+        if (userName) {
+            startQuiz();
+            return;
+        }
+        content.innerHTML = `
+            <div class="start-screen">
+                <h2>¡Bienvenido al Quiz!</h2>
+                <p style="color:#666; font-size:0.9rem;">Pon a prueba tus conocimientos de Biología, Química y Física.</p>
+                <input type="text" id="nameInput" placeholder="Escribe tu nombre" maxlength="20">
+                <button class="btn" id="startBtn">🚀 Comenzar</button>
+            </div>
+        `;
+        document.getElementById('startBtn').addEventListener('click', () => {
+            const name = document.getElementById('nameInput').value.trim();
+            if (!name) {
+                alert("Por favor, ingresa tu nombre para comenzar.");
+                return;
+            }
+            userName = name;
+            userNameDisplay.textContent = userName;
+            startQuiz();
+        });
+    }
+
+    function startQuiz() {
+        currentQuestions = getRandomQuestions(QUESTIONS_PER_ROUND);
+        currentIndex = 0;
+        correctCount = 0;
+        incorrectCount = 0;
+        userAnswers = [];
+        updateScoreBoard();
+        renderQuestion();
+    }
+
+    function renderQuestion() {
+        if (currentIndex >= currentQuestions.length) {
+            renderEnd();
+            return;
+        }
+
+        const q = currentQuestions[currentIndex];
+        const progressPercent = (currentIndex / QUESTIONS_PER_ROUND) * 100;
+
+        const optionsWithIndex = q.opciones.map((opt, idx) => ({ text: opt, originalIndex: idx }));
+        const shuffledOptions = shuffleArray([...optionsWithIndex]);
+
+        let optionsHtml = '';
+        shuffledOptions.forEach((opt) => {
+            if (opt.text.trim() === "") return;
+            optionsHtml += `<button class="option-btn" data-index="${opt.originalIndex}">${opt.text}</button>`;
+        });
+
+        content.innerHTML = `
+            <div class="question-screen" style="display:flex;">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width:${progressPercent}%"></div>
+                </div>
+                <div class="question-text">${currentIndex + 1}. ${q.pregunta}</div>
+                <div class="options" id="optionsContainer">
+                    ${optionsHtml}
+                </div>
+                <div class="feedback" id="feedback"></div>
+            </div>
+        `;
+
+        const optionButtons = document.querySelectorAll('.option-btn');
+        optionButtons.forEach(btn => {
+            btn.addEventListener('click', () => handleAnswer(btn, q));
+        });
+    }
+
+    function handleAnswer(selectedBtn, question) {
+        const allButtons = document.querySelectorAll('.option-btn');
+        allButtons.forEach(btn => btn.disabled = true);
+
+        const selectedIndex = parseInt(selectedBtn.dataset.index);
+        const isCorrect = selectedIndex === question.correcta;
+        const feedbackEl = document.getElementById('feedback');
+
+        if (isCorrect) {
+            selectedBtn.classList.add('correct');
+            feedbackEl.textContent = "¡Excelente! 🎉 Respuesta correcta.";
+            feedbackEl.className = "feedback correct";
+            correctCount++;
+            allButtons.forEach(btn => {
+                if (parseInt(btn.dataset.index) === question.correcta) {
+                    btn.classList.add('correct');
+                }
+            });
+        } else {
+            selectedBtn.classList.add('incorrect');
+            feedbackEl.textContent = "¡Uy, te equivocaste! 😅 La respuesta correcta era: " + question.opciones[question.correcta];
+            feedbackEl.className = "feedback incorrect";
+            incorrectCount++;
+            allButtons.forEach(btn => {
+                if (parseInt(btn.dataset.index) === question.correcta) {
+                    btn.classList.add('correct');
+                }
+            });
+        }
+
+        userAnswers.push({
+            pregunta: question.pregunta,
+            seleccionada: question.opciones[selectedIndex],
+            correcta: question.opciones[question.correcta],
+            esCorrecta: isCorrect,
+            tema: question.tema
+        });
+
+        updateScoreBoard();
+
+        setTimeout(() => {
+            currentIndex++;
+            updateScoreBoard();
+            renderQuestion();
+        }, 1800);
+    }
+
+    function renderEnd() {
+        const total = userAnswers.length;
+        const percentage = Math.round((correctCount / total) * 100);
+        let mensaje = "";
+        if (percentage >= 90) mensaje = "¡Eres un genio! 🏆";
+        else if (percentage >= 70) mensaje = "¡Muy bien! Sigue así. 🌟";
+        else if (percentage >= 50) mensaje = "Buen intento, puedes mejorar. 💪";
+        else mensaje = "No te desanimes, ¡repasa y vuelve a intentarlo! 📚";
+
+        let reportHtml = '';
+        userAnswers.forEach((ans, i) => {
+            const clase = ans.esCorrecta ? 'correct' : 'incorrect';
+            const icono = ans.esCorrecta ? '✅' : '❌';
+            reportHtml += `
+                <div class="report-item">
+                    <div class="q">${i+1}. ${ans.pregunta}</div>
+                    <div class="a ${clase}">${icono} Tu respuesta: ${ans.seleccionada} | Correcta: ${ans.correcta}</div>
+                </div>
+            `;
+        });
+
+        // Construir texto para WhatsApp SOLO con el reporte (sin detalle de preguntas)
+        const notaFinal = Math.round((correctCount / total) * 10); // Nota sobre 10
+        let textoWA = `📝 *REPORTE DE QUIZ*\n`;
+        textoWA += `━━━━━━━━━━━━━━━━━━\n`;
+        textoWA += `👤 *Alumno:* ${userName}\n`;
+        textoWA += `🔁 *Intento:* 1\n`;
+        textoWA += `📋 *Preguntas:* ${total}\n`;
+        textoWA += `✅ *Acertadas:* ${correctCount}\n`;
+        textoWA += `❌ *Erradas:* ${incorrectCount}\n`;
+        textoWA += `🎯 *Nota:* ${notaFinal}/10\n`;
+        textoWA += `━━━━━━━━━━━━━━━━━━\n`;
+        textoWA += `📱 _Generado por Quiz de Estudio_`;
+
+        content.innerHTML = `
+            <div class="end-screen" style="display:flex;">
+                <h2>${mensaje}</h2>
+                <p style="font-size:1.1rem;"><strong>${userName}</strong>, tu puntaje fue: <strong>${correctCount}/${total}</strong> (${percentage}%)</p>
+                <div class="report-list">
+                    ${reportHtml}
+                </div>
+                <button class="btn" id="restartBtn">🔄 Intentar de nuevo</button>
+                <button class="btn btn-wa" id="shareBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+                    Compartir por WhatsApp
+                </button>
+            </div>
+        `;
+
+        document.getElementById('restartBtn').addEventListener('click', () => {
+            startQuiz();
+        });
+
+        document.getElementById('shareBtn').addEventListener('click', () => {
+            const url = `https://wa.me/?text=${encodeURIComponent(textoWA)}`;
+            window.open(url, '_blank');
+        });
+    }
+
+    // Iniciar la app
+    renderStart();
+
+</script>
+</body>
+</html>

@@ -154,7 +154,7 @@ const SUPABASE_ANON_KEY = 'TU_SUPABASE_ANON_KEY_AQUI';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const app = document.getElementById('app');
-const DOMINIO_INTERNO = 'quizapp.local'; // dominio ficticio, nunca se le muestra al usuario
+const DOMINIO_INTERNO = 'quizapp.com'; // dominio ficticio, nunca se le muestra al usuario
 
 function sanitizarUsuario(u) {
   return (u || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');

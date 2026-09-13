@@ -29,6 +29,7 @@
   }
   h1 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 26px; margin: 0 0 4px; }
   h2 { font-family: 'Fraunces', serif; font-weight: 600; font-size: 18px; margin: 0 0 14px; }
+  h2.sub { font-size: 15px; margin-top: 26px; }
   .subtitle { color: var(--ink-muted); font-size: 14px; margin: 0 0 18px; }
   label { display: block; font-size: 13px; color: var(--ink-muted); margin: 12px 0 4px; }
   input, select, textarea {
@@ -46,8 +47,13 @@
   .btn-link { background: none; color: var(--ink-muted); text-decoration: underline; font-family: 'Source Sans 3'; font-size: 13px; padding: 4px 0; }
   .row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
   .row > div { flex: 1; min-width: 140px; }
+  .pwd-wrap { position: relative; }
+  .pwd-wrap button { position: absolute; right: 6px; top: 6px; padding: 4px 10px; font-size: 12px; }
+  .check-list { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 4px; }
+  .check-list label { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--ink); margin: 0; }
+  .check-list input { width: auto; }
   table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13.5px; }
-  th, td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--paper-line); }
+  th, td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--paper-line); vertical-align: top; }
   .pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
   .pill.on { background: #ecf5ed; color: var(--pen-green); }
   .pill.off { background: #f1eee0; color: var(--ink-muted); }
@@ -69,22 +75,26 @@ const SUPABASE_URL = 'https://qiawcxkmszgwvxlbbcdw.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpYXdjeGttc3pnd3Z4bGJiY2R3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyNDU2NjgsImV4cCI6MjEwNDgyMTY2OH0.Yw57xGupEs2f7s1lYIw9Gx1UUP2gg18FbgKj8LVzMfY';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-// Cliente aparte, con sesión propia aislada, solo para crear cuentas nuevas
-// sin cerrar la sesión del admin que está usando el panel.
 const clienteCreacion = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: false, autoRefreshToken: false, storageKey: 'temp-creacion-cuentas' }
 });
 const app = document.getElementById('app');
-let me = { id: null, rol: null };
-let grupoActivo = null;
-let cortesCache = [];
+const DOMINIO_INTERNO = 'quizapp.com';
 
-const DOMINIO_INTERNO = 'quizapp.local';
 function sanitizarUsuario(u) {
   return (u || '').trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
 }
 
+let me = { id: null, rol: null };
+let cortesCache = [];
+let grupoActivo = null;
+let seleccionQuizzes = new Set();
+
 async function init() {
+  if (SUPABASE_URL.includes('TU_SUPABASE')) {
+    app.innerHTML = `<div class="card"><h1>Falta configurar</h1><p class="subtitle">Reemplaza SUPABASE_URL y SUPABASE_ANON_KEY al inicio del archivo.</p></div>`;
+    return;
+  }
   const { data: { session } } = await supabase.auth.getSession();
   if (session) loadDashboard(); else renderLogin();
 }
@@ -126,12 +136,29 @@ async function loadDashboard() {
   const { data: cortes } = await supabase.from('cortes').select('*').order('numero');
   cortesCache = cortes || [];
 
+  if (me.rol === 'admin') {
+    app.innerHTML = `
+      <div class="card">
+        <div class="topbar"><h1>Panel del administrador</h1><button class="btn-link" id="logout">Salir</button></div>
+        <p class="subtitle">${me.usuario} · rol: ${me.rol}</p>
+      </div>
+      <div id="adminSection"></div>
+      <div id="cortesSection" class="card"></div>
+      <div id="quizzesGlobalSection" class="card"></div>
+    `;
+    document.getElementById('logout').onclick = async () => { await supabase.auth.signOut(); renderLogin(); };
+    renderAdminSection();
+    renderCortesSection();
+    renderQuizzesGlobalSection();
+    return;
+  }
+
+  // ---- Vista de profesor ----
   app.innerHTML = `
     <div class="card">
       <div class="topbar"><h1>Panel del profesor</h1><button class="btn-link" id="logout">Salir</button></div>
       <p class="subtitle">${me.usuario} · rol: ${me.rol}</p>
     </div>
-    <div id="adminSection"></div>
     <div class="card">
       <h2>Grupo con el que vas a trabajar</h2>
       <select id="grupoSelect"></select>
@@ -143,13 +170,13 @@ async function loadDashboard() {
     <div id="resultadosSection" class="hidden"></div>
   `;
   document.getElementById('logout').onclick = async () => { await supabase.auth.signOut(); renderLogin(); };
-
-  if (me.rol === 'admin') renderAdminSection();
   renderCortesSection();
   await renderGrupoSelect();
 }
 
-// ---------------- ADMIN: grupos, profesores ----------------
+// ====================================================================
+// ADMIN: grupos + profesores
+// ====================================================================
 function renderAdminSection() {
   const el = document.getElementById('adminSection');
   el.innerHTML = `
@@ -161,26 +188,38 @@ function renderAdminSection() {
         <div><button class="btn-primary" id="gCrear">Crear grupo</button></div>
       </div>
       <div class="error" id="gErr"></div>
+      <table id="gruposTabla"><tr><th>Nombre</th><th>Nivel</th><th></th></tr></table>
     </div>
     <div class="card">
       <h2>Crear profesor</h2>
-      <p class="subtitle">Tú le asignas usuario y clave directamente; el profesor no se registra solo.</p>
+      <p class="subtitle">Tú le asignas usuario y clave directamente, y eliges de una vez a qué grupo(s) queda a cargo.</p>
       <div class="row">
         <div><label>Usuario</label><input id="profUsuario" placeholder="jperez" autocomplete="off"></div>
-        <div><label>Contraseña</label><input id="profPassword" type="password" autocomplete="new-password"></div>
-        <div><label>Grupo</label><select id="profGrupo"></select></div>
+        <div>
+          <label>Contraseña</label>
+          <div class="pwd-wrap">
+            <input id="profPassword" type="password" autocomplete="new-password">
+            <button type="button" class="btn-link" id="verClaveBtn">Ver</button>
+          </div>
+        </div>
       </div>
+      <label>Grupo(s) a cargo</label>
+      <div class="check-list" id="profGruposCheck"></div>
       <button class="btn-primary" id="profCrear">Crear profesor</button>
       <div class="error" id="profErr"></div>
-    </div>
-    <div class="card">
-      <h2>Asignar un grupo adicional a un profesor existente</h2>
-      <label>Usuario del profesor</label>
-      <input id="pUsuario" placeholder="jperez">
-      <button class="btn-outline" id="pBuscar" style="margin-top:8px">Buscar</button>
-      <div id="pResultado"></div>
+
+      <h2 class="sub">Profesores</h2>
+      <table id="profesoresTabla"><tr><th>Usuario</th><th>Grupos a cargo</th><th></th><th></th></tr></table>
     </div>
   `;
+
+  document.getElementById('verClaveBtn').onclick = () => {
+    const inp = document.getElementById('profPassword');
+    const btn = document.getElementById('verClaveBtn');
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+    btn.textContent = inp.type === 'password' ? 'Ver' : 'Ocultar';
+  };
+
   document.getElementById('gCrear').onclick = async () => {
     const nombre = document.getElementById('gNombre').value.trim();
     const nivel = document.getElementById('gNivel').value.trim();
@@ -189,42 +228,17 @@ function renderAdminSection() {
     if (error) { document.getElementById('gErr').textContent = error.message; return; }
     document.getElementById('gNombre').value = ''; document.getElementById('gNivel').value = '';
     document.getElementById('gErr').textContent = '';
-    await renderGrupoSelect();
+    await Promise.all([renderGruposTabla(), poblarProfGruposCheck(), renderProfesoresTabla()]);
   };
-  document.getElementById('pBuscar').onclick = async () => {
-    const usuario = sanitizarUsuario(document.getElementById('pUsuario').value);
-    const { data: perfil } = await supabase.from('perfiles').select('id, usuario, rol').eq('usuario', usuario).maybeSingle();
-    const box = document.getElementById('pResultado');
-    if (!perfil) { box.innerHTML = `<p class="error">No se encontró ninguna cuenta con ese usuario.</p>`; return; }
-    if (perfil.rol !== 'profesor') { box.innerHTML = `<p class="error">Esa cuenta no es profesor (rol actual: ${perfil.rol}). Créala primero con "Crear profesor".</p>`; return; }
-    const { data: grupos } = await supabase.from('grupos').select('id, nombre');
-    box.innerHTML = `
-      <p class="ok-msg">Encontrado: ${perfil.usuario}</p>
-      <div class="row">
-        <div><select id="pGrupo">${(grupos||[]).map(g=>`<option value="${g.id}">${g.nombre}</option>`).join('')}</select></div>
-        <div><button class="btn-small" id="pAsignar">Asignar grupo</button></div>
-      </div>
-      <div class="error" id="pErr"></div>
-    `;
-    document.getElementById('pAsignar').onclick = async () => {
-      const grupoId = document.getElementById('pGrupo').value;
-      const { error } = await supabase.from('profesor_grupos').insert({ profesor_id: perfil.id, grupo_id: grupoId });
-      if (error) { document.getElementById('pErr').textContent = error.message; return; }
-      document.getElementById('pErr').innerHTML = '<span class="ok-msg">Listo, grupo asignado.</span>';
-    };
-  };
-
-  supabase.from('grupos').select('id, nombre').then(({ data: grupos }) => {
-    document.getElementById('profGrupo').innerHTML = (grupos || []).map(g => `<option value="${g.id}">${g.nombre}</option>`).join('') || '<option value="">Crea un grupo primero</option>';
-  });
 
   document.getElementById('profCrear').onclick = async () => {
     const usuario = sanitizarUsuario(document.getElementById('profUsuario').value);
     const password = document.getElementById('profPassword').value;
-    const grupoId = document.getElementById('profGrupo').value;
+    const grupoIds = Array.from(document.querySelectorAll('#profGruposCheck input:checked')).map(c => c.value);
     const errEl = document.getElementById('profErr');
     errEl.textContent = '';
-    if (!usuario || !password || !grupoId) { errEl.textContent = 'Completa usuario, contraseña y grupo.'; return; }
+    if (!usuario || !password) { errEl.textContent = 'Completa usuario y contraseña.'; return; }
+    if (!grupoIds.length) { errEl.textContent = 'Marca al menos un grupo.'; return; }
 
     const { data: existente } = await supabase.rpc('obtener_email_por_usuario', { p_usuario: usuario });
     if (existente) { errEl.textContent = 'Ese usuario ya existe. Prueba con otro.'; return; }
@@ -235,22 +249,116 @@ function renderAdminSection() {
 
     const nuevoId = data.user.id;
     const { error: errRol } = await supabase.from('perfiles').update({ rol: 'profesor' }).eq('id', nuevoId);
-    const { error: errGrupo } = await supabase.from('profesor_grupos').insert({ profesor_id: nuevoId, grupo_id: grupoId });
-    if (errRol || errGrupo) { errEl.textContent = (errRol || errGrupo).message; return; }
+    const { error: errGrupos } = await supabase.from('profesor_grupos')
+      .insert(grupoIds.map(gid => ({ profesor_id: nuevoId, grupo_id: gid })));
+    if (errRol || errGrupos) { errEl.textContent = (errRol || errGrupos).message; return; }
 
     errEl.innerHTML = '<span class="ok-msg">Profesor creado y asignado.</span>';
     document.getElementById('profUsuario').value = '';
     document.getElementById('profPassword').value = '';
+    document.querySelectorAll('#profGruposCheck input:checked').forEach(c => c.checked = false);
+    renderProfesoresTabla();
   };
+
+  renderGruposTabla();
+  poblarProfGruposCheck();
+  renderProfesoresTabla();
 }
 
-// ---------------- Cortes ----------------
+async function poblarProfGruposCheck() {
+  const cont = document.getElementById('profGruposCheck');
+  if (!cont) return;
+  const { data: grupos } = await supabase.from('grupos').select('id, nombre').order('nombre');
+  cont.innerHTML = (grupos || []).map(g => `<label><input type="checkbox" value="${g.id}"> ${g.nombre}</label>`).join('') || '<p class="hint">Crea un grupo primero.</p>';
+}
+
+async function renderGruposTabla() {
+  const { data: grupos } = await supabase.from('grupos').select('id, nombre, nivel').order('nombre');
+  const tabla = document.getElementById('gruposTabla');
+  if (!tabla) return;
+  tabla.innerHTML = '<tr><th>Nombre</th><th>Nivel</th><th></th></tr>' +
+    (grupos || []).map(g => `<tr><td>${g.nombre}</td><td>${g.nivel || '-'}</td><td><button class="btn-outline borrarGrupoBtn" data-id="${g.id}">Borrar</button></td></tr>`).join('');
+  tabla.querySelectorAll('.borrarGrupoBtn').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm('¿Borrar este grupo? Falla si todavía tiene preguntas, quizzes o estudiantes enlazados.')) return;
+      const { error } = await supabase.from('grupos').delete().eq('id', btn.dataset.id);
+      if (error) { alert('No se pudo borrar: ' + error.message); return; }
+      await Promise.all([renderGruposTabla(), poblarProfGruposCheck(), renderProfesoresTabla()]);
+    };
+  });
+}
+
+async function renderProfesoresTabla() {
+  const tabla = document.getElementById('profesoresTabla');
+  if (!tabla) return;
+  const { data: profesores } = await supabase.from('perfiles').select('id, usuario').eq('rol', 'profesor').order('usuario');
+  const { data: asignaciones } = await supabase.from('profesor_grupos').select('id, profesor_id, grupo_id, grupos(nombre)');
+  const { data: grupos } = await supabase.from('grupos').select('id, nombre').order('nombre');
+
+  tabla.innerHTML = '<tr><th>Usuario</th><th>Grupos a cargo</th><th></th><th></th></tr>' +
+    (profesores || []).map(p => {
+      const asignados = (asignaciones || []).filter(a => a.profesor_id === p.id);
+      const nombres = asignados.map(a => a.grupos ? a.grupos.nombre : '').filter(Boolean).join(', ') || '—';
+      return `<tr><td>${p.usuario}</td><td>${nombres}</td>
+        <td><button class="btn-outline editarBtn" data-id="${p.id}">Editar grupos</button></td>
+        <td><button class="btn-outline resetBtn" data-id="${p.id}" data-usuario="${p.usuario}">Restablecer clave</button></td>
+      </tr>`;
+    }).join('');
+
+  tabla.querySelectorAll('.resetBtn').forEach(btn => {
+    btn.onclick = () => {
+      const fila = btn.closest('tr');
+      const celda = fila.children[3];
+      celda.innerHTML = `
+        <div style="display:flex; gap:6px; align-items:center;">
+          <input type="password" class="nuevaClaveInput" placeholder="Nueva clave" style="width:140px">
+          <button class="btn-small confirmarResetBtn">Guardar</button>
+        </div>
+        <div class="error resetErr"></div>`;
+      celda.querySelector('.confirmarResetBtn').onclick = async () => {
+        const nuevaClave = celda.querySelector('.nuevaClaveInput').value;
+        const errBox = celda.querySelector('.resetErr');
+        if (!nuevaClave || nuevaClave.length < 6) { errBox.textContent = 'Mínimo 6 caracteres.'; return; }
+        const { data, error } = await supabase.functions.invoke('resetear-clave', {
+          body: { usuario_id: btn.dataset.id, nueva_clave: nuevaClave }
+        });
+        if (error || (data && data.error)) { errBox.textContent = (data && data.error) || error.message; return; }
+        celda.innerHTML = '<span class="ok-msg">Clave actualizada.</span>';
+      };
+    };
+  });
+
+  tabla.querySelectorAll('.editarBtn').forEach(btn => {
+    btn.onclick = () => {
+      const profId = btn.dataset.id;
+      const asignados = new Set((asignaciones || []).filter(a => a.profesor_id === profId).map(a => a.grupo_id));
+      const fila = btn.closest('tr');
+      const celdaGrupos = fila.children[1];
+      celdaGrupos.innerHTML = `<div class="check-list">${(grupos || []).map(g =>
+        `<label><input type="checkbox" value="${g.id}" ${asignados.has(g.id) ? 'checked' : ''}> ${g.nombre}</label>`
+      ).join('')}</div>`;
+      btn.textContent = 'Guardar';
+      btn.onclick = async () => {
+        const seleccionados = Array.from(celdaGrupos.querySelectorAll('input:checked')).map(c => c.value);
+        await supabase.from('profesor_grupos').delete().eq('profesor_id', profId);
+        if (seleccionados.length) {
+          await supabase.from('profesor_grupos').insert(seleccionados.map(gid => ({ profesor_id: profId, grupo_id: gid })));
+        }
+        renderProfesoresTabla();
+      };
+    };
+  });
+}
+
+// ====================================================================
+// Cortes (compartido, admin puede crear, profesor solo ve)
+// ====================================================================
 function renderCortesSection() {
   const el = document.getElementById('cortesSection');
   el.innerHTML = `
     <h2>Cortes (bimestres)</h2>
     <p class="subtitle">Estos son globales, los usan todos los grupos.</p>
-    <table id="cortesTabla"><tr><th>Número</th><th>Nombre</th></tr></table>
+    <table id="cortesTabla"><tr><th>Número</th><th>Nombre</th>${me.rol === 'admin' ? '<th></th>' : ''}</tr></table>
     ${me.rol === 'admin' ? `
     <div class="row" style="margin-top:14px">
       <div><label>Número</label><input id="cNumero" type="number" placeholder="1"></div>
@@ -260,7 +368,9 @@ function renderCortesSection() {
     <div class="error" id="cErr"></div>` : ''}
   `;
   const tabla = document.getElementById('cortesTabla');
-  cortesCache.forEach(c => { tabla.innerHTML += `<tr><td>${c.numero}</td><td>${c.nombre}</td></tr>`; });
+  cortesCache.forEach(c => {
+    tabla.innerHTML += `<tr><td>${c.numero}</td><td>${c.nombre}</td>${me.rol === 'admin' ? `<td><button class="btn-outline borrarCorteBtn" data-id="${c.id}">Borrar</button></td>` : ''}</tr>`;
+  });
   if (me.rol === 'admin') {
     document.getElementById('cCrear').onclick = async () => {
       const numero = Number(document.getElementById('cNumero').value);
@@ -272,10 +382,104 @@ function renderCortesSection() {
       cortesCache = cortes || [];
       renderCortesSection();
     };
+    tabla.querySelectorAll('.borrarCorteBtn').forEach(btn => {
+      btn.onclick = async () => {
+        if (!confirm('¿Borrar este corte? Falla si algún quiz todavía apunta a él directamente.')) return;
+        const { error } = await supabase.from('cortes').delete().eq('id', btn.dataset.id);
+        if (error) { alert('No se pudo borrar: ' + error.message); return; }
+        const { data: cortes } = await supabase.from('cortes').select('*').order('numero');
+        cortesCache = cortes || [];
+        renderCortesSection();
+      };
+    });
   }
 }
 
-// ---------------- Selector de grupo ----------------
+// ====================================================================
+// ADMIN: ver quizzes por grupo y combinar en uno nuevo
+// ====================================================================
+async function renderQuizzesGlobalSection() {
+  const el = document.getElementById('quizzesGlobalSection');
+  const { data: grupos } = await supabase.from('grupos').select('id, nombre').order('nombre');
+  el.innerHTML = `
+    <h2>Ver quizzes por grupo</h2>
+    <p class="subtitle">Marca quizzes (de uno o varios grupos) para combinarlos en un quiz nuevo. El contenido de preguntas lo maneja el profesor; aquí solo puedes armar combinaciones a partir de lo que ya existe.</p>
+    <select id="verGrupoSelect">${(grupos || []).map(g => `<option value="${g.id}">${g.nombre}</option>`).join('') || '<option value="">No hay grupos</option>'}</select>
+    <table id="quizzesPorGrupoTabla"><tr><th></th><th>Título</th><th>Modo</th><th>Estado</th></tr></table>
+    <p class="hint">Seleccionados para combinar: <span id="contadorSeleccion">0</span></p>
+    <div id="combinarForm" class="hidden">
+      <label>Título del nuevo quiz</label><input id="combTitulo" placeholder="Repaso general">
+      <div class="row">
+        <div><label>Modo</label><select id="combModo"><option value="practica">Práctica</option><option value="examen">Examen</option></select></div>
+        <div><label>Grupo destino</label><select id="combGrupoDestino">${(grupos || []).map(g => `<option value="${g.id}">${g.nombre}</option>`).join('')}</select></div>
+      </div>
+      <label><input type="checkbox" id="combActivo" checked style="width:auto;display:inline-block;margin-right:6px"> Activo desde ya</label>
+      <button class="btn-primary" id="combCrear">Crear quiz combinado</button>
+      <div class="error" id="combErr"></div>
+    </div>
+  `;
+  document.getElementById('verGrupoSelect').onchange = renderQuizzesPorGrupo;
+  document.getElementById('combCrear').onclick = crearQuizCombinado;
+  if (grupos && grupos.length) renderQuizzesPorGrupo();
+}
+
+async function renderQuizzesPorGrupo() {
+  const grupoId = document.getElementById('verGrupoSelect').value;
+  const { data: quizzes } = await supabase.from('quizzes').select('id, titulo, modo, activo').eq('grupo_id', grupoId).order('created_at', { ascending: false });
+  const tabla = document.getElementById('quizzesPorGrupoTabla');
+  tabla.innerHTML = '<tr><th></th><th>Título</th><th>Modo</th><th>Estado</th></tr>' +
+    (quizzes || []).map(q => `
+      <tr>
+        <td><input type="checkbox" class="seleccionQuizChk" value="${q.id}" ${seleccionQuizzes.has(q.id) ? 'checked' : ''}></td>
+        <td>${q.titulo}</td><td>${q.modo}</td>
+        <td><span class="pill ${q.activo ? 'on' : 'off'}">${q.activo ? 'activo' : 'inactivo'}</span></td>
+      </tr>`).join('') || '<tr><td colspan="4">Este grupo todavía no tiene quizzes.</td></tr>';
+
+  tabla.querySelectorAll('.seleccionQuizChk').forEach(chk => {
+    chk.onchange = () => {
+      if (chk.checked) seleccionQuizzes.add(chk.value); else seleccionQuizzes.delete(chk.value);
+      actualizarContadorSeleccion();
+    };
+  });
+  actualizarContadorSeleccion();
+}
+
+function actualizarContadorSeleccion() {
+  document.getElementById('contadorSeleccion').textContent = seleccionQuizzes.size;
+  document.getElementById('combinarForm').classList.toggle('hidden', seleccionQuizzes.size === 0);
+}
+
+async function crearQuizCombinado() {
+  const titulo = document.getElementById('combTitulo').value.trim();
+  const modo = document.getElementById('combModo').value;
+  const grupoDestino = document.getElementById('combGrupoDestino').value;
+  const activo = document.getElementById('combActivo').checked;
+  const errEl = document.getElementById('combErr');
+  errEl.textContent = '';
+  if (!titulo) { errEl.textContent = 'Ponle un título al quiz combinado.'; return; }
+  if (!seleccionQuizzes.size) { errEl.textContent = 'Marca al menos un quiz.'; return; }
+
+  const { data: qp } = await supabase.from('quiz_preguntas').select('pregunta_id').in('quiz_id', Array.from(seleccionQuizzes));
+  const preguntaIds = [...new Set((qp || []).map(r => r.pregunta_id))];
+
+  const { data: nuevoQuiz, error } = await supabase.from('quizzes').insert({
+    grupo_id: grupoDestino, titulo, modo, alcance: 'grupo_preguntas', activo
+  }).select('id').single();
+  if (error) { errEl.textContent = error.message; return; }
+
+  if (preguntaIds.length) {
+    const filas = preguntaIds.map((pid, i) => ({ quiz_id: nuevoQuiz.id, pregunta_id: pid, orden: i + 1 }));
+    await supabase.from('quiz_preguntas').insert(filas);
+  }
+
+  errEl.innerHTML = `<span class="ok-msg">Quiz combinado creado con ${preguntaIds.length} preguntas.</span>`;
+  seleccionQuizzes.clear();
+  renderQuizzesPorGrupo();
+}
+
+// ====================================================================
+// PROFESOR: selector de grupo, carga masiva, preguntas, quizzes propios
+// ====================================================================
 async function renderGrupoSelect() {
   const { data: grupos } = await supabase.from('grupos').select('id, nombre').order('nombre');
   const sel = document.getElementById('grupoSelect');
@@ -289,7 +493,6 @@ async function renderGrupoSelect() {
   renderCargaSection(); renderPreguntasSection(); renderQuizSection();
 }
 
-// ---------------- Carga masiva de preguntas ----------------
 function renderCargaSection() {
   const el = document.getElementById('cargaSection');
   el.classList.remove('hidden');
@@ -306,7 +509,7 @@ function renderCargaSection() {
         · si tu primera fila es de encabezados (con la palabra "tipo"), se ignora automáticamente
       </p>
       <button class="btn-outline" id="plantillaBtn" style="margin-bottom:10px">Descargar plantilla de ejemplo</button>
-      <textarea id="csvInput" placeholder="opcion_unica,1,¿La capital de Perú es Lima?,,Verdadero,V,Falso,F,,,,,&#10;completar,1,El símbolo químico del oro es ___,,,,,,,,,,Au">
+      <textarea id="csvInput" placeholder="opcion_unica,1,¿La capital de Perú es Lima?,,Verdadero,V,Falso,F,,,,,&#10;completar,1,El símbolo químico del oro es ___,,,,,,,,,,Au"></textarea>
       <button class="btn-primary" id="cargarBtn">Cargar preguntas</button>
       <div class="error" id="cargaErr"></div>
     </div>
@@ -323,7 +526,7 @@ function renderCargaSection() {
 }
 
 function esVerdadero(v) {
-  return ['v','1','si','sí','true','x'].includes((v || '').trim().toLowerCase());
+  return ['v', '1', 'si', 'sí', 'true', 'x'].includes((v || '').trim().toLowerCase());
 }
 
 async function cargarPreguntas() {
@@ -357,7 +560,7 @@ async function cargarPreguntas() {
     if (errP) { fallidas++; continue; }
 
     if (tipo === 'opcion_unica') {
-      const opciones = [[o1,c1],[o2,c2],[o3,c3],[o4,c4]]
+      const opciones = [[o1, c1], [o2, c2], [o3, c3], [o4, c4]]
         .filter(([texto]) => texto)
         .map(([texto, correcta], i) => ({ pregunta_id: pregunta.id, texto, es_correcta: esVerdadero(correcta), orden: i + 1 }));
       if (opciones.length) await supabase.from('opciones').insert(opciones);
@@ -368,7 +571,6 @@ async function cargarPreguntas() {
   renderPreguntasSection();
 }
 
-// ---------------- Lista de preguntas del grupo ----------------
 async function renderPreguntasSection() {
   const el = document.getElementById('preguntasSection');
   el.classList.remove('hidden');
@@ -387,7 +589,6 @@ async function renderPreguntasSection() {
   `;
 }
 
-// ---------------- Crear quiz ----------------
 function renderQuizSection() {
   const el = document.getElementById('quizSection');
   el.classList.remove('hidden');
