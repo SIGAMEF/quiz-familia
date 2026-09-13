@@ -1621,12 +1621,13 @@ async function renderPreguntasSectionProfesor() {
 }
 
 function renderTablaPreguntasProfesor() {
-  const buscador = (document.getElementById('buscadorPreguntas').value || '').toLowerCase();
+  const tokens = (document.getElementById('buscadorPreguntas').value || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
   const filtroCorte = document.getElementById('filtroCorte').value;
   const filtroTipo = document.getElementById('filtroTipo').value;
   const filtroQuiz = document.getElementById('filtroQuiz').value;
   const filtradas = preguntasCache.filter(p => {
-    const matchTexto = p.enunciado.toLowerCase().includes(buscador);
+    const textoBusqueda = (p.enunciado + ' ' + (p.tema || '')).toLowerCase();
+    const matchTexto = tokens.every(t => textoBusqueda.includes(t));
     const matchCorte = !filtroCorte || (p.cortes && String(p.cortes.numero) === filtroCorte);
     const matchTipo = !filtroTipo || p.tipo === filtroTipo;
     const matchQuiz = !filtroQuiz || (mapaPreguntaQuizzes[p.id] || []).includes(filtroQuiz);
@@ -1884,9 +1885,10 @@ async function cargarSeleccionables(quizId) {
   }
 
   function aplicarBusqueda() {
-    const q = (document.getElementById('buscadorManual').value || '').toLowerCase();
+    const tokens = (document.getElementById('buscadorManual').value || '').toLowerCase().trim().split(/\s+/).filter(Boolean);
     cont.querySelectorAll('.pregunta-item').forEach(item => {
-      item.style.display = item.querySelector('.pregunta-texto').textContent.toLowerCase().includes(q) ? 'flex' : 'none';
+      const texto = item.querySelector('.pregunta-texto').textContent.toLowerCase();
+      item.style.display = tokens.every(t => texto.includes(t)) ? 'flex' : 'none';
     });
   }
 

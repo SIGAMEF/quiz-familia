@@ -669,7 +669,7 @@
     async function renderQuestion() {
         if (intervaloTiempo) clearInterval(intervaloTiempo);
         const pregunta = state.preguntas[state.index];
-        const imagenHtml = pregunta.imagen_url ? `<img src="${pregunta.imagen_url}" alt="" style="max-width:100%; border-radius:12px; margin-bottom:14px;">` : '';
+        const imagenHtml = pregunta.imagen_url ? `<img src="${pregunta.imagen_url}" alt="" id="imagenPregunta" style="max-width:100%; border-radius:12px; margin-bottom:14px; cursor:zoom-in;" title="Toca para ampliar">` : '';
         const esEstudio = state.quiz.modo === 'estudio';
         const circunferencia = 2 * Math.PI * 22;
 
@@ -708,6 +708,17 @@
             if (intervaloTiempo) clearInterval(intervaloTiempo);
             loadDashboard();
         };
+
+        const imagenPreguntaEl = document.getElementById('imagenPregunta');
+        if (imagenPreguntaEl) {
+            imagenPreguntaEl.onclick = () => {
+                const overlay = document.createElement('div');
+                overlay.style.cssText = 'position:fixed; inset:0; background:rgba(20,18,35,0.92); display:flex; align-items:center; justify-content:center; z-index:2000; padding:20px; cursor:zoom-out;';
+                overlay.innerHTML = `<img src="${pregunta.imagen_url}" alt="" style="max-width:100%; max-height:100%; border-radius:12px; box-shadow:0 20px 50px rgba(0,0,0,0.4);">`;
+                overlay.onclick = () => overlay.remove();
+                document.body.appendChild(overlay);
+            };
+        }
 
         const opts = document.getElementById('opts');
 
