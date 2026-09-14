@@ -612,10 +612,16 @@
         return localStorage.getItem('quiz_voz_pregunta') === '1';
     }
 
+    function textoParaVoz(texto) {
+        return String(texto || '')
+            .replace(/_+\s*$/g, '')  // guiones bajos al final: se omiten, no se leen
+            .replace(/_+/g, ', ');   // guiones bajos en medio: se leen como una pequeña pausa
+    }
+
     function leerPreguntaEnVoz(texto, alTerminar) {
         try {
             speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(texto);
+            const utterance = new SpeechSynthesisUtterance(textoParaVoz(texto));
             utterance.lang = 'es-ES';
             utterance.volume = 1;
             utterance.rate = 1;
