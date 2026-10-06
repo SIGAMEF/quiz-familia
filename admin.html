@@ -289,6 +289,7 @@ function renderAdminApp() {
       <button class="nav-item" data-tab="alumnos">🎓 <span class="nav-text">Alumnos</span></button>
       <button class="nav-item" data-tab="cortes">📅 <span class="nav-text">Cortes</span></button>
       <button class="nav-item" data-tab="quizzes">📝 <span class="nav-text">Quizzes</span></button>
+      <button class="nav-item" data-tab="resultados">📈 <span class="nav-text">Resultados</span></button>
     </aside>
     <main class="main-content">
       <div class="header">
@@ -385,6 +386,18 @@ function renderAdminApp() {
         </div>
       </div>
 
+      <div class="tab-content" id="admtab-resultados">
+        <div class="card">
+          <h2>Resultados por evento</h2>
+          <p class="subtitle">Filtra por grupo, elige un evento y revisa las respuestas por alumno o descarga el reporte masivo.</p>
+          <div class="grid-2">
+            <div class="form-group"><label>Grupo</label><select id="admResGrupo" class="form-control"></select></div>
+            <div class="form-group"><label>Evento</label><select id="admResEvento" class="form-control"></select></div>
+          </div>
+          <div id="admResSeccion" style="margin-top:6px;"></div>
+        </div>
+      </div>
+
       <div class="tab-content" id="admtab-quizzes">
         <div class="card">
           <h2>Ver quizzes por grupo</h2>
@@ -409,7 +422,7 @@ function renderAdminApp() {
   `;
   document.getElementById('logout').onclick = async () => { await supabase.auth.signOut(); window.location.href = 'index.html'; };
   root.querySelectorAll('[data-goto]').forEach(btn => btn.onclick = () => document.querySelector(`.nav-item[data-tab="${btn.dataset.goto}"]`).click());
-  activarTabs('.nav-item', 'admtab', { resumen: 'Resumen', grupos: 'Gestión de grupos', profesores: 'Gestión de profesores', alumnos: 'Alumnos', cortes: 'Cortes y bimestres', quizzes: 'Administración de quizzes' });
+  activarTabs('.nav-item', 'admtab', { resumen: 'Resumen', grupos: 'Gestión de grupos', profesores: 'Gestión de profesores', alumnos: 'Alumnos', cortes: 'Cortes y bimestres', quizzes: 'Administración de quizzes', resultados: 'Resultados por evento' });
 
   renderVerClaveToggle();
   renderGruposAdmin();
@@ -417,6 +430,7 @@ function renderAdminApp() {
   renderAlumnosAdmin();
   renderCortesAdmin();
   renderQuizzesAdminTab();
+  iniciarResultadosAdmin();
   actualizarStatsAdmin();
 }
 
@@ -584,7 +598,7 @@ let alumnosCache = [];
 async function renderAlumnosAdmin() {
   const { data: alumnos } = await supabase
     .from('estudiantes')
-    .select('id, nombre, grupo_id, perfil_id, grupos(nombre), perfiles(usuario)')
+    .select('*, grupos(nombre), perfiles(usuario)')
     .order('nombre');
   alumnosCache = alumnos || [];
 
@@ -606,12 +620,21 @@ function renderTablaAlumnos() {
     return matchTexto && matchGrupo;
   });
   const tabla = document.getElementById('alumnosTabla');
-  tabla.innerHTML = '<tr><th>Nombre</th><th>Usuario</th><th>Grupo</th><th></th></tr>' +
+  tabla.innerHTML = '<tr><th>Nombre</th><th>Usuario</th><th>Grupo</th><th title="Permite al alumno cambiar de grupo desde su ventana">Elegir grupos</th><th></th></tr>' +
     (filtrados.length ? filtrados.map(a => `<tr>
       <td>${a.nombre}</td><td>${a.perfiles ? a.perfiles.usuario : '-'}</td><td>${a.grupos ? a.grupos.nombre : 'Sin grupo'}</td>
+      <td style="text-align:center;"><input type="checkbox" class="elegirGruposChk" data-id="${a.id}" ${a.puede_elegir_grupos ? 'checked' : ''} style="width:auto; accent-color:var(--primary);"></td>
       <td><button class="btn btn-sm btn-danger eliminarAlumnoBtn" data-id="${a.perfil_id}" data-nombre="${a.nombre}">Eliminar</button></td>
-    </tr>`).join('') : '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">No hay alumnos que coincidan.</td></tr>');
+    </tr>`).join('') : '<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">No hay alumnos que coincidan.</td></tr>');
 
+  tabla.querySelectorAll('.elegirGruposChk').forEach(chk => {
+    chk.onchange = async () => {
+      const { error } = await supabase.from('estudiantes').update({ puede_elegir_grupos: chk.checked }).eq('id', chk.dataset.id);
+      if (error) { chk.checked = !chk.checked; mostrarToast('No se pudo guardar: ' + error.message + ' (¿ejecutaste el SQL?)', 'error'); return; }
+      const al = alumnosCache.find(x => x.id === chk.dataset.id); if (al) al.puede_elegir_grupos = chk.checked;
+      mostrarToast(chk.checked ? 'Ahora puede elegir grupos.' : 'Ya no puede elegir grupos.');
+    };
+  });
   tabla.querySelectorAll('.eliminarAlumnoBtn').forEach(btn => {
     btn.onclick = async () => {
       if (!confirm(`¿Eliminar a "${btn.dataset.nombre}"? Se borra su cuenta junto con todo su historial: intentos, respuestas y resultados. Esto no se puede deshacer.`)) return;
@@ -766,10 +789,11 @@ function renderProfesorApp() {
   root.innerHTML = `
     <aside class="sidebar">
       <div class="logo"><span class="logo-text">📘 QuizPanel</span></div>
-      <button class="nav-item active" data-tab="resumen">📊 <span class="nav-text">Resumen</span></button>
+      <button class="nav-item active" data-tab="quizzes">📝 <span class="nav-text">Quizzes</span></button>
+      <button class="nav-item" data-tab="relacionar">🔗 <span class="nav-text">Relacionar quiz</span></button>
+      <button class="nav-item" data-tab="resumen">📊 <span class="nav-text">Resumen</span></button>
       <button class="nav-item" data-tab="cargar">📥 <span class="nav-text">Cargar Preguntas</span></button>
       <button class="nav-item" data-tab="preguntas">📚 <span class="nav-text">Banco de Preguntas</span></button>
-      <button class="nav-item" data-tab="quizzes">📝 <span class="nav-text">Quizzes</span></button>
       <button class="nav-item" data-tab="resultados">📈 <span class="nav-text">Resultados</span></button>
       <a href="concurso.html" style="text-decoration:none; margin-top:14px; padding:11px 14px; border-radius:12px; background:linear-gradient(135deg,#FFC857,#FF9F43); display:flex; align-items:center; gap:10px;">
         <span style="color:#5A3400; font-weight:700; font-size:14px;">🏆 <span class="nav-text">Quiz en vivo</span></span>
@@ -777,7 +801,7 @@ function renderProfesorApp() {
     </aside>
     <main class="main-content">
       <div class="header">
-        <h1 id="pageTitle">Resumen</h1>
+        <h1 id="pageTitle">Gestión de quizzes</h1>
         <div class="user-badge"><span>👨‍🏫</span><span>${me.usuario}</span>
           <button class="btn btn-sm btn-secondary" id="logout" style="margin-left:8px;">Salir</button>
         </div>
@@ -785,7 +809,7 @@ function renderProfesorApp() {
 
       <div class="sticky-group"><select id="grupoSelect" class="form-control"></select></div>
 
-      <div class="tab-content active" id="proftab-resumen">
+      <div class="tab-content" id="proftab-resumen">
         <div class="grid-2">
           <div class="card">
             <h2>Resumen del grupo</h2>
@@ -917,44 +941,114 @@ function renderProfesorApp() {
         </div>
       </div>
 
-      <div class="tab-content" id="proftab-quizzes">
+      <div class="tab-content active" id="proftab-quizzes">
         <div class="card">
-          <h2>➕ Crear nuevo quiz</h2>
-          <p class="subtitle">Créalo vacío para armarlo a mano, o con todas las preguntas de un corte o del grupo.</p>
-          <div class="form-group"><label>Título</label><input id="qTitulo" class="form-control" placeholder="Práctica bimestre 1"></div>
+          <h2>➕ Crear quiz</h2>
+          <p class="subtitle">Elige cómo quieres crearlo.</p>
+          <div class="sub-tabs">
+            <button class="sub-tab active" data-qcrear="titulo">✍️ Con título</button>
+            <button class="sub-tab" data-qcrear="temas">📦 Carga masiva por temas</button>
+          </div>
+          <div class="sub-tab-content active" id="qcrear-titulo">
+            <div class="form-group" style="margin-top:14px;"><label>Título del quiz</label><input id="qTitulo" class="form-control" placeholder="Ej: Movimiento rectilíneo"></div>
+            <button class="btn btn-primary" id="qCrear">Crear y cargar preguntas</button>
+            <div class="error-msg" id="qErr"></div>
+          </div>
+          <div class="sub-tab-content" id="qcrear-temas">
+            <p class="subtitle" style="margin-top:14px;">Sube un Excel o pega filas. Se crea un quiz por cada tema (columna <code>tema_curso</code>). No se guarda nada hasta que pulses <b>Grabar</b>.</p>
+            <button class="btn btn-secondary" id="qPlantillaBtn" style="margin-bottom:12px;">📄 Descargar plantilla</button>
+            <input type="file" id="qExcelInput" accept=".xlsx,.xls,.csv" class="form-control" style="margin-bottom:10px;">
+            <textarea id="qPegar" class="form-control" rows="4" placeholder="…o pega aquí las filas (tabulador, | o coma)"></textarea>
+            <button class="btn btn-secondary" id="qPrevisualizar" style="margin-top:8px;">👁️ Previsualizar</button>
+            <div id="qPreviewTemas" style="margin-top:12px;"></div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>📋 Quizzes del grupo</h2>
+          <p class="subtitle">Gestiona los quizzes existentes y añádeles preguntas.</p>
+          <div class="table-container"><table id="listaQuizzesTabla"><tr><th>Título</th><th>Preguntas</th><th>Estado</th><th>Acciones</th></tr></table></div>
+        </div>
+        <div id="panelGestionQuiz" class="hidden"></div>
+      </div>
+
+      <div class="tab-content" id="proftab-relacionar">
+        <div class="card">
+          <h2>👥 Mis grupos</h2>
+          <p class="subtitle">Crea los grupos con los que trabajarás.</p>
+          <div class="grid-2">
+            <div class="form-group"><label>Nombre del grupo</label><input class="form-control" id="rgNombre" placeholder="4to Secundaria A"></div>
+            <div class="form-group"><label>Nivel educativo</label><input class="form-control" id="rgNivel" placeholder="Secundaria"></div>
+          </div>
+          <button class="btn btn-primary" id="rgCrear">Crear grupo</button>
+          <div class="error-msg" id="rgErr"></div>
+          <div class="table-container" style="margin-top:12px;"><table id="rgTabla"></table></div>
+        </div>
+        <div class="card">
+          <h2>🎯 Crear evento</h2>
+          <p class="subtitle">Un evento es lo que verá el alumno: título, modo y las preguntas que elijas, publicado en uno o varios grupos.</p>
+          <div class="form-group"><label>Título del evento</label><input class="form-control" id="reTitulo" placeholder="Examen bimestral"></div>
+          <div class="form-group"><label>Grupos</label><div id="reGrupos" style="display:flex; flex-direction:column; gap:6px;"></div></div>
           <div class="grid-2">
             <div class="form-group"><label>Modo</label>
-              <select id="qModo" class="form-control">
+              <select id="reModo" class="form-control">
                 <option value="practica">Práctica (feedback inmediato)</option>
                 <option value="examen">Examen (califica al final)</option>
                 <option value="estudio">Estudio (preguntas aleatorias, el alumno elige cuántas)</option>
               </select>
             </div>
-            <div class="form-group"><label>Alcance inicial</label>
-              <select id="qAlcance" class="form-control">
-                <option value="vacio">Quiz vacío (agregar preguntas después)</option>
-                <option value="un_corte">Todas las preguntas de un corte</option>
-                <option value="acumulado">Todas las preguntas del grupo</option>
-              </select>
-            </div>
+            <div class="form-group"><label>Minutos totales (opcional)</label><input class="form-control" id="reMinutos" type="number" min="1" placeholder="Sin límite"></div>
           </div>
-          <div class="form-group hidden" id="qCorteWrap"><label>Corte</label><select id="qCorte" class="form-control"></select></div>
-          <div class="form-group"><label style="text-transform:none; display:flex; align-items:center; gap:8px;"><input type="checkbox" id="qActivo" checked style="width:auto; accent-color:var(--primary);"> Activo desde ya</label></div>
-          <button class="btn btn-primary" id="qCrear">Crear quiz</button>
-          <div class="error-msg" id="qErr"></div>
+          <div class="form-group" id="reAleatoriasWrap"><label>Preguntas aleatorias (opcional)</label><input class="form-control" id="reAleatorias" type="number" min="1" placeholder="Todas las del evento"></div>
+          <p id="reTiempoHint" class="subtitle" style="margin:-6px 0 12px;"></p>
+          <div class="form-group"><label style="text-transform:none; display:flex; align-items:center; gap:8px;"><input type="checkbox" id="reActivo" checked style="width:auto; accent-color:var(--primary);"> Activo desde ya</label></div>
+          <label>¿Qué preguntas lleva? <span style="text-transform:none; font-weight:600;">(puedes combinar ambas formas)</span></label>
+          <div class="sub-tabs">
+            <button class="sub-tab active" data-rel="quizzes">📝 Por quizzes (uno o varios)</button>
+            <button class="sub-tab" data-rel="preguntas">☑️ Por preguntas</button>
+          </div>
+          <div class="sub-tab-content active" id="rel-quizzes"><div id="reQuizzesLista" class="preguntas-seleccionables-scroll" style="margin-top:12px;"></div></div>
+          <div class="sub-tab-content" id="rel-preguntas">
+            <input type="text" id="reBuscar" class="form-control" placeholder="🔍 Buscar por enunciado o tema..." style="margin-top:12px;">
+            <div id="rePreguntasLista" class="preguntas-seleccionables-scroll" style="margin-top:10px;"></div>
+          </div>
+          <p style="font-weight:800; color:var(--primary); margin:12px 0;">📌 Preguntas del evento: <span id="reContador">0</span></p>
+          <button class="btn btn-primary" id="reCrear">🚀 Crear evento</button>
+          <div class="error-msg" id="reErr"></div>
         </div>
         <div class="card">
-          <h2>📋 Quizzes del grupo</h2>
-          <p class="subtitle">Gestiona los quizzes existentes y añádeles preguntas.</p>
-          <div class="table-container"><table id="listaQuizzesTabla"><tr><th>Título</th><th>Modo</th><th>Preguntas</th><th>Estado</th><th>Acciones</th></tr></table></div>
+          <h2>📅 Eventos creados</h2>
+          <div class="table-container"><table id="reEventosTabla"></table></div>
         </div>
-        <div id="panelGestionQuiz" class="hidden"></div>
+        <div class="card hidden" id="reEditCard">
+          <h2>✏️ Editar evento</h2>
+          <p class="subtitle" id="reEditInfo"></p>
+          <div class="form-group"><label>Título</label><input class="form-control" id="eTitulo"></div>
+          <div class="grid-2">
+            <div class="form-group"><label>Modo</label>
+              <select id="eModo" class="form-control"><option value="practica">Práctica</option><option value="examen">Examen</option><option value="estudio">Estudio</option></select>
+            </div>
+            <div class="form-group"><label>Minutos totales (opcional)</label><input class="form-control" id="eMinutos" type="number" min="1" placeholder="Sin límite"></div>
+          </div>
+          <div class="form-group" id="eAleatoriasWrap"><label>Preguntas aleatorias (opcional)</label><input class="form-control" id="eAleatorias" type="number" min="1" placeholder="Todas las del evento"></div>
+          <p id="eTiempoHint" class="subtitle" style="margin:-6px 0 12px;"></p>
+          <div class="form-group"><label style="text-transform:none; display:flex; align-items:center; gap:8px;"><input type="checkbox" id="eActivo" style="width:auto; accent-color:var(--primary);"> Activo</label></div>
+          <label>Preguntas del evento <span style="text-transform:none; font-weight:600;">(desmarca para quitar, marca para agregar)</span></label>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin:8px 0;">
+            <select id="eQuizAgregar" class="form-control" style="flex:1; min-width:200px;"></select>
+            <button class="btn btn-secondary" id="eQuizAgregarBtn">➕ Añadir todas sus preguntas</button>
+          </div>
+          <input type="text" id="eBuscar" class="form-control" placeholder="🔍 Buscar por enunciado o tema...">
+          <div id="ePreguntasLista" class="preguntas-seleccionables-scroll" style="margin-top:10px;"></div>
+          <p style="font-weight:800; color:var(--primary); margin:12px 0;">📌 Preguntas del evento: <span id="eContador">0</span></p>
+          <div style="display:flex; gap:10px;"><button class="btn btn-primary" id="eGuardar">💾 Guardar cambios</button><button class="btn btn-secondary" id="eCancelar">Cancelar</button></div>
+          <div class="error-msg" id="eErr"></div>
+        </div>
       </div>
 
       <div class="tab-content" id="proftab-resultados">
         <div class="card">
-          <h2>Resultados por quiz</h2>
-          <p class="subtitle">Elige un quiz para ver quién lo tomó y con qué puntaje (incluye práctica, examen y estudio — todos los intentos se guardan).</p>
+          <h2>Resultados por evento</h2>
+          <p class="subtitle">Elige un evento para ver quién lo resolvió, sus respuestas pregunta por pregunta y descargar el reporte masivo.</p>
           <select id="resultadosQuizSelect" class="form-control"></select>
           <div id="resultadosSection" style="margin-top:14px;"></div>
         </div>
@@ -969,7 +1063,7 @@ function renderProfesorApp() {
   `;
   document.getElementById('logout').onclick = async () => { await supabase.auth.signOut(); window.location.href = 'index.html'; };
   root.querySelectorAll('[data-goto]').forEach(btn => btn.onclick = () => document.querySelector(`.nav-item[data-tab="${btn.dataset.goto}"]`).click());
-  activarTabs('.nav-item', 'proftab', { resumen: 'Panel del profesor', cargar: 'Cargar preguntas', preguntas: 'Banco de preguntas', quizzes: 'Gestión de quizzes', resultados: 'Resultados' });
+  activarTabs('.nav-item', 'proftab', { resumen: 'Panel del profesor', cargar: 'Cargar preguntas', preguntas: 'Banco de preguntas', quizzes: 'Gestión de quizzes', relacionar: 'Relacionar quiz', resultados: 'Resultados' });
 
   renderCortesTablaProfesor();
   renderGrupoSelectProfesor();
@@ -1011,8 +1105,31 @@ function renderProfesorApp() {
     renderListaQuizzesProfesor();
     actualizarStatsProfesor();
   };
-  document.getElementById('qAlcance').onchange = (e) => document.getElementById('qCorteWrap').classList.toggle('hidden', e.target.value !== 'un_corte');
   document.getElementById('qCrear').onclick = crearQuizProfesor;
+  root.querySelectorAll('[data-qcrear]').forEach(tab => {
+    tab.onclick = () => {
+      root.querySelectorAll('[data-qcrear]').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('#qcrear-titulo, #qcrear-temas').forEach(c => c.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('qcrear-' + tab.dataset.qcrear).classList.add('active');
+    };
+  });
+  inicializarRelacionar();
+  document.getElementById('qPlantillaBtn').onclick = () => descargarPlantilla();
+  document.getElementById('qExcelInput').onchange = async (e) => {
+    const archivo = e.target.files[0];
+    if (!archivo) return;
+    if (!grupoActivo) { mostrarToast('Selecciona un grupo primero.', 'error'); return; }
+    const libro = XLSX.read(await archivo.arrayBuffer(), { type: 'array' });
+    previsualizarPorTemas(XLSX.utils.sheet_to_json(libro.Sheets[libro.SheetNames[0]], { header: 1, defval: '' }));
+    e.target.value = '';
+  };
+  document.getElementById('qPrevisualizar').onclick = () => {
+    const raw = document.getElementById('qPegar').value.trim();
+    if (!raw) { mostrarToast('Pega al menos una fila.', 'error'); return; }
+    if (!grupoActivo) { mostrarToast('Selecciona un grupo primero.', 'error'); return; }
+    previsualizarPorTemas(raw.split('\n').map(l => { const d = l.includes('\t') ? '\t' : l.includes('|') ? '|' : ','; return l.split(d).map(c => c.trim()); }));
+  };
 
   root.querySelectorAll('[data-subtab-cargar]').forEach(tab => {
     tab.onclick = () => {
@@ -1379,7 +1496,7 @@ function renderCortesTablaProfesor() {
   const filtroCorte = document.getElementById('filtroCorte');
   filtroCorte.innerHTML = '<option value="">Todos los cortes</option>' + cortesCache.map(c => `<option value="${c.numero}">${c.nombre}</option>`).join('');
   const qCorte = document.getElementById('qCorte');
-  qCorte.innerHTML = cortesCache.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+  if (qCorte) qCorte.innerHTML = cortesCache.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
   const manualCorte = document.getElementById('manualCorte');
   if (manualCorte) manualCorte.innerHTML = cortesCache.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
 }
@@ -1645,48 +1762,336 @@ function renderTablaPreguntasProfesor() {
 
 async function crearQuizProfesor() {
   const titulo = document.getElementById('qTitulo').value.trim();
-  const modo = document.getElementById('qModo').value;
-  const alcance = document.getElementById('qAlcance').value;
-  const corteId = alcance === 'un_corte' ? document.getElementById('qCorte').value : null;
-  const activo = document.getElementById('qActivo').checked;
   const errEl = document.getElementById('qErr');
   errEl.textContent = '';
   if (!titulo) { errEl.textContent = 'Ponle un título al quiz.'; return; }
-
-  const { data: quiz, error: errQ } = await supabase.from('quizzes').insert({ grupo_id: grupoActivo, titulo, modo, alcance, corte_id: corteId, activo }).select('id').single();
-  if (errQ) { errEl.textContent = errQ.message; return; }
-
-  let preguntasAsignadas = 0;
-  if (alcance !== 'vacio') {
-    let queryPreguntas = supabase.from('preguntas').select('id').eq('grupo_id', grupoActivo);
-    if (alcance === 'un_corte') queryPreguntas = queryPreguntas.eq('corte_id', corteId);
-    const { data: preguntas } = await queryPreguntas;
-    if (preguntas && preguntas.length) {
-      await supabase.from('quiz_preguntas').insert(preguntas.map((p, i) => ({ quiz_id: quiz.id, pregunta_id: p.id, orden: i + 1 })));
-      preguntasAsignadas = preguntas.length;
-    }
-  }
-
+  if (!grupoActivo) { errEl.textContent = 'Selecciona un grupo primero.'; return; }
+  const { data: quiz, error } = await supabase.from('quizzes').insert({ grupo_id: grupoActivo, titulo, modo: 'practica', alcance: 'vacio', corte_id: null, activo: true }).select('id').single();
+  if (error) { errEl.textContent = error.message; return; }
   document.getElementById('qTitulo').value = '';
-  mostrarToast(`Quiz "${titulo}" creado con ${preguntasAsignadas} preguntas.`);
-  renderListaQuizzesProfesor();
+  mostrarToast(`Quiz "${titulo}" creado. Carga sus preguntas.`);
+  await renderListaQuizzesProfesor();
   actualizarStatsProfesor();
-  actualizarDestinoCarga();
+  await abrirPanelGestionQuiz(quiz.id, titulo);
+  const tabMasiva = document.querySelector('#panelGestionQuiz [data-subtab="masiva"]');
+  if (tabMasiva) tabMasiva.click();
+  document.getElementById('panelGestionQuiz').scrollIntoView({ behavior: 'smooth' });
+}
+
+// ---------- Relacionar quiz: grupos + eventos ----------
+let relGrupos = [], relQuizzes = [], relPreguntas = [], relQP = {}, relEventos = [];
+let eEditId = null; const eSel = new Set();
+const relSelQ = new Set(), relSelP = new Set();
+
+function relIdsPreguntas() {
+  const ids = new Set(relSelP);
+  relSelQ.forEach(qid => (relQP[qid] || []).forEach(pid => ids.add(pid)));
+  return [...ids];
+}
+function relActualizarContador() { document.getElementById('reContador').textContent = relIdsPreguntas().length; relActualizarHint(); }
+
+// Tiempo mínimo: 3 segundos por pregunta (tope inicial)
+const SEG_MIN_POR_PREGUNTA = 3;
+function minutosMinimos(n) { return Math.max(1, Math.ceil(n * SEG_MIN_POR_PREGUNTA / 60)); }
+function textoHintTiempo(modo, alea, total, minutos) {
+  if (modo === 'estudio') return 'En modo Estudio el alumno elige cuántas preguntas; no se aplica tiempo mínimo.';
+  const n = alea > 0 ? Math.min(alea, total || alea) : total;
+  if (!n) return '';
+  const min = minutosMinimos(n);
+  let t = `Con ${n} pregunta${n === 1 ? '' : 's'}, si pones tiempo el mínimo es ${min} min (${SEG_MIN_POR_PREGUNTA} s por pregunta).`;
+  if (minutos > 0 && minutos < min) t += ` ⚠️ ${minutos} min es insuficiente.`;
+  return t;
+}
+function errorTiempo(modo, alea, total, minutos) {
+  if (modo === 'estudio' || !(minutos > 0)) return '';
+  const n = alea > 0 ? alea : total;
+  const min = minutosMinimos(n);
+  return minutos < min ? `Con ${n} pregunta${n === 1 ? '' : 's'} el tiempo mínimo es ${min} min (${SEG_MIN_POR_PREGUNTA} s por pregunta).` : '';
+}
+function relActualizarHint() {
+  const modo = document.getElementById('reModo').value;
+  document.getElementById('reAleatoriasWrap').classList.toggle('hidden', modo === 'estudio');
+  document.getElementById('reTiempoHint').textContent = textoHintTiempo(modo, parseInt(document.getElementById('reAleatorias').value, 10), relIdsPreguntas().length, parseInt(document.getElementById('reMinutos').value, 10));
+}
+
+function inicializarRelacionar() {
+  document.getElementById('rgCrear').onclick = async () => {
+    const nombre = document.getElementById('rgNombre').value.trim();
+    const nivel = document.getElementById('rgNivel').value.trim();
+    const errEl = document.getElementById('rgErr'); errEl.textContent = '';
+    if (!nombre) { errEl.textContent = 'Ponle un nombre al grupo.'; return; }
+    const { data: g, error } = await supabase.from('grupos').insert({ nombre, nivel }).select('id').single();
+    if (error) { errEl.textContent = error.message + ' (si dice "row-level security", ejecuta el SQL del Cambio 2 en Supabase)'; return; }
+    const { error: e2 } = await supabase.from('profesor_grupos').insert({ profesor_id: me.id, grupo_id: g.id });
+    if (e2) { errEl.textContent = 'Grupo creado, pero no se pudo asignar a ti: ' + e2.message; return; }
+    document.getElementById('rgNombre').value = ''; document.getElementById('rgNivel').value = '';
+    mostrarToast('Grupo creado.');
+    await renderGrupoSelectProfesor();
+    cargarRelacionar();
+  };
+  root.querySelectorAll('[data-rel]').forEach(tab => tab.onclick = () => {
+    root.querySelectorAll('[data-rel]').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('#rel-quizzes, #rel-preguntas').forEach(c => c.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('rel-' + tab.dataset.rel).classList.add('active');
+  });
+  document.querySelector('.nav-item[data-tab="relacionar"]').addEventListener('click', cargarRelacionar);
+  document.getElementById('reBuscar').oninput = relRenderPreguntas;
+  document.getElementById('reCrear').onclick = crearEvento;
+  ['reModo', 'reAleatorias', 'reMinutos'].forEach(id => { const el = document.getElementById(id); el.oninput = relActualizarHint; el.onchange = relActualizarHint; });
+  inicializarEdicionEvento();
+  cargarRelacionar();
+}
+
+async function cargarRelacionar() {
+  const { data: grupos } = await supabase.from('grupos').select('id, nombre, nivel').order('nombre');
+  relGrupos = grupos || [];
+  const nombreGrupo = id => (relGrupos.find(g => g.id === id) || {}).nombre || '-';
+  document.getElementById('rgTabla').innerHTML = '<tr><th>Grupo</th><th>Nivel</th></tr>' +
+    (relGrupos.map(g => `<tr><td>${escHtml(g.nombre)}</td><td>${escHtml(g.nivel || '')}</td></tr>`).join('') || '<tr><td colspan="2">Aún no tienes grupos.</td></tr>');
+  const marcados = new Set([...document.querySelectorAll('.reGrupoChk:checked')].map(c => c.value));
+  document.getElementById('reGrupos').innerHTML = relGrupos.map(g =>
+    `<label style="text-transform:none; display:flex; align-items:center; gap:8px;"><input type="checkbox" class="reGrupoChk" value="${g.id}" ${marcados.has(g.id) ? 'checked' : ''} style="width:auto; accent-color:var(--primary);"> ${escHtml(g.nombre)}</label>`).join('') || '<span class="subtitle">Crea un grupo arriba.</span>';
+  const ids = relGrupos.map(g => g.id);
+  if (!ids.length) return;
+  const [rq, rqp, rp] = await Promise.all([
+    supabase.from('quizzes').select('*').in('grupo_id', ids).order('created_at', { ascending: false }),
+    supabase.from('quiz_preguntas').select('quiz_id, pregunta_id').order('orden'),
+    supabase.from('preguntas').select('id, enunciado, tema, grupo_id').in('grupo_id', ids).order('tema')
+  ]);
+  const todos = rq.data || [];
+  relQuizzes = todos.filter(q => q.alcance !== 'grupo_preguntas');
+  const eventos = todos.filter(q => q.alcance === 'grupo_preguntas');
+  relPreguntas = rp.data || [];
+  relQP = {}; (rqp.data || []).forEach(r => { (relQP[r.quiz_id] = relQP[r.quiz_id] || []).push(r.pregunta_id); });
+
+  const lista = document.getElementById('reQuizzesLista');
+  lista.innerHTML = relQuizzes.map(q => `<label style="text-transform:none; display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--primary-light);"><input type="checkbox" class="reQuizChk" value="${q.id}" ${relSelQ.has(q.id) ? 'checked' : ''} style="width:auto; accent-color:var(--primary);"><span style="flex:1;">${escHtml(q.titulo)} <span style="color:var(--text-muted); font-size:12px;">· ${escHtml(nombreGrupo(q.grupo_id))}</span></span><b style="color:var(--primary);">${(relQP[q.id] || []).length}</b></label>`).join('') || '<p class="subtitle">Aún no tienes quizzes. Créalos en la pestaña Quizzes.</p>';
+  lista.querySelectorAll('.reQuizChk').forEach(c => c.onchange = () => { c.checked ? relSelQ.add(c.value) : relSelQ.delete(c.value); relActualizarContador(); });
+  relRenderPreguntas();
+
+  document.getElementById('reEventosTabla').innerHTML = '<tr><th>Evento</th><th>Grupo</th><th>Modo</th><th>Min.</th><th>Preguntas</th><th>Estado</th><th></th></tr>' +
+    (eventos.map(q => `<tr><td>${escHtml(q.titulo)}</td><td>${escHtml(nombreGrupo(q.grupo_id))}</td><td>${q.modo}</td><td>${q.minutos || '-'}</td><td>${(relQP[q.id] || []).length}${q.preguntas_aleatorias ? ` <span style="font-size:11px; color:var(--text-muted);">(🎲 ${q.preguntas_aleatorias})</span>` : ''}</td>
+      <td><span class="pill ${q.activo ? 'on' : 'off'}">${q.activo ? 'activo' : 'inactivo'}</span></td>
+      <td><div style="display:flex; gap:6px;"><button class="btn btn-sm btn-primary reEditar" data-id="${q.id}">✏️ Editar</button><button class="btn btn-sm btn-secondary reToggle" data-id="${q.id}" data-activo="${q.activo}">${q.activo ? 'Desactivar' : 'Activar'}</button><button class="btn btn-sm btn-danger reEliminar" data-id="${q.id}" data-titulo="${escHtml(q.titulo)}">🗑️</button></div></td></tr>`).join('') || '<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">Todavía no hay eventos.</td></tr>');
+  relEventos = eventos;
+  document.querySelectorAll('.reEditar').forEach(b => b.onclick = () => abrirEdicionEvento(b.dataset.id));
+  document.querySelectorAll('.reToggle').forEach(b => b.onclick = async () => { await supabase.from('quizzes').update({ activo: b.dataset.activo !== 'true' }).eq('id', b.dataset.id); cargarRelacionar(); });
+  document.querySelectorAll('.reEliminar').forEach(b => b.onclick = async () => {
+    if (!confirm(`¿Eliminar el evento "${b.dataset.titulo}"? Las preguntas y tus quizzes NO se borran, solo el evento.`)) return;
+    await supabase.from('quiz_preguntas').delete().eq('quiz_id', b.dataset.id);
+    const { error } = await supabase.from('quizzes').delete().eq('id', b.dataset.id);
+    if (error) { mostrarToast('No se pudo eliminar: ' + error.message, 'error'); return; }
+    mostrarToast('Evento eliminado.'); cargarRelacionar();
+  });
+  relActualizarContador();
+}
+
+function relRenderPreguntas() {
+  const q = document.getElementById('reBuscar').value.trim().toLowerCase();
+  const filtradas = relPreguntas.filter(p => !q || (p.enunciado || '').toLowerCase().includes(q) || (p.tema || '').toLowerCase().includes(q));
+  const lista = document.getElementById('rePreguntasLista');
+  lista.innerHTML = filtradas.map(p => `<label style="text-transform:none; display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--primary-light);"><input type="checkbox" class="rePregChk" value="${p.id}" ${relSelP.has(p.id) ? 'checked' : ''} style="width:auto; accent-color:var(--primary);"><span style="flex:1; font-size:13px;">${escHtml((p.enunciado || '').slice(0, 110))}</span><span style="font-size:11px; color:var(--text-muted);">${escHtml(p.tema || '')}</span></label>`).join('') || '<p class="subtitle">No hay preguntas que coincidan.</p>';
+  lista.querySelectorAll('.rePregChk').forEach(c => c.onchange = () => { c.checked ? relSelP.add(c.value) : relSelP.delete(c.value); relActualizarContador(); });
+}
+
+async function crearEvento() {
+  const titulo = document.getElementById('reTitulo').value.trim();
+  const grupoIds = [...document.querySelectorAll('.reGrupoChk:checked')].map(c => c.value);
+  const modo = document.getElementById('reModo').value;
+  const minutos = parseInt(document.getElementById('reMinutos').value, 10);
+  const activo = document.getElementById('reActivo').checked;
+  const pids = relIdsPreguntas();
+  const errEl = document.getElementById('reErr'); errEl.textContent = '';
+  if (!titulo) { errEl.textContent = 'Ponle un título al evento.'; return; }
+  if (!grupoIds.length) { errEl.textContent = 'Elige al menos un grupo.'; return; }
+  if (!pids.length) { errEl.textContent = 'Elige al menos un quiz o una pregunta.'; return; }
+  const alea = modo === 'estudio' ? 0 : parseInt(document.getElementById('reAleatorias').value, 10);
+  if (alea > pids.length) { errEl.textContent = `Pides ${alea} aleatorias pero el evento solo tiene ${pids.length} preguntas.`; return; }
+  const errT = errorTiempo(modo, alea, pids.length, minutos);
+  if (errT) { errEl.textContent = errT; return; }
+  let creados = 0;
+  for (const gid of grupoIds) {
+    const fila = { grupo_id: gid, titulo, modo, alcance: 'grupo_preguntas', activo };
+    if (minutos > 0) fila.minutos = minutos;
+    if (alea > 0) fila.preguntas_aleatorias = alea;
+    const { data: quiz, error } = await supabase.from('quizzes').insert(fila).select('id').single();
+    if (error) { errEl.textContent = error.message + (/minutos|aleatorias/.test(error.message) ? ' (ejecuta el SQL del Cambio 2 en Supabase)' : ''); break; }
+    const { error: e2 } = await supabase.from('quiz_preguntas').insert(pids.map((pid, i) => ({ quiz_id: quiz.id, pregunta_id: pid, orden: i + 1 })));
+    if (e2) { errEl.textContent = 'Evento creado sin preguntas: ' + e2.message; break; }
+    creados++;
+  }
+  if (!creados) return;
+  mostrarToast(`Evento "${titulo}" creado en ${creados} grupo${creados === 1 ? '' : 's'} con ${pids.length} preguntas.`);
+  document.getElementById('reTitulo').value = ''; document.getElementById('reMinutos').value = ''; document.getElementById('reAleatorias').value = '';
+  relSelQ.clear(); relSelP.clear();
+  cargarRelacionar();
+}
+
+// ---------- Editar evento ----------
+function inicializarEdicionEvento() {
+  document.getElementById('eBuscar').oninput = eRenderPreguntas;
+  document.getElementById('eCancelar').onclick = () => { document.getElementById('reEditCard').classList.add('hidden'); eEditId = null; };
+  ['eModo', 'eAleatorias', 'eMinutos'].forEach(id => { const el = document.getElementById(id); el.oninput = eActualizarHint; el.onchange = eActualizarHint; });
+  document.getElementById('eQuizAgregarBtn').onclick = () => {
+    const qid = document.getElementById('eQuizAgregar').value;
+    (relQP[qid] || []).forEach(pid => eSel.add(pid));
+    eRenderPreguntas();
+  };
+  document.getElementById('eGuardar').onclick = guardarEdicionEvento;
+}
+
+function eActualizarHint() {
+  const modo = document.getElementById('eModo').value;
+  document.getElementById('eAleatoriasWrap').classList.toggle('hidden', modo === 'estudio');
+  document.getElementById('eContador').textContent = eSel.size;
+  document.getElementById('eTiempoHint').textContent = textoHintTiempo(modo, parseInt(document.getElementById('eAleatorias').value, 10), eSel.size, parseInt(document.getElementById('eMinutos').value, 10));
+}
+
+function eRenderPreguntas() {
+  const q = document.getElementById('eBuscar').value.trim().toLowerCase();
+  const orden = [...relPreguntas].sort((a, b) => (eSel.has(b.id) ? 1 : 0) - (eSel.has(a.id) ? 1 : 0));
+  const filtradas = orden.filter(p => !q || (p.enunciado || '').toLowerCase().includes(q) || (p.tema || '').toLowerCase().includes(q));
+  const lista = document.getElementById('ePreguntasLista');
+  lista.innerHTML = filtradas.map(p => `<label style="text-transform:none; display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--primary-light);"><input type="checkbox" class="ePregChk" value="${p.id}" ${eSel.has(p.id) ? 'checked' : ''} style="width:auto; accent-color:var(--primary);"><span style="flex:1; font-size:13px;">${escHtml((p.enunciado || '').slice(0, 110))}</span><span style="font-size:11px; color:var(--text-muted);">${escHtml(p.tema || '')}</span></label>`).join('') || '<p class="subtitle">No hay preguntas que coincidan.</p>';
+  lista.querySelectorAll('.ePregChk').forEach(c => c.onchange = () => { c.checked ? eSel.add(c.value) : eSel.delete(c.value); eActualizarHint(); });
+  eActualizarHint();
+}
+
+function abrirEdicionEvento(id) {
+  const ev = relEventos.find(e => e.id === id); if (!ev) return;
+  eEditId = id;
+  eSel.clear(); (relQP[id] || []).forEach(pid => eSel.add(pid));
+  const g = relGrupos.find(x => x.id === ev.grupo_id);
+  document.getElementById('reEditInfo').textContent = `Evento del grupo "${g ? g.nombre : '-'}". Si lo creaste en varios grupos, edita cada uno por separado.`;
+  document.getElementById('eTitulo').value = ev.titulo;
+  document.getElementById('eModo').value = ev.modo;
+  document.getElementById('eMinutos').value = ev.minutos || '';
+  document.getElementById('eAleatorias').value = ev.preguntas_aleatorias || '';
+  document.getElementById('eActivo').checked = !!ev.activo;
+  document.getElementById('eQuizAgregar').innerHTML = relQuizzes.map(q => `<option value="${q.id}">${escHtml(q.titulo)} (${(relQP[q.id] || []).length})</option>`).join('') || '<option value="">Sin quizzes</option>';
+  document.getElementById('eBuscar').value = '';
+  document.getElementById('eErr').textContent = '';
+  const card = document.getElementById('reEditCard');
+  card.classList.remove('hidden');
+  eRenderPreguntas();
+  card.scrollIntoView({ behavior: 'smooth' });
+}
+
+async function guardarEdicionEvento() {
+  const errEl = document.getElementById('eErr'); errEl.textContent = '';
+  const titulo = document.getElementById('eTitulo').value.trim();
+  const modo = document.getElementById('eModo').value;
+  const minutos = parseInt(document.getElementById('eMinutos').value, 10);
+  const alea = modo === 'estudio' ? 0 : parseInt(document.getElementById('eAleatorias').value, 10);
+  if (!titulo) { errEl.textContent = 'Ponle un título.'; return; }
+  if (!eSel.size) { errEl.textContent = 'El evento necesita al menos una pregunta.'; return; }
+  if (alea > eSel.size) { errEl.textContent = `Pides ${alea} aleatorias pero el evento solo tiene ${eSel.size} preguntas.`; return; }
+  const errT = errorTiempo(modo, alea, eSel.size, minutos);
+  if (errT) { errEl.textContent = errT; return; }
+  const { error } = await supabase.from('quizzes').update({
+    titulo, modo, activo: document.getElementById('eActivo').checked,
+    minutos: minutos > 0 ? minutos : null, preguntas_aleatorias: alea > 0 ? alea : null
+  }).eq('id', eEditId);
+  if (error) { errEl.textContent = error.message + (/minutos|aleatorias/.test(error.message) ? ' (ejecuta el SQL en Supabase)' : ''); return; }
+  const original = new Set(relQP[eEditId] || []);
+  const quitar = [...original].filter(p => !eSel.has(p));
+  const agregar = [...eSel].filter(p => !original.has(p));
+  if (quitar.length) await supabase.from('quiz_preguntas').delete().eq('quiz_id', eEditId).in('pregunta_id', quitar);
+  if (agregar.length) {
+    const { data: ult } = await supabase.from('quiz_preguntas').select('orden').eq('quiz_id', eEditId).order('orden', { ascending: false }).limit(1);
+    const base = ult && ult.length ? ult[0].orden : 0;
+    const { error: e2 } = await supabase.from('quiz_preguntas').insert(agregar.map((pid, i) => ({ quiz_id: eEditId, pregunta_id: pid, orden: base + i + 1 })));
+    if (e2) { errEl.textContent = 'No se pudieron agregar preguntas: ' + e2.message; return; }
+  }
+  mostrarToast('Evento actualizado.');
+  document.getElementById('reEditCard').classList.add('hidden'); eEditId = null;
+  cargarRelacionar();
+}
+
+// ---------- Carga masiva por temas (un quiz por tema; solo se crea al pulsar Grabar) ----------
+let loteTemas = [];
+const escHtml = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+function previsualizarPorTemas(filasCrudas) {
+  let filas = filasCrudas.filter(f => f.some(c => String(c ?? '').trim() !== ''));
+  if (filas.length && String(filas[0][0] ?? '').toLowerCase().includes('tipo')) filas = filas.slice(1);
+  const existentes = new Set(preguntasCache.map(p => normalizarEnunciado(p.enunciado)));
+  const vistos = new Set(); const grupos = new Map(); let invalidas = 0, duplicadas = 0;
+  filas.forEach(cols => {
+    const r = validarFila(cols, existentes);
+    if (!r.valido) { r.duplicado ? duplicadas++ : invalidas++; return; }
+    const key = normalizarEnunciado(r.enunciado);
+    if (vistos.has(key)) { duplicadas++; return; }
+    vistos.add(key);
+    if (!grupos.has(r.tema)) grupos.set(r.tema, []);
+    grupos.get(r.tema).push({ cols, enunciado: r.enunciado });
+  });
+  loteTemas = [...grupos].map(([tema, items]) => ({ tema, items, abierto: false }));
+  renderLoteTemas(invalidas, duplicadas);
+}
+
+function renderLoteTemas(invalidas = 0, duplicadas = 0) {
+  const cont = document.getElementById('qPreviewTemas');
+  const nota = `<p class="subtitle">${invalidas ? '❌ ' + invalidas + ' con error · ' : ''}${duplicadas ? '⚠️ ' + duplicadas + ' repetidas (no se cargan)' : ''}</p>`;
+  if (!loteTemas.length) { cont.innerHTML = '<p class="error-msg">No hay preguntas válidas para cargar.</p>' + nota; return; }
+  const total = loteTemas.reduce((n, g) => n + g.items.length, 0);
+  cont.innerHTML = loteTemas.map((g, gi) => `
+    <div style="border:2px solid var(--primary-light); border-radius:14px; padding:12px; margin-bottom:10px;">
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <input class="form-control loteTitulo" data-gi="${gi}" value="${escHtml(g.tema)}" style="flex:1; min-width:180px;">
+        <span style="font-weight:800; color:var(--primary);">${g.items.length} preguntas</span>
+        <button class="btn btn-sm btn-secondary loteVer" data-gi="${gi}">📋 Ver preguntas</button>
+        <button class="btn btn-sm btn-danger loteQuitarQuiz" data-gi="${gi}">🗑️ Quitar quiz</button>
+      </div>
+      <div class="${g.abierto ? '' : 'hidden'}" id="loteLista-${gi}" style="margin-top:10px;">
+        ${g.items.map((it, ii) => `<div style="display:flex; gap:8px; align-items:center; padding:6px 0; border-top:1px solid var(--primary-light);"><span style="flex:1; font-size:13px;">${escHtml(it.enunciado)}</span><button class="btn btn-sm btn-danger loteQuitarP" data-gi="${gi}" data-ii="${ii}">✕</button></div>`).join('')}
+      </div>
+    </div>`).join('') + nota + `
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn btn-primary" id="loteGrabar" style="flex:1;">💾 Grabar ${loteTemas.length} quiz${loteTemas.length === 1 ? '' : 'zes'} (${total} preguntas)</button>
+      <button class="btn btn-secondary" id="loteCancelar">Cancelar</button>
+    </div>`;
+
+  cont.querySelectorAll('.loteTitulo').forEach(i => i.oninput = () => { loteTemas[i.dataset.gi].tema = i.value; });
+  cont.querySelectorAll('.loteVer').forEach(b => b.onclick = () => {
+    const g = loteTemas[b.dataset.gi]; g.abierto = !g.abierto;
+    document.getElementById('loteLista-' + b.dataset.gi).classList.toggle('hidden', !g.abierto);
+  });
+  cont.querySelectorAll('.loteQuitarQuiz').forEach(b => b.onclick = () => { loteTemas.splice(b.dataset.gi, 1); renderLoteTemas(invalidas, duplicadas); });
+  cont.querySelectorAll('.loteQuitarP').forEach(b => b.onclick = () => {
+    const g = loteTemas[b.dataset.gi]; g.items.splice(b.dataset.ii, 1);
+    if (!g.items.length) loteTemas.splice(b.dataset.gi, 1);
+    renderLoteTemas(invalidas, duplicadas);
+  });
+  cont.querySelector('#loteCancelar').onclick = () => { loteTemas = []; cont.innerHTML = ''; };
+  cont.querySelector('#loteGrabar').onclick = async (ev) => {
+    ev.target.disabled = true;
+    let creados = 0;
+    for (const g of loteTemas.filter(x => x.items.length)) {
+      const titulo = (g.tema || '').trim() || 'Repaso';
+      const { data: quiz, error } = await supabase.from('quizzes').insert({ grupo_id: grupoActivo, titulo, modo: 'practica', alcance: 'vacio', corte_id: null, activo: true }).select('id').single();
+      if (error) { mostrarToast(`No se pudo crear "${titulo}": ${error.message}`, 'error'); continue; }
+      await procesarFilas(g.items.map(i => i.cols), quiz.id);
+      creados++;
+    }
+    loteTemas = [];
+    cont.innerHTML = `<p class="ok-msg">✅ ${creados} quiz${creados === 1 ? '' : 'zes'} grabado${creados === 1 ? '' : 's'}. Ya aparecen en la lista de abajo.</p>`;
+    await renderListaQuizzesProfesor();
+  };
 }
 
 async function renderListaQuizzesProfesor() {
-  const { data: quizzes } = await supabase.from('quizzes').select('id, titulo, modo, activo').eq('grupo_id', grupoActivo).order('created_at', { ascending: false });
+  const { data: quizzes } = await supabase.from('quizzes').select('id, titulo, modo, activo').eq('grupo_id', grupoActivo).or('alcance.is.null,alcance.neq.grupo_preguntas').order('created_at', { ascending: false });
   const { data: conteos } = await supabase.from('quiz_preguntas').select('quiz_id');
   const mapaConteos = {};
   (conteos || []).forEach(c => { mapaConteos[c.quiz_id] = (mapaConteos[c.quiz_id] || 0) + 1; });
 
   const tabla = document.getElementById('listaQuizzesTabla');
-  const opcionesModo = m => ['practica', 'examen', 'estudio'].map(v => `<option value="${v}" ${v === m ? 'selected' : ''}>${v}</option>`).join('');
 
-  tabla.innerHTML = '<tr><th>Título</th><th>Modo</th><th>Preguntas</th><th>Estado</th><th>Acciones</th></tr>' +
+  tabla.innerHTML = '<tr><th>Título</th><th>Preguntas</th><th>Estado</th><th>Acciones</th></tr>' +
     (quizzes || []).map(q => `<tr>
       <td>${q.titulo}</td>
-      <td><div style="display:flex; gap:6px; align-items:center;"><select class="form-control modoSelect" data-id="${q.id}" style="padding:6px 8px; font-size:12.5px;">${opcionesModo(q.modo)}</select><button class="btn btn-sm btn-secondary guardarModoBtn" data-id="${q.id}">💾</button></div></td>
       <td><span style="font-weight:800; color:var(--primary);">${mapaConteos[q.id] || 0}</span></td>
       <td><span class="pill ${q.activo ? 'on' : 'off'}">${q.activo ? 'activo' : 'inactivo'}</span></td>
       <td><div style="display:flex; gap:6px; flex-wrap:wrap;">
@@ -1695,15 +2100,8 @@ async function renderListaQuizzesProfesor() {
         <button class="btn btn-sm btn-secondary verBtn" data-id="${q.id}" data-titulo="${q.titulo}">📊</button>
         <button class="btn btn-sm btn-danger eliminarQuizBtn" data-id="${q.id}" data-titulo="${q.titulo}">🗑️</button>
       </div></td>
-    </tr>`).join('') || '<tr><td colspan="5" style="text-align:center; color:var(--text-muted);">Todavía no hay quizzes. Crea uno arriba.</td></tr>';
+    </tr>`).join('') || '<tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Todavía no hay quizzes. Crea uno arriba.</td></tr>';
 
-  tabla.querySelectorAll('.guardarModoBtn').forEach(btn => {
-    btn.onclick = async () => {
-      const nuevoModo = tabla.querySelector(`.modoSelect[data-id="${btn.dataset.id}"]`).value;
-      const { error } = await supabase.from('quizzes').update({ modo: nuevoModo }).eq('id', btn.dataset.id);
-      mostrarToast(error ? 'Error al guardar.' : 'Modo actualizado.', error ? 'error' : 'success');
-    };
-  });
   tabla.querySelectorAll('.toggleBtn').forEach(btn => {
     btn.onclick = async () => { await supabase.from('quizzes').update({ activo: btn.dataset.activo !== 'true' }).eq('id', btn.dataset.id); renderListaQuizzesProfesor(); actualizarStatsProfesor(); };
   });
@@ -1926,11 +2324,10 @@ async function inicializarResultadosTab() {
   const selAlumno = document.getElementById('resultadosAlumnoSelect');
   if (!selQuiz || !selAlumno || !grupoActivo) return;
 
-  const { data: quizzes } = await supabase.from('quizzes').select('id, titulo').eq('grupo_id', grupoActivo).order('titulo');
-  selQuiz.innerHTML = '<option value="">Selecciona un quiz...</option>' + (quizzes || []).map(q => `<option value="${q.id}">${q.titulo}</option>`).join('');
+  await llenarSelectEventos(selQuiz, null, 'Selecciona un evento...');
   selQuiz.onchange = () => {
-    if (selQuiz.value) verResultadosProfesor(selQuiz.value, selQuiz.options[selQuiz.selectedIndex].text, false);
-    else document.getElementById('resultadosSection').innerHTML = '';
+    const cont = document.getElementById('resultadosSection');
+    if (selQuiz.value) renderReporteEvento(selQuiz.value, cont); else cont.innerHTML = '';
   };
 
   const { data: estudiantes } = await supabase.from('estudiantes').select('id, nombre').eq('grupo_id', grupoActivo).order('nombre');
@@ -1955,18 +2352,120 @@ async function inicializarResultadosTab() {
 }
 
 async function verResultadosProfesor(quizId, titulo, cambiarPestana = true) {
-  const { data: intentos } = await supabase.from('intentos').select('puntaje_total, estado, estudiantes(nombre)').eq('quiz_id', quizId);
-  if (cambiarPestana) {
-    document.querySelector('.nav-item[data-tab="resultados"]').click();
-    const sel = document.getElementById('resultadosQuizSelect');
-    if (sel) sel.value = quizId;
+  if (cambiarPestana) document.querySelector('.nav-item[data-tab="resultados"]').click();
+  const sel = document.getElementById('resultadosQuizSelect');
+  if (sel) sel.value = quizId;
+  await renderReporteEvento(quizId, document.getElementById('resultadosSection'));
+}
+
+// ====================== Reporte de resultados por evento (profesor y admin) ======================
+async function llenarSelectEventos(sel, grupoId, placeholder) {
+  let q = supabase.from('quizzes').select('id, titulo, grupo_id, alcance').order('created_at', { ascending: false });
+  if (grupoId) q = q.eq('grupo_id', grupoId);
+  const [{ data: quizzes }, { data: grupos }] = await Promise.all([q, supabase.from('grupos').select('id, nombre')]);
+  const nombreG = id => ((grupos || []).find(g => g.id === id) || {}).nombre || '-';
+  const op = x => `<option value="${x.id}">${escHtml(x.titulo)} — ${escHtml(nombreG(x.grupo_id))}</option>`;
+  const eventos = (quizzes || []).filter(x => x.alcance === 'grupo_preguntas');
+  const otros = (quizzes || []).filter(x => x.alcance !== 'grupo_preguntas');
+  sel.innerHTML = `<option value="">${placeholder}</option>` +
+    (eventos.length ? `<optgroup label="🎯 Eventos">${eventos.map(op).join('')}</optgroup>` : '') +
+    (otros.length ? `<optgroup label="📝 Quizzes de tema (histórico)">${otros.map(op).join('')}</optgroup>` : '');
+}
+
+let ultimoReporte = null;
+async function renderReporteEvento(quizId, cont) {
+  cont.innerHTML = '<p class="subtitle">Cargando resultados...</p>';
+  const titulo = (document.querySelector(`option[value="${quizId}"]`) || {}).textContent || 'evento';
+  const { data: intentos } = await supabase.from('intentos')
+    .select('id, puntaje_total, estado, iniciado_en, estudiante_id, estudiantes(nombre)')
+    .eq('quiz_id', quizId).order('iniciado_en', { ascending: false });
+  const lista = intentos || [];
+  if (!lista.length) { cont.innerHTML = '<p class="subtitle" style="text-align:center;">Nadie ha resuelto este evento todavía.</p>'; ultimoReporte = null; return; }
+
+  const resp = [];
+  const ids = lista.map(i => i.id);
+  for (let k = 0; k < ids.length; k += 80) {
+    const { data } = await supabase.from('respuestas').select('*').in('intento_id', ids.slice(k, k + 80));
+    (data || []).forEach(r => resp.push(r));
   }
-  document.getElementById('resultadosSection').innerHTML = `
-    <p class="subtitle">Listado de estudiantes que han tomado "${titulo}".</p>
+  const pids = [...new Set(resp.map(r => r.pregunta_id))];
+  const oids = [...new Set(resp.map(r => r.opcion_id).filter(Boolean))];
+  const preg = {}, ops = {};
+  for (let k = 0; k < pids.length; k += 80) {
+    const { data } = await supabase.from('preguntas').select('id, enunciado, tema').in('id', pids.slice(k, k + 80));
+    (data || []).forEach(p => { preg[p.id] = p; });
+  }
+  for (let k = 0; k < oids.length; k += 80) {
+    const { data } = await supabase.from('opciones').select('id, texto, es_correcta').in('id', oids.slice(k, k + 80));
+    (data || []).forEach(o => { ops[o.id] = o; });
+  }
+  const esOk = r => (r.es_correcta !== undefined && r.es_correcta !== null) ? !!r.es_correcta : (r.opcion_id && ops[r.opcion_id] ? !!ops[r.opcion_id].es_correcta : null);
+  const textoResp = r => r.respuesta_texto || (r.opcion_id && ops[r.opcion_id] ? ops[r.opcion_id].texto : '') || '(sin dato)';
+  const porIntento = {}; resp.forEach(r => { (porIntento[r.intento_id] = porIntento[r.intento_id] || []).push(r); });
+  ultimoReporte = { titulo, lista, resp, preg, pids, esOk, textoResp, porIntento };
+
+  const alumnos = new Set(lista.map(i => i.estudiante_id)).size;
+  const puntajes = lista.filter(i => i.puntaje_total != null).map(i => Number(i.puntaje_total));
+  const prom = puntajes.length ? (puntajes.reduce((a, b) => a + b, 0) / puntajes.length).toFixed(1) : '-';
+  const fmt = d => d ? new Date(d).toLocaleString() : '-';
+  cont.innerHTML = `
+    <p class="subtitle">${lista.length} intento${lista.length === 1 ? '' : 's'} · ${alumnos} alumno${alumnos === 1 ? '' : 's'} · promedio ${prom}</p>
+    <button class="btn btn-primary" id="descargarReporteBtn" style="margin-bottom:12px;">📥 Descargar reporte masivo (Excel)</button>
     <div class="table-container"><table>
-      <tr><th>Estudiante</th><th>Puntaje</th><th>Estado</th></tr>
-      ${(intentos || []).map(i => `<tr><td>${i.estudiantes ? i.estudiantes.nombre : '-'}</td><td>${i.puntaje_total ?? '-'}</td><td>${i.estado}</td></tr>`).join('') || '<tr><td colspan="3" style="text-align:center; color:var(--text-muted);">Nadie lo ha tomado todavía.</td></tr>'}
+      <tr><th>Alumno</th><th>Fecha</th><th>Puntaje</th><th>Estado</th><th>Respondió</th><th></th></tr>
+      ${lista.map(i => `<tr>
+        <td>${escHtml(i.estudiantes ? i.estudiantes.nombre : '-')}</td><td>${fmt(i.iniciado_en)}</td><td><b>${i.puntaje_total ?? '-'}</b></td><td>${i.estado}</td>
+        <td>${(porIntento[i.id] || []).length}</td>
+        <td><button class="btn btn-sm btn-secondary verRespBtn" data-id="${i.id}">📋 Ver respuestas</button></td></tr>
+        <tr class="hidden" id="det-${i.id}"><td colspan="6" style="background:var(--primary-light);">${
+          (porIntento[i.id] || []).map((r, n) => { const ok = esOk(r); return `<div style="padding:5px 0; border-bottom:1px solid #0001; font-size:13px;">${ok === null ? '•' : ok ? '✅' : '❌'} <b>${n + 1}.</b> ${escHtml(preg[r.pregunta_id] ? preg[r.pregunta_id].enunciado : '')}<br><span style="color:var(--text-muted);">Respuesta: ${escHtml(textoResp(r))}</span></div>`; }).join('') || 'Sin respuestas registradas.'
+        }</td></tr>`).join('')}
     </table></div>`;
+  cont.querySelectorAll('.verRespBtn').forEach(b => b.onclick = () => document.getElementById('det-' + b.dataset.id).classList.toggle('hidden'));
+  cont.querySelector('#descargarReporteBtn').onclick = descargarReporteMasivo;
+}
+
+function descargarReporteMasivo() {
+  if (!ultimoReporte) return;
+  const { titulo, lista, preg, pids, esOk, textoResp, porIntento } = ultimoReporte;
+  const marca = ok => ok === null ? '?' : ok ? '✓' : '✗';
+  const nombre = i => (i.estudiantes ? i.estudiantes.nombre : '-');
+  const fecha = d => d ? new Date(d).toLocaleString() : '';
+  // Hoja 1: matriz alumnos x preguntas
+  const h1 = [['Alumno', 'Fecha', 'Estado', 'Puntaje', ...pids.map((p, n) => `P${n + 1}`)]];
+  lista.forEach(i => {
+    const porP = {}; (porIntento[i.id] || []).forEach(r => { porP[r.pregunta_id] = r; });
+    h1.push([nombre(i), fecha(i.iniciado_en), i.estado, i.puntaje_total ?? '', ...pids.map(p => porP[p] ? marca(esOk(porP[p])) : '')]);
+  });
+  // Hoja 2: estadística por pregunta
+  const h2 = [['N°', 'Pregunta', 'Tema', 'Respondieron', 'Correctas', '% acierto']];
+  pids.forEach((p, n) => {
+    const rs = ultimoReporte.resp.filter(r => r.pregunta_id === p);
+    const ok = rs.filter(r => esOk(r) === true).length;
+    h2.push([`P${n + 1}`, (preg[p] || {}).enunciado || '', (preg[p] || {}).tema || '', rs.length, ok, rs.length ? Math.round(ok * 100 / rs.length) + '%' : '']);
+  });
+  // Hoja 3: detalle largo
+  const h3 = [['Alumno', 'Fecha', 'Pregunta', 'Respuesta del alumno', 'Resultado']];
+  lista.forEach(i => (porIntento[i.id] || []).forEach(r => h3.push([nombre(i), fecha(i.iniciado_en), (preg[r.pregunta_id] || {}).enunciado || '', textoResp(r), marca(esOk(r))])));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(h1), 'Alumnos x preguntas');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(h2), 'Por pregunta');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(h3), 'Detalle');
+  XLSX.writeFile(wb, 'reporte_' + titulo.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ _-]/g, '').trim().replace(/\s+/g, '_').slice(0, 40) + '.xlsx');
+}
+
+// ---------- Resultados en el panel del admin ----------
+async function iniciarResultadosAdmin() {
+  const selG = document.getElementById('admResGrupo');
+  const selE = document.getElementById('admResEvento');
+  const cont = document.getElementById('admResSeccion');
+  const { data: grupos } = await supabase.from('grupos').select('id, nombre').order('nombre');
+  selG.innerHTML = '<option value="">Todos los grupos</option>' + (grupos || []).map(g => `<option value="${g.id}">${escHtml(g.nombre)}</option>`).join('');
+  const recargar = async () => { cont.innerHTML = ''; await llenarSelectEventos(selE, selG.value, 'Selecciona un evento...'); };
+  selG.onchange = recargar;
+  selE.onchange = () => selE.value ? renderReporteEvento(selE.value, cont) : (cont.innerHTML = '');
+  document.querySelector('.nav-item[data-tab="resultados"]').addEventListener('click', recargar);
+  await recargar();
 }
 
 let inactividadTimeout;

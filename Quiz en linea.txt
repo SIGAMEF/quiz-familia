@@ -1,0 +1,17 @@
+*** Quiz en linea *****
+usuario : admin
+correo : admin@famimaqu.com
+clave : Famimq2026.
+
+
+
+**CAMBIAR CLAVE DE ADMIN O CUALQUIERA DIRECTO EN SQL ***
+
+   select p.usuario, u.email
+   from perfiles p join auth.users u on u.id = p.id
+   where p.rol = 'admin';
+
+      update auth.users
+   set encrypted_password = crypt('Famimq2026.', gen_salt('bf')),
+       updated_at = now()
+   where email = 'daniel@quizapp.com';

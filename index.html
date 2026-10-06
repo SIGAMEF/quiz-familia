@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
     <style>
         :root {
             --primary: #7C6FF0;
@@ -216,6 +217,15 @@
     };
 
     async function init() {
+        // Llegó desde el correo de recuperación: la pantalla de nueva clave la muestra el evento PASSWORD_RECOVERY
+        if (location.hash.includes('type=recovery')) return;
+        if (location.hash.includes('error_code=')) {
+            history.replaceState(null, '', location.pathname);
+            await renderLogin();
+            const e = document.getElementById('err');
+            if (e) e.textContent = 'El enlace venció o ya se usó. Solicita uno nuevo en "¿Olvidaste tu clave?".';
+            return;
+        }
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
             const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', session.user.id).single();
@@ -255,10 +265,16 @@
             <input type="password" id="password" placeholder="••••••••" autocomplete="${isSignup ? 'new-password' : 'current-password'}">
             <button class="btn-primary" id="submitBtn">${isSignup ? '✨ Crear cuenta' : '🚀 Entrar'}</button>
             <button class="btn-link" id="toggleBtn">${isSignup ? 'Ya tengo cuenta' : 'Crear una cuenta nueva'}</button>
+            ${isSignup ? '' : '<button class="btn-secondary" id="codigoBtn" type="button">🔑 Unirme con código (quiz en vivo)</button>'}
+            ${isSignup ? '' : '<button class="btn-link" id="olvideBtn">¿Olvidaste tu clave?</button>'}
             <div class="error" id="err"></div>
         `;
 
         document.getElementById('toggleBtn').onclick = () => renderLogin(isSignup ? 'login' : 'signup');
+        const olvide = document.getElementById('olvideBtn');
+        if (olvide) olvide.onclick = renderRecuperar;
+        const codigoBtn = document.getElementById('codigoBtn');
+        if (codigoBtn) codigoBtn.onclick = renderUnirseCodigo;
         document.getElementById('submitBtn').onclick = async () => {
             const usuario = sanitizarUsuario(document.getElementById('usuario').value);
             const password = document.getElementById('password').value;
@@ -304,12 +320,143 @@
         };
     }
 
+    // ---------- Unirme con código: quiz en vivo disponibles (nombre, enlace y QR) ----------
+    function enlaceConcurso(id) { return new URL('concurso.html?unirse=' + encodeURIComponent(id), location.href).href; }
+    const escH = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    async function renderUnirseCodigo() {
+        if (state.pollCodigo) { clearInterval(state.pollCodigo); state.pollCodigo = null; }
+        app.innerHTML = `
+            <div class="login-hero">
+                <div class="logo-grande">🔑</div>
+                <h1>Unirme con código</h1>
+                <p>Quiz en vivo disponibles ahora</p>
+            </div>
+            <label>¿Tienes un código o enlace?</label>
+            <input type="text" id="codigoInp" placeholder="Pega aquí el código o el enlace">
+            <button class="btn-primary" id="codigoGo" type="button">Unirme</button>
+            <div class="error" id="err"></div>
+            <h3 style="margin:18px 0 6px;">📡 Quiz en vivo abiertos</h3>
+            <div id="listaVivo"><p style="color:#8E86AC; font-weight:600;">Buscando...</p></div>
+            <button class="btn-secondary" id="actualizarBtn" type="button">🔄 Actualizar</button>
+            <button class="btn-link" id="volverLoginBtn" type="button">Volver</button>
+        `;
+        const salir = () => { clearInterval(state.pollCodigo); state.pollCodigo = null; renderLogin(); };
+        document.getElementById('volverLoginBtn').onclick = salir;
+        document.getElementById('codigoGo').onclick = () => {
+            const txt = document.getElementById('codigoInp').value.trim();
+            if (!txt) { document.getElementById('err').textContent = 'Escribe o pega el código.'; return; }
+            const m = txt.match(/unirse=([^&\s#]+)/);
+            location.href = enlaceConcurso(m ? decodeURIComponent(m[1]) : txt);
+        };
+
+        let ultimaFirma = null;
+        const cargar = async (forzar) => {
+            const cont = document.getElementById('listaVivo');
+            if (!cont) { clearInterval(state.pollCodigo); state.pollCodigo = null; return; }
+            const { data, error } = await supabase.from('concursos').select('id, titulo, estado, modo')
+                .eq('modo', 'vivo').in('estado', ['esperando', 'en_curso']).order('created_at', { ascending: false });
+            if (error) { cont.innerHTML = '<p style="color:#E14D72; font-weight:700;">No se pudo cargar la lista: ' + escH(error.message) + '</p>'; return; }
+            const firma = (data || []).map(c => c.id + c.estado).join('|');
+            if (!forzar && firma === ultimaFirma) return; // evita parpadeo de los QR
+            ultimaFirma = firma;
+            if (!data || !data.length) { cont.innerHTML = '<p style="color:#8E86AC; font-weight:600;">No hay quiz en vivo abiertos por ahora. Pídele el código o el QR al profesor.</p>'; return; }
+            cont.innerHTML = data.map(c => `
+                <div style="border:2px solid var(--border); border-radius:16px; padding:14px; margin-bottom:12px; text-align:center;">
+                    <strong style="font-size:16px;">${escH(c.titulo)}</strong>
+                    <div style="font-size:12px; font-weight:800; margin:4px 0; color:${c.estado === 'esperando' ? '#2FAE6C' : '#FF9F43'};">${c.estado === 'esperando' ? '● Esperando alumnos' : '● En curso'}</div>
+                    <div class="qr-box" data-url="${escH(enlaceConcurso(c.id))}" style="display:inline-block; margin:8px 0;"></div>
+                    <div style="font-size:11px; color:#8E86AC; word-break:break-all; margin-bottom:8px;">${escH(enlaceConcurso(c.id))}</div>
+                    <a href="${escH(enlaceConcurso(c.id))}" style="display:inline-block; background:linear-gradient(135deg,#8B7EF7,#6C5CE7); color:#fff; padding:10px 18px; border-radius:12px; font-weight:800; text-decoration:none;">▶ Unirme</a>
+                    <button type="button" class="btn-copiar" data-url="${escH(enlaceConcurso(c.id))}" style="margin-left:6px; padding:10px 14px; border-radius:12px; background:var(--primary-light); color:var(--primary); font-weight:800;">Copiar enlace</button>
+                </div>`).join('');
+            cont.querySelectorAll('.qr-box').forEach(b => {
+                if (window.QRCode) new QRCode(b, { text: b.dataset.url, width: 140, height: 140 });
+                else b.textContent = '(QR no disponible)';
+            });
+            cont.querySelectorAll('.btn-copiar').forEach(b => b.onclick = async () => {
+                try { await navigator.clipboard.writeText(b.dataset.url); b.textContent = '¡Copiado!'; setTimeout(() => b.textContent = 'Copiar enlace', 1500); } catch (e) { prompt('Copia el enlace:', b.dataset.url); }
+            });
+        };
+        await cargar(true);
+        document.getElementById('actualizarBtn').onclick = () => cargar(true);
+        state.pollCodigo = setInterval(() => cargar(false), 5000);
+    }
+
+    // ---------- Recuperar clave ----------
+    function renderRecuperar() {
+        app.innerHTML = `
+            <div class="login-hero">
+                <div class="logo-grande">🔑</div>
+                <h1>Recuperar clave</h1>
+                <p>Te enviaremos un enlace al correo registrado</p>
+            </div>
+            <label>Usuario</label>
+            <input type="text" id="usuario" placeholder="tu usuario" autocomplete="username">
+            <button class="btn-primary" id="enviarBtn">📧 Enviar enlace</button>
+            <button class="btn-link" id="volverBtn">Volver</button>
+            <div class="error" id="err"></div>`;
+        document.getElementById('volverBtn').onclick = () => renderLogin();
+        document.getElementById('enviarBtn').onclick = async () => {
+            const errEl = document.getElementById('err');
+            errEl.style.color = ''; errEl.textContent = '';
+            const usuario = sanitizarUsuario(document.getElementById('usuario').value);
+            if (!usuario) { errEl.textContent = 'Escribe tu usuario.'; return; }
+            const { data: email } = await supabase.rpc('obtener_email_por_usuario', { p_usuario: usuario });
+            if (!email || email.endsWith('@' + DOMINIO_INTERNO)) {
+                errEl.textContent = 'Esta cuenta no tiene un correo real registrado. Pide a tu profesor o administrador que restablezca tu clave.';
+                return;
+            }
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: window.location.origin + window.location.pathname
+            });
+            if (error) { errEl.textContent = 'No se pudo enviar: ' + error.message; return; }
+            errEl.style.color = 'var(--success)';
+            errEl.textContent = 'Listo. Revisa tu correo (y la carpeta de spam) y abre el enlace.';
+        };
+    }
+
+    function renderNuevaClave() {
+        app.innerHTML = `
+            <div class="login-hero">
+                <div class="logo-grande">🔒</div>
+                <h1>Nueva clave</h1>
+                <p>Escribe tu nueva contraseña</p>
+            </div>
+            <label>Nueva contraseña</label>
+            <input type="password" id="nueva1" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+            <label>Repite la contraseña</label>
+            <input type="password" id="nueva2" placeholder="••••••••" autocomplete="new-password">
+            <button class="btn-primary" id="guardarBtn">Guardar clave</button>
+            <div class="error" id="err"></div>`;
+        document.getElementById('guardarBtn').onclick = async () => {
+            const errEl = document.getElementById('err');
+            errEl.style.color = ''; errEl.textContent = '';
+            const p1 = document.getElementById('nueva1').value;
+            const p2 = document.getElementById('nueva2').value;
+            if (p1.length < 6) { errEl.textContent = 'Mínimo 6 caracteres.'; return; }
+            if (p1 !== p2) { errEl.textContent = 'Las contraseñas no coinciden.'; return; }
+            const { error } = await supabase.auth.updateUser({ password: p1 });
+            if (error) { errEl.textContent = error.message; return; }
+            errEl.style.color = 'var(--success)';
+            errEl.textContent = '¡Clave actualizada! Ahora inicia sesión.';
+            await supabase.auth.signOut();
+            history.replaceState(null, '', location.pathname);
+            setTimeout(() => renderLogin(), 1500);
+        };
+    }
+
+    supabase.auth.onAuthStateChange((event) => {
+        if (event === 'PASSWORD_RECOVERY') renderNuevaClave();
+    });
+
     async function loadDashboard() {
+        detenerTemporizadorTotal();
         app.innerHTML = `<p class="subtitle">Cargando...</p>`;
         const { data: { user } } = await supabase.auth.getUser();
 
         const { data: estudiante } = await supabase
-            .from('estudiantes').select('id, grupo_id, nombre, avatar').eq('perfil_id', user.id).maybeSingle();
+            .from('estudiantes').select('*').eq('perfil_id', user.id).maybeSingle();
 
         if (!estudiante) {
             app.innerHTML = `
@@ -324,7 +471,7 @@
         state.estudiante = estudiante;
 
         const { data: quizzes } = await supabase
-            .from('quizzes').select('id, titulo, modo, activo').eq('grupo_id', estudiante.grupo_id).eq('activo', true);
+            .from('quizzes').select('*').eq('grupo_id', estudiante.grupo_id).eq('activo', true);
 
         const { data: conteos } = await supabase.from('quiz_preguntas').select('quiz_id');
         const mapaConteos = {};
@@ -352,6 +499,17 @@
             fecha.setDate(hoy.getDate() - d);
             if (fechasUnicas.includes(fecha.toDateString())) racha++;
             else if (d > 0) break;
+        }
+
+        let selectorGrupoHtml = '';
+        if (estudiante.puede_elegir_grupos) {
+            const { data: gruposDisp } = await supabase.from('grupos').select('id, nombre').order('nombre');
+            selectorGrupoHtml = `
+            <div style="background:var(--primary-light); border-radius:16px; padding:12px 14px; margin-bottom:18px;">
+                <label style="margin:0 0 6px; display:block;">🔀 Ver los quizzes de otro grupo</label>
+                <select id="grupoSwitcherSel">${(gruposDisp || []).map(g => `<option value="${g.id}" ${g.id === estudiante.grupo_id ? 'selected' : ''}>${g.nombre}</option>`).join('')}</select>
+                <div class="error" id="grupoSwitcherErr" style="text-align:left;"></div>
+            </div>`;
         }
 
         app.innerHTML = `
@@ -382,6 +540,7 @@
                 <div class="stat-box"><div class="stat-icon">🔥</div><div class="stat-value">${racha}</div><div class="stat-label">Racha</div></div>
             </div>
 
+            ${selectorGrupoHtml}
             <div class="section-title">📚 Tus Quizzes</div>
             <div id="list">${(quizzes || []).length ? '' : '<p class="subtitle" style="text-align:center; padding:20px;">No hay quizzes activos por ahora.</p>'}</div>
         `;
@@ -393,6 +552,12 @@
             e.currentTarget.textContent = activo ? '🔊' : '🔈';
         };
         document.getElementById('musicaBtn').onclick = (e) => toggleMusica(e.currentTarget);
+        const gSwitch = document.getElementById('grupoSwitcherSel');
+        if (gSwitch) gSwitch.onchange = async () => {
+            const { error } = await supabase.from('estudiantes').update({ grupo_id: gSwitch.value }).eq('id', estudiante.id);
+            if (error) { document.getElementById('grupoSwitcherErr').textContent = error.message; return; }
+            loadDashboard();
+        };
         document.getElementById('configBtn').onclick = () => abrirConfigModal();
         document.getElementById('avatarBtn').onclick = () => abrirAvatarModal();
 
@@ -407,12 +572,13 @@
             const nombreModo = q.modo === 'practica' ? 'Práctica' : q.modo === 'examen' ? 'Examen' : 'Estudio';
             const ultimo = mapaUltimos[q.id];
             const numPreguntas = mapaConteos[q.id] || 0;
+            const numMostrar = (q.modo !== 'estudio' && Number(q.preguntas_aleatorias) > 0) ? Math.min(Number(q.preguntas_aleatorias), numPreguntas) : numPreguntas;
 
             let lastScoreHtml = '';
             if (ultimo && ultimo.puntaje_total != null) {
-                const pct = numPreguntas > 0 ? (ultimo.puntaje_total / numPreguntas) * 100 : 0;
+                const pct = numMostrar > 0 ? (ultimo.puntaje_total / numMostrar) * 100 : 0;
                 const clase = pct >= 80 ? 'alta' : pct >= 50 ? 'media' : 'baja';
-                lastScoreHtml = `<div class="last-score ${clase}">${ultimo.puntaje_total}/${numPreguntas}</div>`;
+                lastScoreHtml = `<div class="last-score ${clase}">${ultimo.puntaje_total}/${numMostrar}</div>`;
             }
 
             const card = document.createElement('div');
@@ -451,7 +617,7 @@
                     <div class="quiz-icon" style="background:${colores[q.modo].bg}; color:${colores[q.modo].color};">${iconos[q.modo] || '📝'}</div>
                     <div class="quiz-info">
                         <div class="quiz-title">${q.titulo}</div>
-                        <div class="quiz-meta"><span class="quiz-badge ${q.modo}">${nombreModo}</span><span class="quiz-questions">${numPreguntas} preguntas</span></div>
+                        <div class="quiz-meta"><span class="quiz-badge ${q.modo}">${nombreModo}</span><span class="quiz-questions">${numMostrar} preguntas${Number(q.minutos) > 0 ? ' · ⏱️ ' + q.minutos + ' min' : ''}</span></div>
                     </div>
                     <div class="quiz-arrow">›</div>
                 `;
@@ -495,6 +661,15 @@
     }
 
     async function abrirConfigModal() {
+        if (!state.estudiante.puede_elegir_grupos) {
+            const ov = document.createElement('div');
+            ov.className = 'modal-overlay';
+            ov.innerHTML = `<div class="modal"><h3>⚙️ Configuración</h3><p class="subtitle">Tu profesor no ha habilitado el cambio de grupo para tu cuenta.</p><button class="btn-link" id="cerrarSinPermiso">Cerrar</button></div>`;
+            document.body.appendChild(ov);
+            ov.querySelector('#cerrarSinPermiso').onclick = () => ov.remove();
+            ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+            return;
+        }
         const { data: grupos } = await supabase.from('grupos').select('id, nombre').order('nombre');
         const overlay = document.createElement('div');
         overlay.className = 'modal-overlay';
@@ -523,6 +698,7 @@
     const AVATARES = ['😀','😎','🤓','🥳','🦁','🐱','🐶','🦊','🐼','🐸','🦄','🐵','👑','⭐','🚀','🎮','⚽','🎨','📚','🧠','💡','🔥','🌟','🍀','🎯','🐨','🐯','🦋','🐢','🌈'];
 
     async function startQuiz(quiz) {
+        state.finalizado = false;
         state.quiz = quiz;
         const { data: intento } = await supabase
             .from('intentos').insert({ quiz_id: quiz.id, estudiante_id: state.estudiante.id }).select('id').single();
@@ -534,13 +710,73 @@
             .eq('quiz_id', quiz.id)
             .order('orden');
 
-        state.preguntas = qp.map(r => r.preguntas);
+        let listaPreguntas = qp.map(r => r.preguntas);
+        const nAleatorias = Number(quiz.preguntas_aleatorias) || 0;
+        if (nAleatorias > 0 && nAleatorias < listaPreguntas.length) listaPreguntas = barajar(listaPreguntas).slice(0, nAleatorias);
+        state.preguntas = listaPreguntas;
         state.sumaPuntos = state.preguntas.reduce((a, p) => a + Number(p.puntos || 1), 0);
         state.index = 0;
         state.correctas = 0;
         state.segundosPorPregunta = null;
         iniciarMusica();
+        iniciarTemporizadorTotal(Number(quiz.minutos) || 0);
         renderQuestion();
+    }
+
+    // ---------- Tiempo total del evento (si el profesor lo definió) ----------
+    let intervaloTotal = null, audioCtxTimer = null;
+    function pitar(freq, dur, vol = 0.18, tipo = 'sine') {
+        try {
+            if (!audioCtxTimer) audioCtxTimer = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtxTimer.state === 'suspended') audioCtxTimer.resume();
+            const o = audioCtxTimer.createOscillator(), g = audioCtxTimer.createGain();
+            const t = audioCtxTimer.currentTime;
+            o.type = tipo; o.frequency.value = freq;
+            g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+            o.connect(g); g.connect(audioCtxTimer.destination);
+            o.start(t); o.stop(t + dur);
+        } catch (e) { /* sin audio disponible */ }
+    }
+    function alarmaFinal() { [0, 0.35, 0.7].forEach((d, i) => setTimeout(() => pitar(i === 1 ? 660 : 880, 0.3, 0.25, 'square'), d * 1000)); }
+    function detenerTemporizadorTotal() {
+        if (intervaloTotal) clearInterval(intervaloTotal);
+        intervaloTotal = null;
+        const el = document.getElementById('tiempoTotalBar');
+        if (el) el.remove();
+    }
+    function iniciarTemporizadorTotal(minutos) {
+        detenerTemporizadorTotal();
+        if (!(minutos > 0)) return;
+        pitar(1, 0.01, 0.0001); // desbloquea el audio con el gesto del alumno
+        const fin = Date.now() + minutos * 60000;
+        const bar = document.createElement('div');
+        bar.id = 'tiempoTotalBar';
+        bar.style.cssText = 'position:fixed; top:10px; left:50%; transform:translateX(-50%); z-index:9999; padding:10px 22px; border-radius:999px; background:#fff; box-shadow:0 6px 20px rgba(0,0,0,.25); font-weight:800; font-size:22px; font-family:"Baloo 2",Nunito,sans-serif; color:#7C6FF0; border:3px solid #7C6FF0;';
+        document.body.appendChild(bar);
+        let ultimoSegundo = null;
+        const tick = () => {
+            const rest = Math.max(0, Math.ceil((fin - Date.now()) / 1000));
+            if (rest === ultimoSegundo) return;
+            ultimoSegundo = rest;
+            bar.textContent = `⏱️ ${Math.floor(rest / 60)}:${String(rest % 60).padStart(2, '0')}`;
+            if (rest <= 30) { bar.style.color = '#E5484D'; bar.style.borderColor = '#E5484D'; }
+            if (rest === 60 || rest === 30) { pitar(660, 0.15); setTimeout(() => pitar(660, 0.15), 220); }
+            else if (rest > 0 && rest <= 10) { pitar(1000, 0.12, 0.2); bar.style.transform = 'translateX(-50%) scale(1.15)'; setTimeout(() => { bar.style.transform = 'translateX(-50%)'; }, 200); }
+            if (rest <= 0) tiempoAgotado();
+        };
+        tick();
+        intervaloTotal = setInterval(tick, 250);
+    }
+    function tiempoAgotado() {
+        detenerTemporizadorTotal();
+        if (state.finalizado) return;
+        state.finalizado = true; // congela la pantalla de preguntas
+        alarmaFinal();
+        const ov = document.createElement('div');
+        ov.style.cssText = 'position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; color:#fff; font-family:"Baloo 2",sans-serif; font-size:34px; font-weight:800; text-align:center; padding:20px;';
+        ov.textContent = '⏰ ¡Se acabó el tiempo!';
+        document.body.appendChild(ov);
+        setTimeout(() => { ov.remove(); state.finalizado = false; finishQuiz(); }, 2200);
     }
 
     function barajar(arr) {
@@ -553,6 +789,7 @@
     }
 
     async function startQuizEstudio(quiz, cantidad, segundosPorPregunta) {
+        state.finalizado = false;
         state.quiz = quiz;
         state.cantidadEstudio = cantidad;
         state.segundosPorPregunta = segundosPorPregunta || state.segundosPorPregunta || 20;
@@ -711,6 +948,7 @@
     }
 
     async function renderQuestion() {
+        if (state.finalizado) return;
         if (intervaloTiempo) clearInterval(intervaloTiempo);
         const pregunta = state.preguntas[state.index];
         const imagenHtml = pregunta.imagen_url ? `<img src="${pregunta.imagen_url}" alt="" id="imagenPregunta" style="max-width:100%; border-radius:12px; margin-bottom:14px; cursor:zoom-in;" title="Toca para ampliar">` : '';
@@ -871,6 +1109,7 @@
     }
 
     async function finishQuiz() {
+        detenerTemporizadorTotal();
         if (intervaloTiempo) clearInterval(intervaloTiempo);
         const { data: total } = await supabase.rpc('finalizar_intento', { p_intento_id: state.intentoId });
         const esEstudio = state.quiz.modo === 'estudio';
