@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz en vivo · QuizApp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+<style>
+  .podio { display: flex; justify-content: center; align-items: flex-end; gap: 10px; margin: 18px 0 8px; }
+  .podio .lugar { text-align: center; flex: 1; max-width: 150px; }
+  .podio .bloque { border-radius: 12px 12px 0 0; padding: 10px 6px; font-family: 'Baloo 2'; font-weight: 800; font-size: 20px; }
+  .podio .l1 .bloque { background: linear-gradient(135deg,#FFE7A8,#FFC857); height: 120px; }
+  .podio .l2 .bloque { background: #E5E1F5; height: 90px; }
+  .podio .l3 .bloque { background: #FFD9C2; height: 68px; }
+  .fila-pos { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--primary-soft); margin-top: 6px; font-weight: 800; }
+  .fila-pos.yo { outline: 3px solid var(--primary); }
+  .fila-pos .pts { margin-left: auto; color: var(--primary-dark); white-space: nowrap; }
+  .barra-op { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+  .barra-op .fondo { flex: 1; background: #F1EEFB; border-radius: 8px; height: 30px; position: relative; overflow: hidden; }
+  .barra-op .llena { height: 100%; border-radius: 8px; transition: width .4s; }
+  .barra-op .lbl-op { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-weight: 800; font-size: 13px; color: var(--ink); white-space: nowrap; }
+  .op-proy { padding: 16px 18px; border-radius: 14px; color: #fff; font-weight: 800; font-size: 18px; display: flex; align-items: center; gap: 10px; }
+  .op-proy.revelada-no { opacity: .35; }
+  .op-proy img { max-height: 90px; border-radius: 8px; background: #fff; }
+  .participantes { display: flex; flex-wrap: wrap; gap: 8px; }
+  .participante { display: inline-flex; align-items: center; gap: 6px; background: var(--primary-soft); border-radius: 30px; padding: 4px 12px 4px 4px; font-weight: 800; }
+  .participante button { border: none; background: none; cursor: pointer; color: var(--muted); font-size: 14px; }
+  .pin-input { font-family: 'Baloo 2'; font-size: 34px; letter-spacing: 10px; text-align: center; font-weight: 800; }
+  body.proyector .hoja { max-width: 1200px; }
+  body.proyector .enun-proy { font-size: 34px !important; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+</head>
+<body class="centrado">
+<div class="hoja" id="app"><div class="center"><div class="spinner"></div></div></div>
+<script type="module" src="js/vivo.js"></script>
+</body>
+</html>
