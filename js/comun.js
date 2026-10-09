@@ -248,7 +248,23 @@ export async function exigirRol(roles) {
   if (!perfil) { location.href = 'index.html'; return null; }
   if (perfil.estado === 'restringido') { mostrarRestringido(perfil); return null; }
   if (!roles.includes(perfil.rol)) { location.href = paginaDeRol(perfil.rol); return null; }
+  vigilarCambioDeSesion(perfil.id);
   return perfil;
+}
+
+// Si en otra pestaña se inicia sesión con otra cuenta (o se cierra), esta página
+// se recarga para no seguir trabajando con datos de otra persona.
+export function vigilarCambioDeSesion(idActual) {
+  const revisar = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const id = session?.user?.id || null;
+    if (id !== idActual) {
+      toast(id ? 'Se inició sesión con otra cuenta en otra pestaña. Recargando...' : 'La sesión se cerró en otra pestaña.', 'error');
+      setTimeout(() => { if (id) location.reload(); else location.href = 'index.html'; }, 1200);
+    }
+  };
+  window.addEventListener('storage', (e) => { if (!e.key || /auth-token/.test(e.key)) revisar(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) revisar(); });
 }
 
 export function mostrarRestringido(perfil) {

@@ -342,10 +342,16 @@ export function montarListaPreguntas(cont, preguntas, op) {
 // opciones: { volver(), quizzes() → lista para mover/copiar, onPublicar(quizId), onVivo(quizId), onCargaMasiva(quizId) }
 export async function montarEditorQuiz(cont, quizId, op = {}) {
   cont.innerHTML = '<div class="center" style="padding:40px;"><div class="spinner"></div></div>';
-  const { data: quiz, error } = await supabase.from('quizzes').select('*').eq('id', quizId).maybeSingle();
-  if (error || !quiz) { cont.innerHTML = `<div class="empty"><span class="big">🤔</span>No se encontró el quiz.</div>`; return; }
-  const { data: preguntas, error: e2 } = await supabase.rpc('preguntas_de_quiz', { p_quiz: quizId });
-  if (e2) { cont.innerHTML = `<div class="empty">${esc(mensajeError(e2))}</div>`; return; }
+  const { data, error } = await supabase.rpc('quiz_editor', { p_quiz: quizId });
+  if (error || !data) {
+    console.error('quiz_editor', error);
+    cont.innerHTML = `<div class="card empty"><span class="big">🤔</span>No se pudo abrir el quiz.<br><span class="small" style="color:var(--red);">${esc(mensajeError(error || 'sin datos'))}</span>
+      ${/quiz_editor|function|schema cache/i.test(error?.message || '') ? '<p class="hint">Falta ejecutar la última versión de 05_parche_paneles.sql en Supabase.</p>' : ''}
+      ${op.volver ? '<br><button class="btn btn-sm" data-volver2 style="margin-top:10px;">← Volver</button>' : ''}</div>`;
+    const b = $('[data-volver2]', cont); if (b) b.onclick = op.volver;
+    return;
+  }
+  const quiz = data.quiz, preguntas = data.preguntas;
 
   const totalPts = preguntas.filter(p => p.tipo !== 'lluvia_ideas').reduce((a, p) => a + Number(p.puntos), 0);
   const subtemas = [...new Set(preguntas.map(p => p.subtema).filter(Boolean))].sort();

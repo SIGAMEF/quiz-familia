@@ -273,6 +273,7 @@ function inicioPlazo() {
 
 async function preguntaPlazo() {
   limpiarTimersPregunta();
+  const zona = $('#preg'); if (zona) zona.innerHTML = '<div class="center" style="padding:30px;"><div class="spinner"></div></div>';
   await cargarPreguntas();
   const s = P.sesion;
   const pendientes = P.preguntas.filter(p => !P.respuestas.has(p.id));
