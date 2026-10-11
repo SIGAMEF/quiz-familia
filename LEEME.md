@@ -5,7 +5,7 @@ Ejecuta **`05_parche_paneles.sql`** (incluido en este zip). Si ya ejecutaste una
 
 ## 2. Archivos (repositorio de GitHub)
 - **Reemplaza**: `index.html`, `admin.html`
-- **Agrega**: `profesor.html`, `alumno.html`, `vivo.html` y las carpetas `css/` y `js/` completas
+- **Agrega**: `profesor.html`, `alumno.html`, `vivo.html`, `jugar.html` y las carpetas `css/` y `js/` completas
 - **Borra** (ya no se usan): `concurso.html`, `quiz.html`, `lucas.html`
 - **Conserva** `musica-fondo.mp3` si lo tienes (la música de fondo del alumno)
 - No subas `Quiz en linea.txt` (tiene la clave del admin)
@@ -16,6 +16,7 @@ Ejecuta **`05_parche_paneles.sql`** (incluido en este zip). Si ya ejecutaste una
 | `index.html` | Login de todos, registro de profesores y de alumnos (con el enlace o código del grupo) |
 | `profesor.html` | Quizzes, carga masiva, grupos con QR, publicar, en vivo, libreta |
 | `alumno.html` | Quizzes asignados, práctica / examen / estudio, historial, mis grupos |
+| `jugar.html` | Enlace / QR de una publicación: el alumno del grupo entra con su cuenta; si el profesor lo permite, cualquiera lo resuelve como invitado |
 | `vivo.html` | Quiz en vivo: participantes con PIN, enlace o QR (con cuenta o como invitado) y control del profesor |
 | `admin.html` | Resumen, profesores, instituciones, alumnos, todos los quizzes, periodos |
 

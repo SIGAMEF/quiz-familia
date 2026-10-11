@@ -533,6 +533,7 @@ function camposPublicacion(p = {}, pers = []) {
       <label class="check"><input type="checkbox" data-c="mostrar_respuestas" ${p.mostrar_respuestas !== false ? 'checked' : ''}> Al terminar, mostrar al alumno sus respuestas y las correctas</label>
       <label class="check"><input type="checkbox" data-c="barajar_preguntas" ${p.barajar_preguntas ? 'checked' : ''}> Cambiar el orden de las preguntas para cada alumno</label>
       <label class="check"><input type="checkbox" data-c="barajar_opciones" ${p.barajar_opciones !== false ? 'checked' : ''}> Cambiar el orden de las opciones</label>
+      <label class="check"><input type="checkbox" data-c="permite_invitados" ${p.permite_invitados ? 'checked' : ''}> 📱 Con el enlace o QR, también pueden resolverlo personas <b>sin cuenta</b> (como invitados, no van a la libreta)</label>
     </div>`;
 }
 const DESC_MODO = {
@@ -557,7 +558,8 @@ function activarCamposPublicacion(cont) {
       modo, periodo_id: v('periodo_id').value || null, inicio: aIso(v('inicio').value), fin: aIso(v('fin').value),
       seg_por_pregunta: num('seg_por_pregunta'), cantidad_preguntas: num('cantidad_preguntas'), intentos_max: num('intentos_max'),
       peso: num('peso') || 1, mostrar_respuestas: v('mostrar_respuestas').checked,
-      barajar_preguntas: v('barajar_preguntas').checked, barajar_opciones: v('barajar_opciones').checked
+      barajar_preguntas: v('barajar_preguntas').checked, barajar_opciones: v('barajar_opciones').checked,
+      permite_invitados: v('permite_invitados').checked
     };
   };
 }
@@ -610,9 +612,9 @@ async function vPublicar(quizPre) {
         <td>${esc(p.grupo_nombre)}</td><td><span class="badge ${MODOS[p.modo].clase}">${MODOS[p.modo].ico} ${MODOS[p.modo].nombre}</span></td>
         <td class="small">${esc(p.periodo_nombre || '—')}</td>
         <td class="small">${p.inicio || p.fin ? `${p.inicio ? fmtFecha(p.inicio, true) : '…'}<br>→ ${p.fin ? fmtFecha(p.fin, true) : '…'}` : 'Siempre'}</td>
-        <td>${p.rindieron}/${p.n_alumnos}</td><td class="nota ${claseNota(p.promedio)}">${textoNota(p.promedio, p.escala)}</td>
+        <td>${p.rindieron}/${p.n_alumnos}${p.invitados ? `<br><span class="small muted">+${p.invitados} invitado(s)</span>` : ''}</td><td class="nota ${claseNota(p.promedio)}">${textoNota(p.promedio, p.escala)}</td>
         <td><input type="checkbox" data-activo ${p.activo ? 'checked' : ''} style="width:18px; height:18px; accent-color:var(--primary);"></td>
-        <td><div class="row" style="gap:4px; flex-wrap:nowrap;"><button class="btn btn-sm" data-res>📊</button><button class="btn btn-sm" data-edit>✏️</button><button class="btn btn-sm btn-red" data-del>🗑</button></div></td></tr>`).join('')}
+        <td><div class="row" style="gap:4px; flex-wrap:nowrap;"><button class="btn btn-sm" data-qr title="Enlace y QR para enviar">📱</button><button class="btn btn-sm" data-res title="Resultados">📊</button><button class="btn btn-sm" data-vivo title="Jugarla en vivo">🏆</button><button class="btn btn-sm" data-edit>✏️</button><button class="btn btn-sm btn-red" data-del>🗑</button></div></td></tr>`).join('')}
       </tbody></table></div>` : '<div class="empty"><span class="big">📣</span>Aún no hay publicaciones.</div>';
     $$('[data-p]', contenido).forEach(tr => {
       const p = pubs.find(x => x.id === tr.dataset.p);
@@ -622,6 +624,8 @@ async function vPublicar(quizPre) {
         p.activo = e.target.checked; toast(p.activo ? 'Visible para los alumnos' : 'Oculto para los alumnos');
       };
       $('[data-res]', tr).onclick = () => verResultados(p);
+      $('[data-qr]', tr).onclick = () => compartirPublicacion(p, () => pintar());
+      $('[data-vivo]', tr).onclick = () => { location.hash = `vivo/pub-${p.id}`; };
       $('[data-edit]', tr).onclick = () => editarPublicacion(p, pers);
       $('[data-del]', tr).onclick = async () => {
         if (!await confirmar(`Se quitará "${p.quiz_titulo}" de ${p.grupo_nombre} y se borrarán los resultados de ${p.rindieron} alumno(s).\nSi solo quieres ocultarlo, desmarca "Activo".`, { titulo: '¿Eliminar publicación?', boton: 'Eliminar' })) return;
@@ -633,6 +637,38 @@ async function vPublicar(quizPre) {
   };
   $('[data-filtro]', contenido).onchange = pintar;
   pintar();
+}
+
+function enlacePublicacion(p) { return `${urlBase()}jugar.html?p=${p.id}`; }
+
+// Enlace y QR de una publicación (para enviar por WhatsApp o proyectar)
+function compartirPublicacion(p, alCambiar) {
+  const url = enlacePublicacion(p);
+  const m = abrirModal(`<h3>📱 ${esc(p.quiz_titulo)} · ${esc(p.grupo_nombre)}</h3>
+    <div class="center"><div data-qrp style="display:inline-block; padding:8px; background:#fff; border-radius:12px;"></div></div>
+    <div class="row" style="margin-top:10px;"><input class="input grow" readonly value="${esc(url)}" data-url style="font-size:13px;"></div>
+    <div class="row" style="gap:6px; margin-top:8px; flex-wrap:wrap;">
+      <button class="btn btn-sm btn-primary" data-copiar>🔗 Copiar enlace</button>
+      <button class="btn btn-sm" data-grande>🖥 QR en pantalla completa</button>
+      <button class="btn btn-sm" data-wa style="background:#25D366; color:#fff;">WhatsApp</button>
+      <a class="btn btn-sm btn-outline" href="${esc(url)}" target="_blank" rel="noopener">👁 Probar</a></div>
+    <div class="feedback neutro" style="margin-top:12px; text-align:left;">
+      🎒 <b>Alumnos del grupo:</b> entran con su cuenta y su nota va a la libreta.<br>
+      🙋 <b>Sin cuenta:</b> <label class="check" style="display:inline-flex; margin:4px 0 0;"><input type="checkbox" data-inv ${p.permite_invitados ? 'checked' : ''}> pueden resolverlo como invitados con su nombre y avatar (los ves en 📊, no en la libreta)</label>
+      ${p.activo ? '' : '<br>⚠️ La publicación está <b>oculta</b>: márcala como activa para que el enlace funcione.'}
+    </div>`);
+  dibujarQR($('[data-qrp]', m.el), url, 200);
+  $('[data-url]', m.el).onclick = (e) => e.target.select();
+  $('[data-copiar]', m.el).onclick = () => copiar(url);
+  $('[data-grande]', m.el).onclick = () => mostrarQRGrande(p.quiz_titulo, url, '', p.permite_invitados ? 'Escanea para resolver el quiz' : `Escanea y entra con tu cuenta · ${p.grupo_nombre}`);
+  $('[data-wa]', m.el).onclick = () => window.open(`https://wa.me/?text=${encodeURIComponent(`📝 ${p.quiz_titulo}\nResuélvelo aquí: ${url}`)}`, '_blank');
+  $('[data-inv]', m.el).onchange = async (e) => {
+    const { error } = await supabase.from('publicaciones').update({ permite_invitados: e.target.checked }).eq('id', p.id);
+    if (error) { toast(mensajeError(error), 'error'); e.target.checked = !e.target.checked; return; }
+    p.permite_invitados = e.target.checked;
+    toast(p.permite_invitados ? 'Cualquiera con el enlace puede resolverlo' : 'Solo los alumnos del grupo');
+    if (alCambiar) alCambiar();
+  };
 }
 
 function editarPublicacion(p, pers) {
@@ -655,11 +691,12 @@ async function verResultados(p) {
     try { r = await rpc('resultados_publicacion', { p_pub: p.id }); } catch (e) { $('[data-c]', m.el).textContent = mensajeError(e); return; }
     const fin = r.intentos.filter(i => i.estado === 'finalizado');
     $('[data-c]', m.el).innerHTML = `
-      <div class="row" style="margin-bottom:10px;"><span class="badge green">✅ ${new Set(fin.map(i => i.alumno_id)).size} rindieron</span>
+      <div class="row" style="margin-bottom:10px;"><span class="badge green">✅ ${new Set(fin.filter(i => !i.es_invitado).map(i => i.alumno_id)).size} rindieron</span>
+        ${fin.some(i => i.es_invitado) ? `<span class="badge amber">🙋 ${fin.filter(i => i.es_invitado).length} invitado(s)</span>` : ''}
         <span class="badge gray">⏳ ${r.sin_rendir.length} sin rendir</span>
         <span class="grow"></span><button class="btn btn-sm btn-primary" data-xls ${fin.length ? '' : 'disabled'}>⬇️ Excel</button></div>
       ${r.intentos.length ? `<div class="tabla-wrap scroll-y"><table class="tabla"><thead><tr><th>Alumno</th><th>Intento</th><th>Fecha</th><th>Aciertos</th><th>Puntaje</th><th>Nota</th><th></th></tr></thead><tbody>
-        ${r.intentos.map(i => `<tr data-i="${i.id}"><td><div class="row" style="gap:6px; flex-wrap:nowrap;">${avatarHtml(i.avatar, 'sm')}<b>${esc(i.nombre)}</b></div></td>
+        ${r.intentos.map(i => `<tr data-i="${i.id}"><td><div class="row" style="gap:6px; flex-wrap:nowrap;">${avatarHtml(i.avatar, 'sm')}<b>${esc(i.nombre)}</b>${i.es_invitado ? ' <span class="badge gray">invitado</span>' : ''}${i.en_vivo ? ' <span class="badge amber" title="Resultado de una sesión en vivo">🏆 en vivo</span>' : ''}</div></td>
           <td>${i.intento}${i.estado === 'en_curso' ? ' <span class="badge amber">en curso</span>' : ''}</td><td class="small">${fmtFecha(i.finalizado_en || i.iniciado_en, true)}</td>
           <td>${i.aciertos}/${i.total}</td><td>${Number(i.puntaje)}/${Number(i.puntaje_max)}</td>
           <td class="nota ${i.estado === 'finalizado' ? claseNota(i.nota) : ''}">${i.estado === 'finalizado' ? textoNota(i.nota, p.escala) : '—'}</td>
@@ -667,7 +704,7 @@ async function verResultados(p) {
         </tbody></table></div>` : '<div class="empty">Nadie ha rendido este quiz todavía.</div>'}
       ${r.sin_rendir.length ? `<p class="small" style="margin-top:10px;"><b>Sin rendir:</b> ${r.sin_rendir.map(a => esc(a.nombre)).join(', ')}</p>` : ''}`;
     const xls = $('[data-xls]', m.el);
-    if (xls) xls.onclick = () => descargarResultados(`${p.quiz_titulo}_${p.grupo_nombre}`, fin.map(i => ({ ...i, fecha: i.finalizado_en })), p.escala).catch(e => toast(mensajeError(e), 'error'));
+    if (xls) xls.onclick = () => descargarResultados(`${p.quiz_titulo}_${p.grupo_nombre}`, fin.map(i => ({ ...i, nombre: i.es_invitado ? `${i.nombre} (invitado)` : i.nombre, usuario: i.usuario || '', fecha: i.finalizado_en })), p.escala).catch(e => toast(mensajeError(e), 'error'));
     $$('[data-i]', m.el).forEach(tr => {
       const i = r.intentos.find(x => x.id === tr.dataset.i);
       $('[data-det]', tr).onclick = () => detalleIntento(i);
@@ -693,19 +730,34 @@ async function detalleIntento(i) {
 }
 
 // ======================= EN VIVO =======================
-async function vVivo(quizPre) {
+async function vVivo(param) {
   spinner();
-  let quizzes, grupos, sesiones;
-  try { [quizzes, grupos, sesiones] = await Promise.all([misQuizzes(), misGrupos(), rpc('mis_sesiones_vivo')]); } catch (e) { return falla(e); }
+  let quizzes, grupos, sesiones, pubs;
+  try { [quizzes, grupos, sesiones, pubs] = await Promise.all([misQuizzes(), misGrupos(), rpc('mis_sesiones_vivo'), rpc('mis_publicaciones_profesor')]); } catch (e) { return falla(e); }
   const conPreguntas = quizzes.filter(q => q.n_preguntas > 0);
+  pubs = pubs.filter(p => p.n_preguntas > 0);
+  const pubPre = param && param.startsWith('pub-') ? param.slice(4) : '';
+  const quizPre = pubPre ? '' : param;
+  let origen = pubPre && pubs.some(p => p.id === pubPre) ? 'pub' : 'quiz';
+  const nombrePub = (p) => `${p.quiz_titulo} → ${p.grupo_nombre} · ${MODOS[p.modo].nombre}${p.periodo_nombre ? ' · ' + p.periodo_nombre : ''}`;
   const estados = { armado: ['Borrador', 'gray'], esperando: ['Sala abierta', 'amber'], en_curso: ['En curso', 'green'], finalizado: ['Finalizado', 'gray'] };
   contenido.innerHTML = `
     <div class="card"><h2>🏆 Nueva sesión en vivo</h2>
       <p class="sub">Tus alumnos entran con su cuenta, y cualquiera sin cuenta entra solo con su nombre y un avatar, usando el PIN, el enlace o el QR.</p>
       ${!conPreguntas.length ? '<div class="feedback mal">Primero crea un quiz con preguntas.</div>' : ''}
+      <label class="lbl">Elegir por</label>
+      <div class="chips"><button type="button" class="chip ${origen === 'quiz' ? 'activo' : ''}" data-origen="quiz">📚 Por quiz</button>
+        <button type="button" class="chip ${origen === 'pub' ? 'activo' : ''}" data-origen="pub">📣 Por publicación</button></div>
       <div class="grid grid-2">
-        <div><label class="lbl">Quiz</label><select class="input" data-quiz>${conPreguntas.map(q => `<option value="${q.id}" ${q.id === quizPre ? 'selected' : ''}>${esc(q.titulo)} (${q.n_preguntas})</option>`).join('')}</select></div>
+        <div data-o="quiz" class="${origen === 'quiz' ? '' : 'hidden'}"><label class="lbl">Quiz</label><select class="input" data-quiz>${conPreguntas.map(q => `<option value="${q.id}" ${q.id === quizPre ? 'selected' : ''}>${esc(q.titulo)} (${q.n_preguntas})</option>`).join('')}</select></div>
+        <div data-o="pub" class="${origen === 'pub' ? '' : 'hidden'}"><label class="lbl">Publicación</label>${pubs.length
+          ? `<select class="input" data-pub>${pubs.map(p => `<option value="${p.id}" ${p.id === pubPre ? 'selected' : ''}>${esc(nombrePub(p))}</option>`).join('')}</select>`
+          : '<div class="feedback neutro small">Aún no tienes publicaciones. Créalas en "Publicar".</div>'}</div>
         <div><label class="lbl">Título de la sesión</label><input class="input" data-titulo placeholder="Igual que el quiz"></div>
+      </div>
+      <div data-o="pub" class="${origen === 'pub' ? '' : 'hidden'}">
+        <p class="hint">Se usan el quiz, el grupo y la configuración de la publicación (puedes ajustarla abajo).</p>
+        <label class="check"><input type="checkbox" data-registrar checked> 📒 Los alumnos del grupo que jueguen con su cuenta suman un intento en esta publicación (su nota va a la libreta, sin el bono por velocidad)</label>
       </div>
       <label class="lbl">Modo</label>
       <div class="chips"><button type="button" class="chip activo" data-modo="vivo">🎤 En vivo — tú pasas cada pregunta</button><button type="button" class="chip" data-modo="plazo">⏱ Por plazo — cada uno a su ritmo</button></div>
@@ -713,7 +765,7 @@ async function vVivo(quizPre) {
         <div data-solo="vivo"><label class="lbl">Segundos por pregunta</label><input class="input" type="number" min="5" data-seg value="20" placeholder="Sin límite"></div>
         <div data-solo="plazo" class="hidden"><label class="lbl">Tiempo total (minutos)</label><input class="input" type="number" min="1" data-total placeholder="Sin límite"></div>
         <div><label class="lbl">¿Cuántas preguntas?</label><input class="input" type="number" min="1" data-cant placeholder="Todas"></div>
-        <div><label class="lbl">Grupo (opcional)</label><select class="input" data-grupo><option value="">— Ninguno —</option>${grupos.map(g => `<option value="${g.id}">${esc(g.nombre)}</option>`).join('')}</select></div>
+        <div data-o="quiz" class="${origen === 'quiz' ? '' : 'hidden'}"><label class="lbl">Grupo (opcional)</label><select class="input" data-grupo><option value="">— Ninguno —</option>${grupos.map(g => `<option value="${g.id}">${esc(g.nombre)}</option>`).join('')}</select></div>
       </div>
       <div class="stack" style="margin-top:12px;">
         <label class="check"><input type="checkbox" data-aleatorio checked> Elegir preguntas al azar (si no, en el orden del quiz)</label>
@@ -723,11 +775,12 @@ async function vVivo(quizPre) {
       <details style="margin-top:12px;"><summary style="cursor:pointer; font-weight:800; color:var(--primary-dark);">⚙️ Elegir preguntas fijas y cambiar puntos</summary>
         <p class="hint">Las marcadas aparecen sí o sí; el resto se completa según "¿Cuántas preguntas?".</p><div data-fijas style="margin-top:8px;"></div></details>
       <div class="err" data-err></div>
-      <button class="btn btn-amber" data-crear ${conPreguntas.length ? '' : 'disabled'}>🚀 Crear sesión y abrir la sala</button>
+      <button class="btn btn-amber" data-crear ${(origen === 'pub' ? pubs.length : conPreguntas.length) ? '' : 'disabled'}>🚀 Crear sesión y abrir la sala</button>
     </div>
     <div class="card"><h2>Mis sesiones</h2>
       ${sesiones.length ? `<div class="tabla-wrap"><table class="tabla"><thead><tr><th>Sesión</th><th>Modo</th><th>Estado</th><th>PIN</th><th>Participantes</th><th>Fecha</th><th></th></tr></thead><tbody>
-        ${sesiones.map(s => `<tr data-s="${s.id}"><td><b>${esc(s.titulo)}</b><br><span class="small muted">${esc(s.quiz_titulo)} · ${s.n_preguntas} preg.${s.grupo_nombre ? ' · ' + esc(s.grupo_nombre) : ''}</span></td>
+        ${sesiones.map(s => `<tr data-s="${s.id}"><td><b>${esc(s.titulo)}</b><br><span class="small muted">${esc(s.quiz_titulo)} · ${s.n_preguntas} preg.${s.grupo_nombre ? ' · ' + esc(s.grupo_nombre) : ''}</span>
+          ${s.publicacion_id ? `<br><span class="badge ${MODOS[s.publicacion_modo]?.clase || 'gray'}" title="${s.registrar_notas ? 'Las notas de los alumnos del grupo van a la publicación' : 'No registra notas'}">📣 Publicación${s.registrar_notas ? ' · 📒 a la libreta' : ''}</span>` : ''}</td>
           <td>${s.modo === 'vivo' ? '🎤 En vivo' : '⏱ Por plazo'}</td><td><span class="badge ${estados[s.estado][1]}">${estados[s.estado][0]}</span></td>
           <td class="titulo" style="letter-spacing:2px;">${s.estado === 'finalizado' ? '—' : esc(s.codigo)}</td><td>${s.n_participantes}</td><td class="small">${fmtFecha(s.created_at, true)}</td>
           <td><div class="row" style="gap:4px; flex-wrap:nowrap;"><a class="btn btn-sm btn-primary" href="vivo.html?control=${s.id}">${s.estado === 'finalizado' ? '📊 Resultados' : '▶ Abrir'}</a>
@@ -740,10 +793,28 @@ async function vVivo(quizPre) {
     $$('[data-modo]', contenido).forEach(x => x.classList.toggle('activo', x === b));
     $$('[data-solo]', contenido).forEach(x => x.classList.toggle('hidden', x.dataset.solo !== modo));
   });
+  const pubSel = () => pubs.find(p => p.id === $('[data-pub]', contenido)?.value);
+  const quizActual = () => origen === 'pub' ? pubSel()?.quiz_id : $('[data-quiz]', contenido).value;
+  // al elegir una publicación se copia su configuración
+  const aplicarPub = () => {
+    const p = pubSel(); if (!p) return;
+    $('[data-cant]', contenido).value = p.cantidad_preguntas ?? '';
+    if (p.seg_por_pregunta) $('[data-seg]', contenido).value = p.seg_por_pregunta;
+    $('[data-aleatorio]', contenido).checked = !!p.barajar_preguntas;
+  };
+  $$('[data-origen]', contenido).forEach(b => b.onclick = () => {
+    origen = b.dataset.origen;
+    $$('[data-origen]', contenido).forEach(x => x.classList.toggle('activo', x === b));
+    $$('[data-o]', contenido).forEach(x => x.classList.toggle('hidden', x.dataset.o !== origen));
+    $('[data-crear]', contenido).disabled = origen === 'pub' ? !pubs.length : !conPreguntas.length;
+    if (origen === 'pub') aplicarPub();
+    preguntasQuiz = []; if ($('details', contenido).open) cargarFijas();
+  });
+  if ($('[data-pub]', contenido)) $('[data-pub]', contenido).onchange = () => { aplicarPub(); preguntasQuiz = []; if ($('details', contenido).open) cargarFijas(); };
   const fijasCont = $('[data-fijas]', contenido);
   let preguntasQuiz = [];
   const cargarFijas = async () => {
-    const qid = $('[data-quiz]', contenido).value; if (!qid) return;
+    const qid = quizActual(); if (!qid) return;
     fijasCont.innerHTML = '<div class="spinner"></div>';
     try { preguntasQuiz = await rpc('preguntas_de_quiz', { p_quiz: qid }); } catch (e) { fijasCont.textContent = mensajeError(e); return; }
     fijasCont.innerHTML = `<div class="tabla-wrap scroll-y" style="max-height:300px;"><table class="tabla"><thead><tr><th>Fija</th><th>Pregunta</th><th>Puntos</th></tr></thead><tbody>
@@ -761,14 +832,18 @@ async function vVivo(quizPre) {
       titulo: $('[data-titulo]', contenido).value.trim(), modo,
       seg_por_pregunta: modo === 'vivo' ? ($('[data-seg]', contenido).value || null) : null,
       seg_total: modo === 'plazo' && $('[data-total]', contenido).value ? Number($('[data-total]', contenido).value) * 60 : null,
-      cantidad: $('[data-cant]', contenido).value || null, grupo_id: $('[data-grupo]', contenido).value || null,
+      cantidad: $('[data-cant]', contenido).value || null,
+      grupo_id: origen === 'pub' ? null : ($('[data-grupo]', contenido).value || null),
+      publicacion_id: origen === 'pub' ? (pubSel()?.id || null) : null,
+      registrar_notas: $('[data-registrar]', contenido).checked,
       aleatorio: $('[data-aleatorio]', contenido).checked, puntos_velocidad: $('[data-velocidad]', contenido).checked,
       permite_invitados: $('[data-invitados]', contenido).checked,
       fijas: $$('[data-fija]:checked', contenido).map(i => i.dataset.fija), puntos
     };
     if (cfg.seg_por_pregunta && Number(cfg.seg_por_pregunta) < 5) { err.textContent = 'Mínimo 5 segundos por pregunta.'; return; }
+    if (origen === 'pub' && !cfg.publicacion_id) { err.textContent = 'Elige una publicación.'; return; }
     try {
-      const id = await rpc('vivo_crear', { p_quiz: $('[data-quiz]', contenido).value, p_config: cfg });
+      const id = await rpc('vivo_crear', { p_quiz: quizActual(), p_config: cfg });
       const { error } = await supabase.from('sesiones_vivo').update({ estado: 'esperando' }).eq('id', id);
       if (error) throw error;
       location.href = `vivo.html?control=${id}`;
@@ -782,6 +857,7 @@ async function vVivo(quizPre) {
       toast('Sesión eliminada'); vVivo();
     };
   });
+  if (origen === 'pub') aplicarPub();
   if (quizPre) cargarFijas();
 }
 

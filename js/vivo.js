@@ -12,7 +12,7 @@ const app = $('#app');
 const params = new URLSearchParams(location.search);
 const COLORES = ['#E21B3C', '#1368CE', '#D89E00', '#26890C', '#864CBF', '#0AA3A3', '#E05D00', '#7A5C3E'];
 const FIGURAS = ['▲', '◆', '●', '■', '★', '⬟', '⬢', '✚'];
-const COLS_SESION = 'id,titulo,modo,estado,codigo,seg_por_pregunta,seg_total,pregunta_actual,pregunta_iniciada_en,permite_invitados,profesor_id,quiz_id,puntos_velocidad';
+const COLS_SESION = 'id,titulo,modo,estado,codigo,seg_por_pregunta,seg_total,pregunta_actual,pregunta_iniciada_en,permite_invitados,profesor_id,quiz_id,puntos_velocidad,publicacion_id,registrar_notas';
 
 let timers = [], canal = null;
 function limpiar() {
@@ -452,11 +452,14 @@ function pintarControl() {
   on('#bSiguiente', () => actualizarSesion({ pregunta_actual: s.pregunta_actual + 1 }));
   on('#bTerminar', async () => {
     if (s.modo === 'plazo' && !await confirmar('Se cierra para todos y se calculan los puntajes con lo que cada uno haya respondido.', { titulo: '¿Terminar ahora?', boton: 'Terminar' })) return;
-    try { await rpc('vivo_terminar', { p_sesion: s.id }); C.sesion = await leerSesion(s.id); pintarControl(); } catch (e) { toast(mensajeError(e), 'error'); }
+    try {
+      await rpc('vivo_terminar', { p_sesion: s.id }); C.sesion = await leerSesion(s.id); pintarControl();
+      if (s.publicacion_id && s.registrar_notas) toast('📒 Las notas de los alumnos del grupo quedaron en la publicación');
+    } catch (e) { toast(mensajeError(e), 'error'); }
   });
   on('#bRevelar', () => { C.revelada = !C.revelada; revelar(); });
   on('#bOtraVez', async () => {
-    if (!await confirmar('Se borran los participantes y sus respuestas de esta partida. Las preguntas se mantienen y el PIN cambia.', { titulo: '¿Jugar de nuevo?', boton: 'Sí, de nuevo', peligro: false })) return;
+    if (!await confirmar(`Se borran los participantes y sus respuestas de esta partida. Las preguntas se mantienen y el PIN cambia.${s.publicacion_id && s.registrar_notas ? '\nTambién se quitan de la libreta las notas que registró esta partida.' : ''}`, { titulo: '¿Jugar de nuevo?', boton: 'Sí, de nuevo', peligro: false })) return;
     try { await rpc('vivo_reiniciar', { p_sesion: s.id }); C.sesion = await leerSesion(s.id); pintarControl(); } catch (e) { toast(mensajeError(e), 'error'); }
   });
   on('#bInvitados', async () => {
