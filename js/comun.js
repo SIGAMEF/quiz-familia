@@ -358,3 +358,46 @@ export function textoNota(n, escala = 'vigesimal') {
   return v;
 }
 export function claseNota(n) { const l = notaLiteral(n); return l ? 'nota-' + l.toLowerCase() : ''; }
+
+// ---------- Menú de la cuenta (se abre al tocar el nombre/avatar) ----------
+// items: [{ ico, txt, accion, peligro }] o 'sep' para una línea divisoria
+export function menuUsuario(boton, items) {
+  const ancla = document.createElement('div');
+  ancla.className = 'menu-ancla';
+  boton.replaceWith(ancla);
+  ancla.appendChild(boton);
+  boton.setAttribute('aria-haspopup', 'menu');
+  boton.setAttribute('aria-expanded', 'false');
+  let menu = null;
+  const cerrar = () => {
+    if (!menu) return;
+    menu.remove(); menu = null;
+    boton.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('click', fuera, true);
+    document.removeEventListener('keydown', tecla);
+  };
+  const fuera = (e) => { if (!ancla.contains(e.target)) cerrar(); };
+  const tecla = (e) => { if (e.key === 'Escape') { cerrar(); boton.focus(); } };
+  boton.onclick = (e) => {
+    e.stopPropagation();
+    if (menu) return cerrar();
+    menu = document.createElement('div');
+    menu.className = 'menu-usuario';
+    menu.setAttribute('role', 'menu');
+    items.forEach(it => {
+      if (it === 'sep') { menu.appendChild(Object.assign(document.createElement('hr'))); return; }
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('role', 'menuitem');
+      if (it.peligro) b.className = 'peligro';
+      if (it.id) b.dataset.menu = it.id;
+      b.innerHTML = `<span class="ico">${it.ico}</span><span>${esc(it.txt)}</span>`;
+      b.onclick = () => { cerrar(); it.accion(); };
+      menu.appendChild(b);
+    });
+    ancla.appendChild(menu);
+    boton.setAttribute('aria-expanded', 'true');
+    setTimeout(() => { document.addEventListener('click', fuera, true); document.addEventListener('keydown', tecla); });
+    menu.querySelector('button')?.focus();
+  };
+}

@@ -3,7 +3,7 @@
 // ============================================================
 import {
   supabase, $, $$, esc, toast, abrirModal, confirmar, pedirDatos, mensajeError, coincide,
-  exigirRol, salir, cierreInactividad, avatarHtml, fmtFecha
+  exigirRol, salir, menuUsuario, cierreInactividad, avatarHtml, fmtFecha
 } from './comun.js';
 import { montarEditorQuiz } from './editor-quiz.js';
 
@@ -31,17 +31,19 @@ function iniciar() {
     <aside class="lateral">
       <div class="marca">🛡 <span class="txt">Admin</span></div>
       <nav class="nav">${Object.entries(VISTAS).map(([k, v]) => `<button data-ir="${k}"><span class="ico">${v.ico}</span><span class="txt">${v.txt}</span></button>`).join('')}</nav>
-      <div class="pie"><a class="btn btn-sm btn-outline btn-block" href="profesor.html" style="margin-bottom:8px;">📚 Mis quizzes (panel profesor)</a>
-        <button class="btn btn-sm btn-ghost btn-block" id="bSalir">🚪 Salir</button></div>
     </aside>
     <main class="principal">
       <div class="cabecera"><h1 id="tituloVista"></h1>
-        <div class="usuario-chip">${avatarHtml(perfil.avatar, 'sm', '🛡')}<span>${esc(perfil.nombre || perfil.usuario)}</span><span class="badge red">Admin</span></div></div>
+        <button type="button" class="usuario-chip" id="chipPerfil" title="Mi cuenta">${avatarHtml(perfil.avatar, 'sm', '🛡')}<span class="nombre">${esc(perfil.nombre || perfil.usuario)}</span><span class="badge red extra">Admin</span><span class="flecha">▼</span></button></div>
       <div id="contenido"></div>
     </main></div>`;
   contenido = $('#contenido');
   $$('[data-ir]').forEach(b => b.onclick = () => ir(b.dataset.ir));
-  $('#bSalir').onclick = salir;
+  menuUsuario($('#chipPerfil'), [
+    { ico: '📚', txt: 'Mis quizzes (panel profesor)', id: 'profesor', accion: () => { location.href = 'profesor.html'; } },
+    'sep',
+    { ico: '🚪', txt: 'Cerrar sesión', id: 'salir', peligro: true, accion: salir }
+  ]);
   window.addEventListener('hashchange', enrutar);
   cierreInactividad(60);
   enrutar();

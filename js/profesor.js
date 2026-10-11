@@ -4,7 +4,7 @@
 import {
   supabase, $, $$, esc, toast, abrirModal, confirmar, pedirDatos, cargando, mensajeError, coincide,
   exigirRol, salir, cierreInactividad, avatarHtml, selectorAvatar, subirAvatar, AVATARES_PROFESOR,
-  urlBase, dibujarQR, mostrarQRGrande, copiar, fmtFecha, TIPOS, MODOS, textoNota, claseNota
+  urlBase, menuUsuario, dibujarQR, mostrarQRGrande, copiar, fmtFecha, TIPOS, MODOS, textoNota, claseNota
 } from './comun.js';
 import { descargarPlantilla, leerExcel, leerPegado, filaAPregunta, descargarErrores, descargarLibreta, descargarResultados } from './excel.js';
 import { montarEditorQuiz, montarListaPreguntas } from './editor-quiz.js';
@@ -32,23 +32,23 @@ function iniciar() {
       <div class="marca">📘 <span class="txt">QuizApp</span></div>
       <nav class="nav">${Object.entries(VISTAS).map(([k, v]) => `<button data-ir="${k}"><span class="ico">${v.ico}</span><span class="txt">${v.txt}</span></button>`).join('')}
         <button data-ir="perfil"><span class="ico">👤</span><span class="txt">Mi perfil</span></button></nav>
-      <div class="pie">
-        ${perfil.rol === 'admin' ? '<a class="btn btn-sm btn-outline btn-block" href="admin.html" style="margin-bottom:8px;">🛡 Panel admin</a>' : ''}
-        <button class="btn btn-sm btn-ghost btn-block" id="bSalir">🚪 Salir</button>
-      </div>
     </aside>
     <main class="principal">
       <div class="cabecera">
         <h1 id="tituloVista"></h1>
-        <div class="usuario-chip" id="chipPerfil" title="Mi perfil">${avatarHtml(perfil.avatar, 'sm', '👩‍🏫')}
-          <span>${esc(perfil.nombre || perfil.usuario)}</span>${perfil.institucion ? `<span class="small muted">· ${esc(perfil.institucion)}</span>` : ''}</div>
+        <button type="button" class="usuario-chip" id="chipPerfil" title="Mi cuenta">${avatarHtml(perfil.avatar, 'sm', '👩‍🏫')}
+          <span class="nombre">${esc(perfil.nombre || perfil.usuario)}</span>${perfil.institucion ? `<span class="small muted extra">· ${esc(perfil.institucion)}</span>` : ''}<span class="flecha">▼</span></button>
       </div>
       <div id="contenido"></div>
     </main></div>`;
   contenido = $('#contenido');
   $$('[data-ir]').forEach(b => b.onclick = () => ir(b.dataset.ir));
-  $('#chipPerfil').onclick = () => ir('perfil');
-  $('#bSalir').onclick = salir;
+  menuUsuario($('#chipPerfil'), [
+    { ico: '👤', txt: 'Mi perfil', id: 'perfil', accion: () => ir('perfil') },
+    ...(perfil.rol === 'admin' ? [{ ico: '🛡', txt: 'Panel admin', id: 'admin', accion: () => { location.href = 'admin.html'; } }] : []),
+    'sep',
+    { ico: '🚪', txt: 'Cerrar sesión', id: 'salir', peligro: true, accion: salir }
+  ]);
   window.addEventListener('hashchange', enrutar);
   cierreInactividad(90);
   enrutar();

@@ -208,3 +208,24 @@ img.zoom { max-width: 100%; border-radius: 12px; margin-bottom: 12px; cursor: zo
 .qr-grande .caja { background: #fff; border-radius: 22px; padding: 26px; text-align: center; max-width: 92vw; }
 .codigo-grande { font-family: 'Baloo 2'; font-size: 34px; font-weight: 800; letter-spacing: 4px; color: var(--primary-dark); }
 .stack > .check { display: flex; }
+
+/* ---------- Menú de la cuenta ---------- */
+.menu-ancla { position: relative; display: inline-flex; }
+.usuario-chip { font: inherit; font-weight: 800; color: var(--ink); max-width: 100%; }
+.usuario-chip .flecha { color: var(--muted); font-size: 11px; margin-left: 2px; }
+.usuario-chip .nombre { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+.menu-usuario { position: absolute; right: 0; top: calc(100% + 8px); background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 40px rgba(60,50,140,.18); min-width: 220px; padding: 6px; z-index: 300; animation: menuIn .12s ease-out; }
+.menu-usuario button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 12px; border: none; background: none; border-radius: 10px; font: inherit; font-weight: 800; color: var(--ink); cursor: pointer; text-align: left; }
+.menu-usuario button:hover, .menu-usuario button:focus-visible { background: var(--primary-light); color: var(--primary-dark); outline: none; }
+.menu-usuario button.peligro { color: var(--red); }
+.menu-usuario button.peligro:hover, .menu-usuario button.peligro:focus-visible { background: var(--red-bg); color: var(--red); }
+.menu-usuario .ico { width: 22px; text-align: center; }
+.menu-usuario hr { border: none; border-top: 1px solid var(--line); margin: 4px 6px; }
+@keyframes menuIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (max-width: 860px) {
+  .cabecera { flex-wrap: nowrap; }
+  .cabecera h1 { font-size: 20px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .usuario-chip .extra { display: none; }
+  .usuario-chip .nombre { max-width: 110px; }
+}
+@media (max-width: 420px) { .usuario-chip .nombre { display: none; } .usuario-chip { padding-right: 10px; } }

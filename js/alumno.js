@@ -3,7 +3,7 @@
 // ============================================================
 import {
   supabase, $, $$, esc, toast, abrirModal, confirmar, pedirDatos, cargando, mensajeError,
-  exigirRol, salir, cierreInactividad, avatarHtml, selectorAvatar, subirAvatar, AVATARES_ALUMNO,
+  exigirRol, salir, menuUsuario, cierreInactividad, avatarHtml, selectorAvatar, subirAvatar, AVATARES_ALUMNO,
   fmtFecha, MODOS, textoNota, claseNota, notaLiteral
 } from './comun.js';
 import { detenerMusica, alternarMusica, musicaActiva, vozActiva, alternarVoz, callar } from './juego.js';
@@ -50,8 +50,7 @@ async function inicio() {
       <div class="row" style="gap:6px; flex-wrap:nowrap;">
         <button class="btn btn-sm btn-outline btn-icon" id="bVoz" title="Leer preguntas en voz alta">${vozActiva() ? '🔊' : '🔈'}</button>
         <button class="btn btn-sm btn-outline btn-icon" id="bMusica" title="Música">${musicaActiva() ? '🎵' : '🔇'}</button>
-        <button class="btn btn-sm btn-outline btn-icon" id="bConfig" title="Mis grupos y cuenta">⚙️</button>
-        <button class="btn btn-sm btn-outline btn-icon" id="bSalir" title="Salir">🚪</button>
+        <button type="button" class="btn btn-sm btn-outline btn-icon" id="bCuenta" title="Mi cuenta" aria-label="Mi cuenta">☰</button>
       </div>
     </div>
     <a href="vivo.html" class="btn btn-amber btn-block" style="justify-content:space-between; padding:14px 18px; margin-bottom:16px;"><span>🏆 Unirme a un quiz en vivo</span><span>›</span></a>
@@ -70,11 +69,16 @@ async function inicio() {
         <span class="grow"><b>${esc(h.titulo)}</b><br><span class="small muted">${MODOS[h.modo].ico} ${MODOS[h.modo].nombre} · ${fmtFecha(h.finalizado_en, true)}</span></span>
         <span class="badge ${claseNota(h.nota)}" style="font-size:13px;">${textoNota(h.nota, h.escala)}</span></div>`).join('')}</div></details>` : ''}`;
 
-  $('#bSalir').onclick = salir;
+
   $('#bVoz').onclick = (e) => { e.currentTarget.textContent = alternarVoz() ? '🔊' : '🔈'; };
   $('#bMusica').onclick = (e) => { const a = alternarMusica(); detenerMusica(); e.currentTarget.textContent = a ? '🎵' : '🔇'; };
   $('#bAvatar').onclick = cambiarAvatar;
-  $('#bConfig').onclick = () => configuracion(grupos);
+  menuUsuario($('#bCuenta'), [
+    { ico: '🧑‍🎤', txt: 'Cambiar mi avatar', id: 'avatar', accion: cambiarAvatar },
+    { ico: '⚙️', txt: 'Mis grupos y cuenta', id: 'config', accion: () => configuracion(grupos) },
+    'sep',
+    { ico: '🚪', txt: 'Cerrar sesión', id: 'salir', peligro: true, accion: salir }
+  ]);
   $$('[data-grupo]').forEach(b => b.onclick = () => { filtroGrupo = b.dataset.grupo; inicio(); });
 
   const lista = $('#lista');
