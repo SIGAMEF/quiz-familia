@@ -2,215 +2,87 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>QuizApp</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Quiz Familia Marroquín</title>
+<meta name="description" content="Juegos para jugar en familia: sopa de letras, quiz, ahorcado, memorama, rompecabezas, ordena la frase y trivia bíblica.">
+<script>
+  // Los enlaces y QR antiguos de los grupos (index.html?grupo=...) siguen funcionando
+  if (/[?&]grupo=/.test(location.search)) location.replace('entrar.html' + location.search);
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Gochi+Hand&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/juegos.css">
+<link rel="stylesheet" href="css/portal.css">
 </head>
-<body class="centrado">
-<div class="hoja" id="app"><div class="center"><div class="spinner"></div></div></div>
+<body class="portal-fam">
+<header class="fam-cab">
+  <a class="fam-logo" href="index.html" aria-label="Quiz Familia Marroquín, inicio">
+    <span class="fam-logo-cara" id="logoCara" aria-hidden="true"></span>
+    <span class="fam-logo-txt"><span class="fam-quiz">Quiz Familia</span><span class="fam-apellido">Marroquín</span></span>
+  </a>
+  <p class="fam-lema">Juega, aprende y comparte en familia</p>
+  <nav class="fam-cuenta" id="acciones" aria-label="Cuenta">
+    <a class="fam-sesion" href="entrar.html"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4.2"/><path d="M3.5 21c.8-4.6 4.2-7 8.5-7s7.7 2.4 8.5 7z"/></svg><span>Iniciar sesión</span><b aria-hidden="true">›</b></a>
+  </nav>
+</header>
 
-<script type="module">
-import {
-  supabase, DOMINIO, $, esc, toast, sanitizarUsuario, mensajeError, iniciarSesion, miPerfil, paginaDeRol,
-  mostrarRestringido, selectorAvatar, subirAvatar, AVATARES_ALUMNO, AVATARES_PROFESOR, avatarHtml
-} from './js/comun.js';
+<main class="fam-main">
+  <section class="fam-bienvenida" aria-labelledby="tBien">
+    <div class="fam-escena" aria-hidden="true" id="escena"></div>
+    <div class="fam-canguro" aria-hidden="true" id="mascota"></div>
+    <div class="fam-letrero">
+      <span class="rama h1" aria-hidden="true">🌿</span><span class="rama h2" aria-hidden="true">🌿</span>
+      <h1 id="tBien">¡Bienvenidos!</h1>
+      <p>Elige un juego y disfruta con la familia.</p>
+    </div>
+    <ul class="fam-nota">
+      <li><span aria-hidden="true">👨‍👩‍👧‍👦</span>En equipo o en solitario</li>
+      <li><span aria-hidden="true">🧠</span>Diversión y aprendizaje</li>
+      <li><span aria-hidden="true">⭐</span>¡Participa y gana puntos!</li>
+    </ul>
+  </section>
 
-const app = $('#app');
-const params = new URLSearchParams(location.search);
-const codigoGrupo = (params.get('grupo') || '').trim().toUpperCase();
+  <section id="juegos" aria-label="Juegos">
+    <ul class="fam-tarjetas" id="tarjetas"></ul>
+  </section>
 
-async function irSegunPerfil(perfil) {
-  if (!perfil) return;
-  if (perfil.estado === 'restringido') { mostrarRestringido(perfil); return; }
-  location.href = paginaDeRol(perfil.rol);
-}
-
-async function init() {
-  let perfil = null;
-  try { perfil = await miPerfil(); } catch (e) { console.error(e); }
-
-  if (codigoGrupo) {
-    const { data: grupo } = await supabase.rpc('grupo_por_codigo', { p_codigo: codigoGrupo });
-    if (perfil && perfil.rol === 'alumno') return vistaUnirseConCuenta(grupo, perfil);
-    if (perfil) return irSegunPerfil(perfil);
-    return vistaRegistroAlumno(grupo);
-  }
-  if (perfil) return irSegunPerfil(perfil);
-  vistaLogin();
-}
-
-function hero(sub) {
-  return `<div class="hero"><div class="logo">🐸</div><h1>QuizApp</h1><p class="muted" style="font-weight:700;">${esc(sub)}</p></div>`;
-}
-
-// ---------------- Login ----------------
-function vistaLogin() {
-  app.innerHTML = `
-    ${hero('Aprende jugando')}
-    <form id="fLogin">
-      <label class="lbl">Usuario</label><input class="input" id="usuario" autocomplete="username" autocapitalize="none" placeholder="tu usuario">
-      <label class="lbl">Contraseña</label><input class="input" id="clave" type="password" autocomplete="current-password" placeholder="••••••••">
-      <button class="btn btn-primary btn-block" style="margin-top:16px;" id="bEntrar">🚀 Entrar</button>
-      <div class="err" id="err"></div>
-    </form>
-    <a class="btn btn-amber btn-block" href="vivo.html" style="margin-top:4px;">🏆 Unirme a un quiz en vivo</a>
-    <div style="border-top:1px solid var(--line); margin:18px 0 12px;"></div>
-    <p class="center muted small" style="font-weight:700; margin-bottom:8px;">¿No tienes cuenta?</p>
-    <div class="grid grid-2">
-      <button class="btn btn-outline" id="bProf">👩‍🏫 Soy profesor</button>
-      <button class="btn btn-outline" id="bAlu">🎒 Soy alumno</button>
-    </div>`;
-  $('#bProf').onclick = vistaRegistroProfesor;
-  $('#bAlu').onclick = () => vistaRegistroAlumno(null);
-  $('#fLogin').onsubmit = async (e) => {
-    e.preventDefault();
-    const btn = $('#bEntrar'); btn.disabled = true; $('#err').textContent = '';
-    try { await irSegunPerfil(await iniciarSesion($('#usuario').value, $('#clave').value)); }
-    catch (er) { $('#err').textContent = mensajeError(er); btn.disabled = false; }
-  };
-}
-
-// ---------------- Registro profesor ----------------
-function vistaRegistroProfesor() {
-  app.innerHTML = `
-    <button class="btn btn-ghost btn-sm" id="volver">← Volver</button>
-    <h1 style="margin:6px 0 2px;">Cuenta de profesor</h1>
-    <p class="muted" style="font-weight:600;">Crea tus quizzes, tus grupos y comparte el enlace con tus alumnos.</p>
-    <form id="f">
-      <label class="lbl">Institución *</label><input class="input" id="institucion" placeholder="Ej: IE San Martín de Porres" maxlength="120">
-      <div class="grid grid-2">
-        <div><label class="lbl">Tu nombre</label><input class="input" id="nombre" placeholder="Ej: Ana Torres" maxlength="60"></div>
-        <div><label class="lbl">Curso</label><input class="input" id="curso" placeholder="Ej: Ciencia y Tecnología" maxlength="60"></div>
+  <section id="mas" class="fam-mas" aria-labelledby="tMas">
+    <h2 id="tMas" class="rotulo-tabla">Más juegos</h2>
+    <div class="fam-mas-grid">
+      <div class="fam-mini" style="--c:#27AE60; --c2:#1E8449">
+        <span class="fam-mini-ico" aria-hidden="true">🔀</span>
+        <div><h3>Ordena la palabra</h3><p>Las letras están revueltas: ordénalas con la pista.</p></div>
+        <a class="fam-jugar" id="lnkOrdena" href="juegos.html?j=ordena">Jugar <b aria-hidden="true">›</b></a>
       </div>
-      <div class="grid grid-2">
-        <div><label class="lbl">Usuario *</label><input class="input" id="usuario" autocapitalize="none" placeholder="sin espacios" maxlength="30"></div>
-        <div><label class="lbl">Contraseña *</label><input class="input" id="clave" type="password" autocomplete="new-password" placeholder="mínimo 6"></div>
+      <form class="fam-mini" id="fPin" style="--c:#E5484D; --c2:#B42E33">
+        <span class="fam-mini-ico" aria-hidden="true">🏆</span>
+        <div><h3><label for="pin">Entrar con PIN</label></h3><p>Quiz en vivo o sala de juegos: escribe el PIN que te compartieron.</p>
+          <input id="pin" name="pin" inputmode="numeric" maxlength="6" placeholder="PIN" autocomplete="off">
+          <span class="err" id="errPin" aria-live="polite"></span></div>
+        <button class="fam-jugar" type="submit">Entrar <b aria-hidden="true">›</b></button>
+      </form>
+    </div>
+    <div class="tabla-juego biblioteca">
+      <div class="bib-cab">
+        <div><h3>Temas para jugar</h3><p>Elige un tema y el juego. Aquí también aparecerán los juegos que creen los profesores.</p></div>
+        <div class="segmento" id="filtro" role="group" aria-label="Filtrar por juego"></div>
       </div>
-      <p class="hint">El usuario solo puede tener letras, números, punto, guion o guion bajo.</p>
-      <label class="lbl">Avatar o foto (opcional)</label><div id="av"></div>
-      <button class="btn btn-primary btn-block" style="margin-top:16px;" id="bCrear">✨ Crear mi cuenta</button>
-      <div class="err" id="err"></div>
-    </form>`;
-  $('#volver').onclick = vistaLogin;
-  const av = selectorAvatar($('#av'), { emojis: AVATARES_PROFESOR });
-  $('#f').onsubmit = async (e) => {
-    e.preventDefault();
-    await registrar({
-      rol: 'profesor',
-      institucion: $('#institucion').value.trim(),
-      nombre: $('#nombre').value.trim(),
-      curso: $('#curso').value.trim()
-    }, av, (d) => !d.institucion ? 'La institución es obligatoria.' : null);
-  };
-}
+      <ul class="bib-lista" id="biblioteca"></ul>
+    </div>
+  </section>
+</main>
 
-// ---------------- Registro alumno ----------------
-function vistaRegistroAlumno(grupo) {
-  const conGrupo = !!(grupo && grupo.id);
-  app.innerHTML = `
-    ${conGrupo ? '' : '<button class="btn btn-ghost btn-sm" id="volver">← Volver</button>'}
-    ${conGrupo ? tarjetaGrupo(grupo) : `<h1 style="margin:6px 0 2px;">Cuenta de alumno</h1>
-      <p class="muted" style="font-weight:600;">Necesitas el código del grupo que te dio tu profesor (o abre el enlace/QR que te compartió).</p>`}
-    ${codigoGrupo && !conGrupo ? '<div class="feedback mal">El enlace del grupo no es válido. Pide a tu profesor uno nuevo.</div>' : ''}
-    ${conGrupo && !grupo.acepta_registros ? '<div class="feedback mal">Este grupo ya no acepta nuevos alumnos. Habla con tu profesor.</div>' : ''}
-    <form id="f" ${conGrupo && !grupo.acepta_registros ? 'class="hidden"' : ''}>
-      ${conGrupo ? '' : '<label class="lbl">Código del grupo *</label><input class="input" id="codigo" placeholder="Ej: K7P2QX9M" maxlength="12" style="text-transform:uppercase;">'}
-      <label class="lbl">Tu nombre y apellido *</label><input class="input" id="nombre" placeholder="Ej: Lucas Pérez" maxlength="60">
-      <div class="grid grid-2">
-        <div><label class="lbl">Usuario *</label><input class="input" id="usuario" autocapitalize="none" placeholder="sin espacios" maxlength="30"></div>
-        <div><label class="lbl">Contraseña *</label><input class="input" id="clave" type="password" autocomplete="new-password" placeholder="mínimo 6"></div>
-      </div>
-      <label class="lbl">Elige tu avatar o sube una foto</label><div id="av"></div>
-      <button class="btn btn-primary btn-block" style="margin-top:16px;" id="bCrear">✨ Crear mi cuenta</button>
-      <div class="err" id="err"></div>
-    </form>
-    <p class="center small" style="margin-top:12px;"><a href="index.html">¿Ya tienes cuenta? Inicia sesión</a></p>`;
-  if (!conGrupo) $('#volver').onclick = vistaLogin;
-  const av = selectorAvatar($('#av'), { emojis: AVATARES_ALUMNO });
-  $('#f').onsubmit = async (e) => {
-    e.preventDefault();
-    const codigo = conGrupo ? codigoGrupo : ($('#codigo').value || '').trim().toUpperCase();
-    await registrar({ rol: 'alumno', nombre: $('#nombre').value.trim(), codigo_grupo: codigo },
-      av, async (d) => {
-        if (!d.nombre) return 'Escribe tu nombre.';
-        if (!codigo) return 'Escribe el código del grupo.';
-        if (!conGrupo) {
-          const { data: g } = await supabase.rpc('grupo_por_codigo', { p_codigo: codigo });
-          if (!g) return 'Ese código de grupo no existe.';
-          if (!g.acepta_registros) return 'Ese grupo ya no acepta nuevos alumnos.';
-        }
-        return null;
-      });
-  };
-}
-
-function tarjetaGrupo(g) {
-  return `<div class="card" style="background:var(--primary-soft); border:none; box-shadow:none; margin-bottom:6px;">
-    <div class="row">${avatarHtml(g.avatar_profesor, 'lg', '👩‍🏫')}
-      <div class="grow"><p class="small muted" style="font-weight:800;">TE INVITA A SU GRUPO</p>
-        <h2>${esc(g.nombre)}</h2>
-        <p style="font-weight:700;">${esc(g.profesor)}${g.curso ? ' · ' + esc(g.curso) : ''}</p>
-        <p class="small muted" style="font-weight:700;">🏫 ${esc(g.institucion || '')}</p></div></div></div>`;
-}
-
-function vistaUnirseConCuenta(grupo, perfil) {
-  app.innerHTML = grupo ? `${tarjetaGrupo(grupo)}
-    <p style="font-weight:700; margin:10px 0;">Ya tienes sesión como <b>${esc(perfil.nombre || perfil.usuario)}</b>.</p>
-    <button class="btn btn-primary btn-block" id="unir">Unirme a este grupo</button>
-    <button class="btn btn-ghost btn-block" id="ir">Ir a mis quizzes</button><div class="err" id="err"></div>`
-    : `<div class="feedback mal">El enlace del grupo no es válido.</div><button class="btn btn-primary btn-block" id="ir">Ir a mis quizzes</button>`;
-  $('#ir').onclick = () => location.href = 'alumno.html';
-  if (grupo) $('#unir').onclick = async () => {
-    const { error } = await supabase.rpc('unirme_a_grupo', { p_codigo: codigoGrupo });
-    if (error) { $('#err').textContent = mensajeError(error); return; }
-    toast('¡Te uniste al grupo!');
-    setTimeout(() => location.href = 'alumno.html', 700);
-  };
-}
-
-// ---------------- Registro común ----------------
-async function registrar(datos, av, validar) {
-  const err = $('#err'), btn = $('#bCrear');
-  err.textContent = '';
-  const usuario = sanitizarUsuario($('#usuario').value);
-  const clave = $('#clave').value;
-  if (usuario.length < 3) { err.textContent = 'El usuario debe tener al menos 3 caracteres (letras, números, . _ -).'; return; }
-  if (clave.length < 6) { err.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
-  const problema = await validar(datos);
-  if (problema) { err.textContent = problema; return; }
-
-  btn.disabled = true; btn.textContent = 'Creando cuenta...';
-  try {
-    const { data: libre, error: e0 } = await supabase.rpc('usuario_disponible', { p_usuario: usuario });
-    if (e0) throw e0;
-    if (!libre) throw new Error('Ese usuario ya está en uso. Prueba con otro.');
-
-    const meta = { ...datos, usuario, avatar: av.archivo() ? '' : av.valor() };
-    const { data, error } = await supabase.auth.signUp({ email: `${usuario}@${DOMINIO}`, password: clave, options: { data: meta } });
-    if (error) throw error;
-    if (!data.session) {
-      // Si Supabase pide confirmar correo, intentamos entrar directo
-      const { error: e2 } = await supabase.auth.signInWithPassword({ email: `${usuario}@${DOMINIO}`, password: clave });
-      if (e2) throw new Error('Cuenta creada, pero el proyecto pide confirmar el correo. Avisa al administrador.');
-    }
-    if (av.archivo()) {
-      try {
-        const url = await subirAvatar(av.archivo(), data.user.id);
-        await supabase.from('perfiles').update({ avatar: url }).eq('id', data.user.id);
-      } catch (e) { console.warn('No se pudo subir la foto', e); }
-    }
-    toast('¡Cuenta creada!');
-    location.href = paginaDeRol(datos.rol);
-  } catch (e) {
-    err.textContent = mensajeError(e);
-    btn.disabled = false; btn.textContent = '✨ Crear mi cuenta';
-  }
-}
-
-init();
-</script>
+<footer class="fam-pie">
+  <ul>
+    <li><span aria-hidden="true">💙</span>Para toda la familia</li>
+    <li><span aria-hidden="true">👥</span>Juega con primos y amigos</li>
+    <li><span aria-hidden="true">🏆</span>Suma puntos y gana</li>
+    <li><span aria-hidden="true">😊</span>¡Diviértete!</li>
+  </ul>
+  <p>¿Eres profesor? <a href="entrar.html?modo=profesor">Crea tu cuenta</a> para armar tus propios juegos y quizzes.</p>
+</footer>
+<script type="module" src="js/portal.js"></script>
 </body>
 </html>

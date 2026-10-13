@@ -245,7 +245,7 @@ export function paginaDeRol(rol) {
 export async function exigirRol(roles) {
   let perfil = null;
   try { perfil = await miPerfil(); } catch (e) { console.error(e); }
-  if (!perfil) { location.href = 'index.html'; return null; }
+  if (!perfil) { location.href = 'entrar.html'; return null; }
   if (perfil.estado === 'restringido') { mostrarRestringido(perfil); return null; }
   if (!roles.includes(perfil.rol)) { location.href = paginaDeRol(perfil.rol); return null; }
   vigilarCambioDeSesion(perfil.id);

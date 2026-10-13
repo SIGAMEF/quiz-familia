@@ -74,7 +74,11 @@ function pantallaPin(error = '') {
     const pin = $('#pin').value.trim();
     if (pin.length !== 6) return pantallaPin('El PIN tiene 6 números.');
     const s = await rpc('vivo_por_codigo', { p_codigo: pin }).catch(() => null);
-    if (!s) return pantallaPin('No hay ninguna sesión abierta con ese PIN.');
+    if (!s) {
+      const sala = await rpc('sala_por_codigo', { p_codigo: pin }).catch(() => null);   // ¿es una sala de juegos?
+      if (sala) { location.href = `juegos.html?sala=${pin}`; return; }
+      return pantallaPin('No hay ninguna sesión abierta con ese PIN.');
+    }
     history.replaceState(null, '', `vivo.html?s=${s.id}`);
     entrarSesion(s.id);
   };
@@ -368,7 +372,7 @@ async function control(id) {
   limpiar();
   let perfil = null;
   try { perfil = await miPerfil(); } catch { }
-  if (!perfil || !['profesor', 'admin'].includes(perfil.rol)) { location.href = 'index.html'; return; }
+  if (!perfil || !['profesor', 'admin'].includes(perfil.rol)) { location.href = 'entrar.html'; return; }
   const s = await leerSesion(id);
   if (!s || (s.profesor_id !== perfil.id && perfil.rol !== 'admin')) {
     app.innerHTML = '<div class="center"><h2>No se encontró la sesión</h2><a class="btn btn-primary" href="profesor.html#vivo" style="margin-top:10px;">Volver al panel</a></div>'; return;
@@ -547,5 +551,12 @@ async function refrescarStats() {
 // =====================================================================
 if (params.get('control')) control(params.get('control'));
 else if (params.get('s')) entrarSesion(params.get('s'));
-else if (params.get('pin')) { const pin = params.get('pin'); rpc('vivo_por_codigo', { p_codigo: pin }).then(s => s ? entrarSesion(s.id) : pantallaPin('PIN no válido')).catch(() => pantallaPin()); }
+else if (params.get('pin')) {
+  const pin = params.get('pin');
+  rpc('vivo_por_codigo', { p_codigo: pin }).then(async s => {
+    if (s) return entrarSesion(s.id);
+    const sala = await rpc('sala_por_codigo', { p_codigo: pin }).catch(() => null);
+    if (sala) location.href = `juegos.html?sala=${pin}`; else pantallaPin('PIN no válido');
+  }).catch(() => pantallaPin());
+}
 else pantallaPin();

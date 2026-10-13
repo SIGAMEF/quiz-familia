@@ -17,6 +17,7 @@ const VISTAS = {
   instituciones: { ico: '🏫', txt: 'Instituciones' },
   alumnos: { ico: '🎒', txt: 'Alumnos' },
   quizzes: { ico: '📚', txt: 'Quizzes' },
+  publicos: { ico: '🌐', txt: 'Juegos públicos' },
   periodos: { ico: '📅', txt: 'Periodos' }
 };
 const MENSAJE_DEFECTO = 'Tu cuenta fue restringida. Comunícate con el administrador de QuizApp.';
@@ -55,8 +56,31 @@ function enrutar() {
   $$('[data-ir]').forEach(b => b.classList.toggle('activo', b.dataset.ir === clave));
   $('#tituloVista').textContent = vista === 'quiz' ? 'Editar quiz' : (VISTAS[vista]?.txt || 'Resumen');
   window.scrollTo(0, 0);
-  const v = { inicio: vInicio, profesores: vProfesores, instituciones: vInstituciones, alumnos: vAlumnos, quizzes: vQuizzes, quiz: vQuiz, periodos: vPeriodos };
+  const v = { inicio: vInicio, profesores: vProfesores, instituciones: vInstituciones, alumnos: vAlumnos, quizzes: vQuizzes, quiz: vQuiz, periodos: vPeriodos, publicos: vPublicos };
   (v[vista] || vInicio)(param ? decodeURIComponent(param) : '');
+}
+
+// ======================= JUEGOS PÚBLICOS =======================
+const ICO_TIPO = { sopa: '🔎', ahorcado: '🦘', memoria: '🃏', ordena: '🔀', frase: '🔤', rompecabezas: '🧩', quiz: '📝' };
+async function vPublicos() {
+  spinner();
+  let lista;
+  try { lista = await rpc('admin_juegos'); } catch (e) { return falla(e); }
+  contenido.innerHTML = `<div class="card"><h2>🌐 Lo que se ve en la página principal</h2>
+    <p class="sub">Juegos y quizzes que los profesores marcaron como públicos. Puedes quitarlos de la página si no corresponden.</p>
+    ${lista.length ? `<div class="tabla-wrap"><table class="tabla"><thead><tr><th>Juego</th><th>Autor</th><th>Elementos</th><th>Jugadas</th><th>Público</th><th></th></tr></thead><tbody>
+    ${lista.map(j => `<tr data-k="${j.clase}:${j.id}"><td>${ICO_TIPO[j.tipo] || '🎲'} <b>${esc(j.titulo)}</b><br><span class="small muted">${esc(j.tipo)}${j.tema ? ' · ' + esc(j.tema) : ''}</span></td>
+      <td>${esc(j.autor)}</td><td>${j.n}</td><td>${j.jugadas}</td>
+      <td>${j.publico ? '<span class="badge green">Sí</span>' : '<span class="badge gray">No</span>'}</td>
+      <td><div class="row" style="gap:4px; flex-wrap:nowrap;"><a class="btn btn-sm" target="_blank" rel="noopener" href="juegos.html?${j.clase === 'quiz' ? 'q' : 'g'}=${j.id}">▶</a>
+        ${j.publico ? '<button class="btn btn-sm btn-red" data-quitar>Quitar de públicos</button>' : ''}</div></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Todavía nadie compartió juegos públicos.</div>'}</div>`;
+  $$('[data-quitar]', contenido).forEach(b => b.onclick = async () => {
+    const [clase, id] = b.closest('[data-k]').dataset.k.split(':');
+    if (!await confirmar('Dejará de aparecer en la página principal. El profesor lo conserva en su panel.', { titulo: '¿Quitar de públicos?', boton: 'Quitar' })) return;
+    const { error } = await supabase.from(clase === 'quiz' ? 'quizzes' : 'juegos').update({ publico: false }).eq('id', id);
+    if (error) return toast(mensajeError(error), 'error');
+    toast('Quitado de la página principal'); vPublicos();
+  });
 }
 
 // ======================= RESUMEN =======================

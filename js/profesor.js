@@ -8,6 +8,8 @@ import {
 } from './comun.js';
 import { descargarPlantilla, leerExcel, leerPegado, filaAPregunta, descargarErrores, descargarLibreta, descargarResultados } from './excel.js';
 import { montarEditorQuiz, montarListaPreguntas } from './editor-quiz.js';
+import { vistaJuegos } from './editor-juegos.js';
+import { imprimir } from './juegos/imprimir.js';
 
 const raiz = $('#raiz');
 let perfil = null;
@@ -15,6 +17,7 @@ let perfil = null;
 const VISTAS = {
   inicio: { ico: '🏠', txt: 'Inicio' },
   quizzes: { ico: '📚', txt: 'Mis quizzes' },
+  juegos: { ico: '🎲', txt: 'Mis juegos' },
   carga: { ico: '📥', txt: 'Carga masiva' },
   banco: { ico: '🔎', txt: 'Todas mis preguntas' },
   grupos: { ico: '👥', txt: 'Grupos y alumnos' },
@@ -63,7 +66,7 @@ function enrutar() {
   const titulos = { ...Object.fromEntries(Object.entries(VISTAS).map(([k, v]) => [k, v.txt])), perfil: 'Mi perfil', quiz: 'Editar quiz' };
   $('#tituloVista').textContent = titulos[vista] || 'Inicio';
   window.scrollTo(0, 0);
-  const vistas = { inicio: vInicio, quizzes: vQuizzes, quiz: vQuiz, banco: vBanco, carga: vCarga, grupos: vGrupos, publicar: vPublicar, vivo: vVivo, libreta: vLibreta, perfil: vPerfil };
+  const vistas = { inicio: vInicio, quizzes: vQuizzes, juegos: () => vistaJuegos(contenido, { rpc, misGrupos }), quiz: vQuiz, banco: vBanco, carga: vCarga, grupos: vGrupos, publicar: vPublicar, vivo: vVivo, libreta: vLibreta, perfil: vPerfil };
   (vistas[vista] || vInicio)(param ? decodeURIComponent(param) : '');
 }
 
@@ -79,7 +82,7 @@ async function periodos() {
   if (!periodosCache) { const { data } = await supabase.from('periodos').select('id, numero, nombre').order('numero'); periodosCache = data || []; }
   return periodosCache;
 }
-function enlaceGrupo(g) { return `${urlBase()}index.html?grupo=${g.codigo_invitacion}`; }
+function enlaceGrupo(g) { return `${urlBase()}entrar.html?grupo=${g.codigo_invitacion}`; }
 function falla(e) { console.error(e); contenido.innerHTML = `<div class="card empty"><span class="big">⚠️</span>${esc(mensajeError(e))}<br><button class="btn btn-sm" style="margin-top:10px;" onclick="location.reload()">Reintentar</button></div>`; }
 
 // ======================= INICIO =======================
@@ -154,16 +157,26 @@ async function vQuizzes() {
         <div class="row between" style="align-items:flex-start;"><h3 class="grow">${esc(q.titulo)}</h3>${q.tema ? `<span class="badge">${esc(q.tema)}</span>` : ''}</div>
         <p class="small muted" style="font-weight:700; margin:4px 0 8px;">${q.n_preguntas} preguntas · ${q.puntos} pts · ${q.n_publicaciones ? `📣 publicado ${q.n_publicaciones === 1 ? '1 vez' : q.n_publicaciones + ' veces'}` : 'sin publicar'}</p>
         ${(q.subtemas || []).length ? `<div class="chips" style="margin-bottom:8px;">${q.subtemas.slice(0, 5).map(s => `<span class="badge gray">${esc(s)}</span>`).join('')}${q.subtemas.length > 5 ? `<span class="badge gray">+${q.subtemas.length - 5}</span>` : ''}</div>` : ''}
+        <label class="chip check" style="align-self:flex-start; margin-bottom:6px;" title="Aparece en la página principal; se juega sin ver las respuestas"><input type="checkbox" data-publico="${q.id}" ${q.publico ? 'checked' : ''}> 🌐 Público</label>
         <p class="small muted" style="margin-top:auto;">Editado ${fmtFecha(q.updated_at, true)}</p>
         <div class="row" style="gap:6px; margin-top:10px;">
           <button class="btn btn-sm btn-primary" data-acc="editar" data-id="${q.id}">✏️ Editar</button>
           <button class="btn btn-sm btn-green" data-acc="publicar" data-id="${q.id}">📣 Publicar</button>
           <button class="btn btn-sm btn-amber" data-acc="vivo" data-id="${q.id}">🏆 En vivo</button>
           <button class="btn btn-sm" data-acc="duplicar" data-id="${q.id}" title="Duplicar">⧉</button>
+          <button class="btn btn-sm" data-acc="ficha" data-id="${q.id}" title="Imprimir ficha">🖨</button>
+          <button class="btn btn-sm" data-acc="solucion" data-id="${q.id}" title="Imprimir solución">🖨✔</button>
           <button class="btn btn-sm btn-red" data-acc="eliminar" data-id="${q.id}" title="Eliminar">🗑</button>
         </div>
       </div>`).join('') || `<div class="empty card" style="grid-column:1/-1;"><span class="big">📚</span>${quizzes.length ? 'Ningún quiz coincide.' : 'Todavía no tienes quizzes. Crea uno a mano o súbelos desde Excel.'}</div>`;
     $$('[data-acc]', lista).forEach(b => b.onclick = () => accionQuiz(b.dataset.acc, quizzes.find(q => q.id === b.dataset.id)));
+    $$('[data-publico]', lista).forEach(c => c.onchange = async () => {
+      const q = quizzes.find(x => x.id === c.dataset.publico);
+      if (c.checked && q.n_publicaciones && !await confirmar('Al hacerlo público, cualquiera podrá jugarlo y conocer las preguntas (las respuestas no se muestran antes de responder).\nSi lo usas como examen, mejor haz una copia para compartir.', { titulo: '¿Hacer público este quiz?', boton: 'Hacer público', peligro: false })) { c.checked = false; return; }
+      const { error } = await supabase.from('quizzes').update({ publico: c.checked }).eq('id', q.id);
+      if (error) { c.checked = !c.checked; return toast(mensajeError(error), 'error'); }
+      q.publico = c.checked; toast(q.publico ? 'Ahora aparece en la página principal' : 'Ya no es público');
+    });
   };
   $('[data-buscar]', contenido).oninput = pintar;
   $('[data-tema]', contenido).onchange = pintar;
@@ -172,6 +185,11 @@ async function vQuizzes() {
 
 async function accionQuiz(acc, q) {
   if (acc === 'editar') return ir('quiz', q.id);
+  if (acc === 'ficha' || acc === 'solucion') {
+    try { const preguntas = await rpc('preguntas_de_quiz', { p_quiz: q.id }); await imprimir('quiz', { titulo: q.titulo, tema: q.tema, preguntas }, { solucion: acc === 'solucion' }); }
+    catch (e) { toast(mensajeError(e), 'error'); }
+    return;
+  }
   if (acc === 'publicar') return ir('publicar', q.id);
   if (acc === 'vivo') return ir('vivo', q.id);
   if (acc === 'duplicar') {

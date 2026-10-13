@@ -13,8 +13,10 @@ Ejecuta **`05_parche_paneles.sql`** (incluido en este zip). Si ya ejecutaste una
 ## 3. Páginas
 | Página | Para quién |
 |---|---|
-| `index.html` | Login de todos, registro de profesores y de alumnos (con el enlace o código del grupo) |
-| `profesor.html` | Quizzes, carga masiva, grupos con QR, publicar, en vivo, libreta |
+| `index.html` | Portal "Quiz Familia Marroquín": 8 juegos sin cuenta (sopa, quiz, ahorcado, memorama, rompecabezas, ordena la frase, trivia bíblica, ordena la palabra), PIN del vivo e Iniciar sesión |
+| `entrar.html` | Login de todos, registro de profesores y de alumnos (con el enlace o código del grupo). Los enlaces antiguos `index.html?grupo=` se redirigen aquí |
+| `juegos.html` | Los juegos libres (`?j=ahorcado&s=animales`) |
+| `profesor.html` | Quizzes (con opción de hacerlos públicos e imprimirlos), Mis juegos (sopa, ahorcado, memorama, ordena, frase, rompecabezas: crear, generar, publicar en grupos, hacer públicos, imprimir ficha y solución), carga masiva, grupos con QR, publicar, en vivo, libreta |
 | `alumno.html` | Quizzes asignados, práctica / examen / estudio, historial, mis grupos |
 | `jugar.html` | Enlace / QR de una publicación: el alumno del grupo entra con su cuenta; si el profesor lo permite, cualquiera lo resuelve como invitado |
 | `vivo.html` | Quiz en vivo: participantes con PIN, enlace o QR (con cuenta o como invitado) y control del profesor |
