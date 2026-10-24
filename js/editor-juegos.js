@@ -3,7 +3,7 @@
 // generarlos, publicarlos en grupos e imprimirlos. La lista está en "Mis actividades" (profesor.js).
 // ============================================================
 import {
-  supabase, $, $$, esc, toast, abrirModal, confirmar, cargando, mensajeError, fmtFecha,
+  supabase, $, $$, esc, htmlMenuMas, toast, abrirModal, confirmar, cargando, mensajeError, fmtFecha,
   subirImagen, urlBase, copiar, mostrarQRGrande, avatarHtml
 } from './comun.js';
 import { JUEGOS } from './juegos/contenido.js';
@@ -48,25 +48,20 @@ const tipoImpresion = (t) => ['trivia', 'relampago'].includes(t) ? 'quiz' : t;  
 // La visibilidad (privado, grupos, público, destacado) la pinta "Mis actividades" en [data-visibilidad]
 export function htmlTarjetaJuego(j) {
   const info = infoTipo(j.tipo);
-  return `<div class="card act-card" data-j="${j.id}" style="margin:0; display:flex; flex-direction:column;">
-      <div class="row" style="align-items:flex-start; flex-wrap:nowrap;"><span class="act-ico" style="--c:${info.color || '#8E86AC'}" title="${esc(info.nombre)}">${info.ico}</span>
-        <div class="grow"><h3>${esc(j.titulo)}</h3><p class="small muted" style="font-weight:700;">${esc(info.nombre)}${j.tema ? ' · ' + esc(j.tema) : ''} · ${j.n} ${UNIDAD[j.tipo] || 'palabras'}</p></div></div>
-      <div class="row" style="gap:6px; margin:8px 0;">
-        <span data-visibilidad></span>
-        ${j.publico ? `<span class="badge gray">▶ ${j.jugadas} jugadas</span>` : ''}
-        ${j.publicaciones.map(p => `<span class="badge ${p.activo ? 'green' : 'gray'}">👥 ${esc(p.grupo)}${p.jugaron ? ` · ${p.jugaron} jugaron` : ''}</span>`).join('')}
-      </div>
-      <p class="small muted" style="margin-top:auto;">Editado ${fmtFecha(j.updated_at, true)}</p>
-      <div class="row" style="gap:6px; margin-top:10px;">
-        <a class="btn btn-sm btn-primary" href="juegos.html?g=${j.id}" target="_blank" rel="noopener">▶ Jugar</a>
-        <button class="btn btn-sm" data-acc="editar">✏️ Editar</button>
-        <button class="btn btn-sm btn-green" data-acc="publicar">📣 Grupos</button>
-        <button class="btn btn-sm" data-acc="resultados" title="Quién jugó">📊</button>
-        <button class="btn btn-sm" data-acc="enlace" title="Enlace y QR">📱</button>
-        <button class="btn btn-sm" data-acc="ficha" title="Imprimir ficha">🖨</button>
-        <button class="btn btn-sm" data-acc="solucion" title="Imprimir solución">🖨✔</button>
-        <button class="btn btn-sm btn-red" data-acc="eliminar" title="Eliminar">🗑</button>
-      </div>
+  const pubs = j.publicaciones.filter(p => p.activo);
+  return `<div class="card act-card" data-j="${j.id}">
+      <div class="act-cab"><span class="act-ico" style="--c:${info.color || '#8E86AC'}" title="${esc(info.nombre)}">${info.ico}</span>
+        <div class="grow"><h3 title="${esc(j.titulo)}">${esc(j.titulo)}</h3>
+          <p class="act-meta">${esc(info.nombre)} · ${j.n} ${UNIDAD[j.tipo] || 'palabras'}${j.publico ? ` · ▶ ${j.jugadas} jugadas` : ''}</p></div></div>
+      ${j.tema || pubs.length ? `<div class="act-chips" title="${esc(pubs.map(p => `${p.grupo}${p.jugaron ? ` (${p.jugaron} jugaron)` : ''}`).join(' · '))}">${j.tema ? `<span class="badge">${esc(j.tema)}</span>` : ''}${pubs.length ? `<span class="badge green">👥 ${pubs.length === 1 ? esc(pubs[0].grupo) : pubs.length + ' grupos'}</span>` : ''}</div>` : ''}
+      <div class="vis-fila" data-visibilidad></div>
+      <div class="act-pie"><span class="act-fecha">Editado ${fmtFecha(j.updated_at, true)}</span>
+        <div class="act-acciones">
+          <a class="btn btn-sm btn-primary" href="juegos.html?g=${j.id}" target="_blank" rel="noopener">▶ Jugar</a>
+          <button class="btn btn-sm" data-acc="editar">✏️ Editar</button>
+          <button class="btn btn-sm btn-green" data-acc="publicar">📣 Grupos</button>
+          ${htmlMenuMas([['data-acc="resultados"', '📊', 'Quién jugó'], ['data-acc="enlace"', '📱', 'Enlace y QR'], ['data-acc="ficha"', '🖨', 'Imprimir ficha'], ['data-acc="solucion"', '✔', 'Imprimir solución'], 'sep', ['data-acc="eliminar"', '🗑', 'Eliminar', true]])}
+        </div></div>
     </div>`;
 }
 

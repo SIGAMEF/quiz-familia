@@ -19,17 +19,18 @@ create table if not exists public.proyecto_hojas (
   proyecto_id uuid not null references public.proyectos(id) on delete cascade,
   orden       int not null default 0,
   tipo        text not null default 'contenido'
-              check (tipo in ('contenido','pregunta','vf','opcion','completar','lluvia','agrupar','ruleta','juego')),
+              check (tipo in ('contenido','pregunta','vf','opcion','completar','lluvia','agrupar','ruleta','juego','unirse')),
   diseno      jsonb not null default '{}'::jsonb,   -- fondo + elementos (posiciones en % del lienzo)
   config      jsonb not null default '{}'::jsonb,   -- configuración propia del tipo de hoja
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
 create index if not exists proyecto_hojas_proyecto_idx on public.proyecto_hojas (proyecto_id, orden);
--- (si la tabla ya existía, se actualizan los tipos permitidos: "juego" es una hoja con un juego de Mis actividades)
+-- (si la tabla ya existía, se actualizan los tipos permitidos: "juego" es una hoja con un juego de Mis actividades
+--  y "unirse" es el registro de participantes, como en Agrupar pero sin formar grupos)
 alter table public.proyecto_hojas drop constraint if exists proyecto_hojas_tipo_check;
 alter table public.proyecto_hojas add constraint proyecto_hojas_tipo_check
-  check (tipo in ('contenido','pregunta','vf','opcion','completar','lluvia','agrupar','ruleta','juego'));
+  check (tipo in ('contenido','pregunta','vf','opcion','completar','lluvia','agrupar','ruleta','juego','unirse'));
 
 -- Permisos fila por fila: se leen y borran con la tabla; se crean y guardan con las funciones de abajo
 -- Visibilidad (Mis actividades): público = en la biblioteca de la portada; destacado = en la fila "Creado por nuestros profesores"
@@ -105,7 +106,7 @@ begin
     exception when others then raise exception 'La hoja % no tiene un id válido', i; end;
     if v_id is null then raise exception 'La hoja % no tiene id', i; end if;
     if v_id = any(v_ids) then raise exception 'La hoja % está repetida', i; end if;
-    if coalesce(h->>'tipo', '') not in ('contenido','pregunta','vf','opcion','completar','lluvia','agrupar','ruleta','juego') then
+    if coalesce(h->>'tipo', '') not in ('contenido','pregunta','vf','opcion','completar','lluvia','agrupar','ruleta','juego','unirse') then
       raise exception 'La hoja % tiene un tipo no válido', i;
     end if;
     if jsonb_typeof(coalesce(h->'diseno', '{}')) <> 'object' or jsonb_typeof(coalesce(h->'config', '{}')) <> 'object' then
@@ -1120,11 +1121,11 @@ begin
     'proyecto', jsonb_build_object('id', v_proy.id, 'nombre', v_proy.nombre),
     'intento', jsonb_build_object('id', v_int.id, 'token', case when v_int.alumno_id is null then v_int.token end, 'alias', v_int.alias, 'avatar', v_int.avatar,
                                   'hoja_actual', v_int.hoja_actual, 'respuestas', v_int.respuestas, 'juegos', v_int.juegos, 'completado', v_int.completado),
-    -- las hojas en vivo (Agrupar y Ruleta) no van; las respuestas correctas, solo las ya respondidas
+    -- las hojas en vivo (Unirse, Agrupar y Ruleta) no van; las respuestas correctas, solo las ya respondidas
     'hojas', (select coalesce(jsonb_agg(jsonb_build_object('id', h.id, 'tipo', h.tipo, 'diseno', h.diseno,
                 'config', case when v_int.respuestas ? h.id::text then h.config else _config_publica(h, false) end)
               order by h.orden, h.created_at), '[]'::jsonb)
-              from proyecto_hojas h where h.proyecto_id = v_proy.id and h.tipo not in ('agrupar','ruleta')));
+              from proyecto_hojas h where h.proyecto_id = v_proy.id and h.tipo not in ('agrupar','ruleta','unirse')));
 end $$;
 
 -- Responder una hoja (una vez) o guardar el puntaje de un juego (se queda el mejor). Devuelve la corrección.
@@ -1170,7 +1171,7 @@ create or replace function public.mis_proyectos_alumno() returns jsonb
 language sql stable security definer set search_path = public as $$
   select coalesce(jsonb_agg(jsonb_build_object('publicacion_id', pp.id, 'titulo', p.nombre, 'grupo', g.nombre,
       'profesor', coalesce(pf.nombre, pf.usuario),
-      'hojas', (select count(*) from proyecto_hojas h where h.proyecto_id = p.id and h.tipo not in ('agrupar','ruleta')),
+      'hojas', (select count(*) from proyecto_hojas h where h.proyecto_id = p.id and h.tipo not in ('agrupar','ruleta','unirse')),
       'hoja_actual', i.hoja_actual, 'completado', coalesce(i.completado, false), 'empezado', i.id is not null)
     order by i.completado nulls first, pp.created_at desc), '[]'::jsonb)
   from proyecto_publicaciones pp join proyectos p on p.id = pp.proyecto_id join grupos g on g.id = pp.grupo_id

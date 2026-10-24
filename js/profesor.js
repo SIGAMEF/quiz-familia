@@ -4,7 +4,7 @@
 import {
   supabase, $, $$, esc, toast, abrirModal, confirmar, pedirDatos, cargando, mensajeError, coincide,
   exigirRol, salir, cierreInactividad, avatarHtml, selectorAvatar, subirAvatar, AVATARES_PROFESOR,
-  urlBase, menuUsuario, dibujarQR, mostrarQRGrande, copiar, fmtFecha, TIPOS, MODOS, textoNota, claseNota
+  urlBase, menuUsuario, htmlMenuMas, dibujarQR, mostrarQRGrande, copiar, fmtFecha, TIPOS, MODOS, textoNota, claseNota
 } from './comun.js';
 import { descargarPlantilla, leerExcel, leerPegado, filaAPregunta, descargarErrores, descargarLibreta, descargarResultados } from './excel.js';
 import { montarEditorQuiz, montarListaPreguntas } from './editor-quiz.js';
@@ -12,6 +12,7 @@ import { htmlTarjetaJuego, conectarTarjetaJuego, abrirEditor, publicarJuego } fr
 import { JUEGOS } from './juegos/contenido.js';
 import { elegirActividad } from './catalogo.js';
 import { pintarVisibilidad, chipsFiltro } from './visibilidad.js';
+import { vistaConsumo } from './consumo.js';
 import { imprimir } from './juegos/imprimir.js';
 import { htmlTarjetaProyecto, conectarTarjetaProyecto, crearProyecto, publicarProyecto } from './proyectos/lista.js';
 
@@ -33,6 +34,7 @@ let contenido;
 let periodosCache = null;
 
 function iniciar() {
+  if (perfil.rol === 'admin') VISTAS.consumo = { ico: '📊', txt: 'Consumo' };   // cuota de Supabase: solo el administrador
   raiz.innerHTML = `<div class="app">
     <aside class="lateral">
       <div class="marca">📘 <span class="txt">QuizApp</span></div>
@@ -69,7 +71,7 @@ function enrutar() {
   const titulos = { ...Object.fromEntries(Object.entries(VISTAS).map(([k, v]) => [k, v.txt])), perfil: 'Mi perfil', quiz: 'Editar quiz', juegos: 'Mis actividades', proyectos: 'Mis actividades' };
   $('#tituloVista').textContent = titulos[vista] || 'Inicio';
   window.scrollTo(0, 0);
-  const vistas = { inicio: vInicio, quizzes: vQuizzes, juegos: () => vQuizzes('juegos'), quiz: vQuiz, banco: vBanco, carga: vCarga, grupos: vGrupos, publicar: vPublicar, vivo: vVivo, proyectos: () => vQuizzes('proyectos'), libreta: vLibreta, perfil: vPerfil };
+  const vistas = { inicio: vInicio, quizzes: vQuizzes, juegos: () => vQuizzes('juegos'), quiz: vQuiz, banco: vBanco, carga: vCarga, grupos: vGrupos, publicar: vPublicar, vivo: vVivo, proyectos: () => vQuizzes('proyectos'), libreta: vLibreta, perfil: vPerfil, consumo: () => perfil.rol === 'admin' ? vistaConsumo(contenido, { rpc }) : vInicio() };
   (vistas[vista] || vInicio)(param ? decodeURIComponent(param) : '');
 }
 
@@ -148,23 +150,22 @@ async function nuevaActividad(alGuardar = () => vQuizzes()) {
   abrirEditor(t, null, alGuardar);
 }
 
+// Tarjeta de un quiz: cabecera, datos, visibilidad y 3 acciones (las demás en "⋯"). Mismo esquema que juegos y proyectos.
 function htmlTarjetaQuiz(q) {
-  return `<div class="card act-card" data-q="${q.id}" style="margin:0; display:flex; flex-direction:column;">
-      <div class="row" style="align-items:flex-start; flex-wrap:nowrap;"><span class="act-ico" style="--c:#8E5BE8" title="Quiz tradicional">📝</span>
-        <h3 class="grow">${esc(q.titulo)}</h3>${q.tema ? `<span class="badge">${esc(q.tema)}</span>` : ''}</div>
-      <p class="small muted" style="font-weight:700; margin:4px 0 8px;">Quiz · ${q.n_preguntas} preguntas · ${q.puntos} pts · ${q.n_publicaciones ? `📣 publicado ${q.n_publicaciones === 1 ? '1 vez' : q.n_publicaciones + ' veces'}` : 'sin publicar'}</p>
-      ${(q.subtemas || []).length ? `<div class="chips" style="margin-bottom:8px;">${q.subtemas.slice(0, 5).map(s => `<span class="badge gray">${esc(s)}</span>`).join('')}${q.subtemas.length > 5 ? `<span class="badge gray">+${q.subtemas.length - 5}</span>` : ''}</div>` : ''}
-      <div class="row" style="gap:6px; margin-bottom:6px;"><span data-visibilidad></span></div>
-      <p class="small muted" style="margin-top:auto;">Editado ${fmtFecha(q.updated_at, true)}</p>
-      <div class="row" style="gap:6px; margin-top:10px;">
-        <button class="btn btn-sm btn-primary" data-acc="editar">✏️ Editar</button>
-        <button class="btn btn-sm btn-green" data-acc="publicar">📣 Publicar</button>
-        <button class="btn btn-sm btn-amber" data-acc="vivo">🏆 En vivo</button>
-        <button class="btn btn-sm" data-acc="duplicar" title="Duplicar">⧉</button>
-        <button class="btn btn-sm" data-acc="ficha" title="Imprimir ficha">🖨</button>
-        <button class="btn btn-sm" data-acc="solucion" title="Imprimir solución">🖨✔</button>
-        <button class="btn btn-sm btn-red" data-acc="eliminar" title="Eliminar">🗑</button>
-      </div>
+  const chips = [q.tema, ...(q.subtemas || [])].filter(Boolean);
+  return `<div class="card act-card" data-q="${q.id}">
+      <div class="act-cab"><span class="act-ico" style="--c:#8E5BE8" title="Quiz tradicional">📝</span>
+        <div class="grow"><h3 title="${esc(q.titulo)}">${esc(q.titulo)}</h3>
+          <p class="act-meta">Quiz · ${q.n_preguntas} preguntas · ${q.puntos} pts${q.n_publicaciones ? ` · 📣 ${q.n_publicaciones === 1 ? '1 vez' : q.n_publicaciones + ' veces'}` : ''}</p></div></div>
+      ${chips.length ? `<div class="act-chips" title="${esc(chips.join(' · '))}">${chips.slice(0, 2).map((t, i) => `<span class="badge ${i ? 'gray' : ''}">${esc(t)}</span>`).join('')}${chips.length > 2 ? `<span class="badge gray">+${chips.length - 2}</span>` : ''}</div>` : ''}
+      <div class="vis-fila" data-visibilidad></div>
+      <div class="act-pie"><span class="act-fecha">Editado ${fmtFecha(q.updated_at, true)}</span>
+        <div class="act-acciones">
+          <button class="btn btn-sm btn-primary" data-acc="editar">✏️ Editar</button>
+          <button class="btn btn-sm btn-green" data-acc="publicar">📣 Publicar</button>
+          <button class="btn btn-sm btn-amber" data-acc="vivo">🏆 En vivo</button>
+          ${htmlMenuMas([['data-acc="duplicar"', '⧉', 'Duplicar'], ['data-acc="ficha"', '🖨', 'Imprimir ficha'], ['data-acc="solucion"', '✔', 'Imprimir solución'], 'sep', ['data-acc="eliminar"', '🗑', 'Eliminar', true]])}
+        </div></div>
     </div>`;
 }
 

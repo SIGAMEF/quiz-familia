@@ -9,6 +9,7 @@ import { pintarMiGrupo } from './agrupar.js';
 import { esPregunta, quedan } from './preguntas.js';
 import { ajustarReloj, ahoraServidor } from './ruleta.js';
 import { juegoCelular } from './juego-hoja.js';
+import { enPausa, alReanudar } from '../reposo.js';
 
 const raiz = document.getElementById('raiz');
 const params = new URLSearchParams(location.search);
@@ -99,6 +100,7 @@ async function subirFoto(blob) {
 // ---------- Seguir al profesor ----------
 async function sondear() {
   clearTimeout(tSondeo);
+  if (enPausa()) return;   // en pausa por inactividad: se vuelve a consultar al reanudar
   let e;
   try { e = await rpc('proyecto_estado', { p_pin: pin, p_token: yo.token, p_version: version }); }
   catch {
@@ -169,13 +171,13 @@ function pintar(e) {
     cont.innerHTML = '<div class="part"><div class="part-card"><div class="part-hecho">⏳<b>Espera un momento…</b><small>El profesor está preparando la siguiente hoja.</small></div></div></div>';
     return;
   }
-  if (hoja.tipo === 'agrupar') {
+  if (hoja.tipo === 'agrupar' || hoja.tipo === 'unirse') {
     const pant = document.createElement('div');
     pant.className = 'movil-pantalla';
     pant.innerHTML = '<div class="lienzo-fondo"></div><div class="movil-scroll part-scroll"></div>';
     cont.appendChild(pant);
     pintarFondo(pant.querySelector('.lienzo-fondo'), hoja.diseno?.fondo);
-    pintarMiGrupo(pant.querySelector('.movil-scroll'), e.yo);
+    pintarMiGrupo(pant.querySelector('.movil-scroll'), e.yo, { soloRegistro: hoja.tipo === 'unirse' });
     return;
   }
   if (esPregunta(hoja.tipo)) {
@@ -219,5 +221,6 @@ setInterval(() => {
 
 // al volver a la pestaña, actualizar enseguida
 document.addEventListener('visibilitychange', () => { if (!document.hidden && yo) sondear(); });
+alReanudar(() => { if (yo) sondear(); });
 
 if (pin.length === 6) entrar(); else pedirPin();

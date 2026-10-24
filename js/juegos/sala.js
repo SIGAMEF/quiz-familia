@@ -4,6 +4,7 @@
 // ============================================================
 import { $, $$, esc, figura, sonar, confeti, relojBarra, alFinalizarPartida, prefs, selectorEmoji } from './util.js';
 import { sopaDe } from './sopa.js';
+import { enPausa } from '../reposo.js';
 
 const CARGADORES = {
   ahorcado: () => import('./ahorcado.js'), sopa: () => import('./sopa.js'), memoria: () => import('./memoria.js'),
@@ -37,6 +38,7 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
   const aLocal = (iso) => Date.parse(iso) - S.offset;
 
   async function sondear() {
+    if (enPausa()) return;   // en pausa por inactividad (el intervalo sigue y consulta al reanudar)
     let est;
     try { est = await rpc('sala_estado', { p_sala: sala_id }); } catch (e) { return; }
     S.est = est; S.offset = Date.parse(est.ahora) - Date.now();

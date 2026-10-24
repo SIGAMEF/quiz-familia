@@ -1,7 +1,7 @@
 // ============================================================
 // Proyectos en grupo: lista de proyectos (panel del profesor y del admin) y sus resultados
 // ============================================================
-import { $, $$, esc, toast, confirmar, pedirDatos, mensajeError, fmtFecha, coincide, abrirModal, urlBase, copiar, mostrarQRGrande } from '../comun.js';
+import { $, $$, esc, htmlMenuMas, toast, confirmar, pedirDatos, mensajeError, fmtFecha, coincide, abrirModal, urlBase, copiar, mostrarQRGrande } from '../comun.js';
 import { pintarHoja } from './lienzo.js';
 import { esPregunta, TIPOS_PREGUNTA, textoEnunciado, textoRespuesta } from './preguntas.js';
 import { borrarFotos } from './vivo-profe.js';
@@ -23,21 +23,21 @@ export async function crearProyecto({ rpc, panel = 'profesor' }) {
 // Tarjeta de un proyecto (la usan esta lista y "Mis actividades"). La visibilidad se pinta en [data-visibilidad].
 export function htmlTarjetaProyecto(p) {
   const s = p.sesion;
-  return `<div class="card proy-card" data-proy="${p.id}">
+  return `<div class="card act-card proy-card" data-proy="${p.id}">
       <button class="proy-mini" data-abrir title="Abrir en el editor"><div data-mini></div></button>
-      <h3 title="${esc(p.nombre)}"><span class="act-ico chico" style="--c:#E5484D" title="Proyecto en grupo">🎨</span> ${esc(p.nombre)}</h3>
-      <p class="small muted" style="font-weight:700; margin:0 2px;">Proyecto · ${p.n_hojas} ${p.n_hojas === 1 ? 'hoja' : 'hojas'} · editado ${fmtFecha(p.updated_at, true)}</p>
-      <div class="row" style="gap:6px; margin:6px 2px 0;"><span data-visibilidad></span></div>
+      <div class="act-cab"><span class="act-ico" style="--c:#E5484D" title="Proyecto en grupo">🎨</span>
+        <div class="grow"><h3 title="${esc(p.nombre)}">${esc(p.nombre)}</h3>
+          <p class="act-meta">Proyecto · ${p.n_hojas} ${p.n_hojas === 1 ? 'hoja' : 'hojas'}</p></div></div>
+      <div class="vis-fila" data-visibilidad></div>
       ${s ? `<div class="proy-vivo">📡 <b>Sesión en curso</b> · hoja ${s.hoja_indice} de ${s.total_hojas} · ${s.participantes} ${s.participantes === 1 ? 'participante' : 'participantes'} · PIN ${esc(s.pin)}${s.estado === 'pausada' ? ' · en pausa' : ''}
         <div class="row" style="gap:6px; margin-top:6px;"><button class="btn btn-sm btn-primary" data-continuar>Continuar sesión</button><button class="btn btn-sm btn-outline" data-reiniciar>Reiniciar</button></div></div>` : ''}
-      <div class="acciones">
-        <button class="btn btn-sm btn-primary" data-abrir>✏️ Abrir</button>
-        ${s ? '' : '<button class="btn btn-sm btn-green" data-envivo title="Presentar en vivo con PIN y QR">📡 En vivo</button>'}
-        <button class="btn btn-sm" data-presentar title="Presentar sin participantes">▶</button>
-        ${p.n_sesiones || p.n_intentos ? '<button class="btn btn-sm" data-resultados title="Resultados (en vivo y a su ritmo)">📊</button>' : ''}
-        <button class="btn btn-sm btn-outline" data-duplicar title="Duplicar">⧉</button>
-        <button class="btn btn-sm btn-red" data-eliminar title="Eliminar">🗑</button>
-      </div>
+      <div class="act-pie"><span class="act-fecha">Editado ${fmtFecha(p.updated_at, true)}</span>
+        <div class="act-acciones">
+          <button class="btn btn-sm btn-primary" data-abrir>✏️ Abrir</button>
+          ${s ? '' : '<button class="btn btn-sm btn-green" data-envivo title="Presentar en vivo con PIN y QR">📡 En vivo</button>'}
+          <button class="btn btn-sm" data-presentar title="Presentar sin participantes">▶ Presentar</button>
+          ${htmlMenuMas([...(p.n_sesiones || p.n_intentos ? [['data-resultados', '📊', 'Resultados']] : []), ['data-duplicar', '⧉', 'Duplicar'], 'sep', ['data-eliminar', '🗑', 'Eliminar', true]])}
+        </div></div>
     </div>`;
 }
 
@@ -144,7 +144,7 @@ async function verResultadosRitmo(p, rpc) {
   let filas, hojas;
   try { [filas, { hojas }] = await Promise.all([rpc('proyecto_ritmo_resultados', { p_proyecto: p.id }), rpc('proyecto_editor', { p_proyecto: p.id })]); }
   catch (e) { return toast(mensajeError(e), 'error'); }
-  const recorrido = hojas.filter(h => !['agrupar', 'ruleta'].includes(h.tipo));
+  const recorrido = hojas.filter(h => !['agrupar', 'ruleta', 'unirse'].includes(h.tipo));
   const preguntas = recorrido.filter(h => esPregunta(h.tipo));
   const juegos = recorrido.filter(h => h.tipo === 'juego');
   const resumen = (f) => {
@@ -211,7 +211,7 @@ async function verResultados(p, rpc, alCambiar) {
       }
       const porGrupo = h.config?.modo === 'grupo';
       const res = h.tipo === 'juego'
-        ? { participantes: parts, respuestas: s.respuestas.filter(r => r.hoja_id === h.id), grupos: s.grupos.filter(g => g.hoja_id === hojaGrupos), modoGrupo: h.config?.modo === 'grupo', inicio: 0, abiertas: false }
+        ? { participantes: parts, respuestas: s.respuestas.filter(r => r.hoja_id === h.id), grupos: s.grupos.filter(g => g.hoja_id === (s.grupos.some(x => x.hoja_id === h.config?.hoja_grupos) ? h.config.hoja_grupos : hojaGrupos)), modoGrupo: h.config?.modo === 'grupo', inicio: 0, abiertas: false }
         : h.tipo === 'agrupar'
         ? { participantes: parts, grupos: s.grupos.filter(g => g.hoja_id === h.id), profe: false }
         : { revelar: true, respuestas: s.respuestas.filter(r => r.hoja_id === h.id).map(r => { const g = porGrupo ? grupo(r.grupo_id) : null; return { alias: g ? g.nombre : r.alias, avatar: g ? g.emoji : r.avatar, valor: r.valor }; }) };

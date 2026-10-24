@@ -5,6 +5,7 @@
 import { supabase, urlBase, mensajeError } from '../comun.js';
 import { esPregunta } from './preguntas.js';
 import { ajustarReloj } from './ruleta.js';
+import { enPausa, alReanudar } from '../reposo.js';
 
 async function rpc(nombre, args) {
   const { data, error } = await supabase.rpc(nombre, args);
@@ -23,11 +24,11 @@ export async function borrarFotos(rutas) {
 // api.alCambiar(datos) se llama cada vez que llega el estado; api.alError(mensaje) si falla la consulta 3 veces seguidas
 export function crearVivo(sesion, { alCambiar = () => {}, alError = () => {} } = {}) {
   let datos = { sesion, participantes: [], grupos: [], respuestas: [] };
-  let t = null, activo = false, fallos = 0;
+  let t = null, activo = false, fallos = 0, quitarReanudar = null;
 
   const sondear = async () => {
     clearTimeout(t);
-    if (!activo) return;
+    if (!activo || enPausa()) return;   // en pausa por inactividad: se vuelve a consultar al reanudar
     try {
       datos = await rpc('proyecto_estado_profe', { p_sesion: datos.sesion.id });
       ajustarReloj(datos.ahora);
@@ -52,8 +53,8 @@ export function crearVivo(sesion, { alCambiar = () => {}, alError = () => {} } =
     get sesion() { return datos.sesion; },
     get datos() { return datos; },
     get url() { return enlaceParticipante(datos.sesion.pin); },
-    iniciar() { activo = true; return sondear(); },
-    detener() { activo = false; clearTimeout(t); },
+    iniciar() { activo = true; quitarReanudar ??= alReanudar(() => sondear()); return sondear(); },
+    detener() { activo = false; clearTimeout(t); quitarReanudar?.(); quitarReanudar = null; },
     ir: (hoja) => accion('proyecto_ir_a_hoja', { p_sesion: id(), p_hoja: hoja }),
     registro: (abierto, tardios = null) => accion('proyecto_registro', { p_sesion: id(), p_abierto: abierto, p_tardios: tardios }),
     respuestas: (abiertas, revelar = null) => accion('proyecto_respuestas', { p_sesion: id(), p_abiertas: abiertas, p_revelar: revelar }),
@@ -78,15 +79,16 @@ export function crearVivo(sesion, { alCambiar = () => {}, alError = () => {} } =
     // Lo que necesita la zona de una hoja (mismo formato que la simulación)
     res(hoja) {
       const s = datos.sesion;
-      if (hoja.tipo === 'agrupar') {
+      if (hoja.tipo === 'agrupar' || hoja.tipo === 'unirse') {
         return { participantes: datos.participantes, grupos: datos.grupos.filter(g => g.hoja_id === hoja.id),
           pin: s.pin, url: enlaceParticipante(s.pin), profe: true, registro_abierto: s.registro_abierto };
       }
       if (hoja.tipo === 'juego') {
         const actual = s.hoja_id === hoja.id;
-        // los grupos confirmados más recientes (de la última hoja Agrupar que se usó)
+        // los grupos de la hoja Agrupar elegida (o los confirmados más recientes)
         const conf = datos.grupos.filter(g => g.confirmado).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-        const hg = conf.at(-1)?.hoja_id;
+        const elegida = hoja.config?.hoja_grupos;
+        const hg = elegida && conf.some(g => g.hoja_id === elegida) ? elegida : conf.at(-1)?.hoja_id;
         return { participantes: datos.participantes, respuestas: actual ? datos.respuestas : [], grupos: conf.filter(g => g.hoja_id === hg),
           modoGrupo: hoja.config?.modo === 'grupo', inicio: actual && s.juego_inicio ? Date.parse(s.juego_inicio) : null,
           abiertas: actual && s.respuestas_abiertas, servidor: true, profe: true };

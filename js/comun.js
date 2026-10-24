@@ -361,6 +361,22 @@ export function claseNota(n) { const l = notaLiteral(n); return l ? 'nota-' + l.
 
 // ---------- Menú de la cuenta (se abre al tocar el nombre/avatar) ----------
 // items: [{ ico, txt, accion, peligro }] o 'sep' para una línea divisoria
+// Menú "⋯" de una tarjeta con las acciones secundarias. items: [atributos, ico, texto, peligro?] o 'sep'.
+// Los botones quedan en la tarjeta (con sus data-*), así se conectan igual que los demás.
+export function htmlMenuMas(items, titulo = 'Más acciones') {
+  return `<details class="mas-menu"><summary class="btn btn-sm" title="${esc(titulo)}" aria-label="${esc(titulo)}">⋯</summary>
+    <div class="menu-usuario" role="menu">${items.map(it => it === 'sep' ? '<hr>'
+      : `<button type="button" role="menuitem" ${it[0]}${it[3] ? ' class="peligro"' : ''}><span class="ico">${it[1]}</span><span>${esc(it[2])}</span></button>`).join('')}</div></details>`;
+}
+// se cierra al elegir una opción, al tocar fuera o con Esc
+document.addEventListener('click', (e) => {
+  document.querySelectorAll('details.mas-menu[open]').forEach(d => { if (!d.contains(e.target) || e.target.closest('.menu-usuario button')) d.open = false; });
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('details.mas-menu[open]').forEach(d => { d.open = false; d.querySelector('summary').focus(); });
+});
+
 export function menuUsuario(boton, items) {
   const ancla = document.createElement('div');
   ancla.className = 'menu-ancla';

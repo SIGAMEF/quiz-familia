@@ -7,6 +7,7 @@ import {
 } from './comun.js';
 import { pintarPregunta, mostrarCorreccion, cronometro, decir, callar, tono } from './juego.js';
 import { descargarVivo } from './excel.js';
+import { enPausa, alReanudar, alEntrarEnPausa } from './reposo.js';
 
 const app = $('#app');
 const params = new URLSearchParams(location.search);
@@ -14,13 +15,15 @@ const COLORES = ['#E21B3C', '#1368CE', '#D89E00', '#26890C', '#864CBF', '#0AA3A3
 const FIGURAS = ['▲', '◆', '●', '■', '★', '⬟', '⬢', '✚'];
 const COLS_SESION = 'id,titulo,modo,estado,codigo,seg_por_pregunta,seg_total,pregunta_actual,pregunta_iniciada_en,permite_invitados,profesor_id,quiz_id,puntos_velocidad,publicacion_id,registrar_notas';
 
-let timers = [], canal = null;
+let timers = [], canal = null, quitarPausa = [];
 function limpiar() {
   timers.forEach(t => { clearInterval(t); clearTimeout(t); }); timers = [];
   if (canal) { try { supabase.removeChannel(canal); } catch { } canal = null; }
+  quitarPausa.forEach(f => f()); quitarPausa = [];
   callar();
 }
-function cada(fn, ms) { const t = setInterval(fn, ms); timers.push(t); return t; }
+// local: relojes en pantalla, que no consultan al servidor y siguen aunque esté en pausa por inactividad
+function cada(fn, ms, { local = false } = {}) { const t = setInterval(() => { if (local || !enPausa()) fn(); }, ms); timers.push(t); return t; }
 function anchoHoja(ancho) { app.className = 'hoja' + (ancho ? ' ancha' : ''); window.scrollTo(0, 0); }
 async function rpc(n, a) { const { data, error } = await supabase.rpc(n, a); if (error) throw error; return data; }
 async function leerSesion(id) {
@@ -42,11 +45,17 @@ function escucharSesion(id, alCambiar) {
       }
     } finally { ocupado = false; }
   };
-  try {
-    canal = supabase.channel('sv-' + id)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sesiones_vivo', filter: `id=eq.${id}` }, (p) => revisar(p.new))
-      .subscribe();
-  } catch { }
+  const conectar = () => {
+    try {
+      canal = supabase.channel('sv-' + id)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sesiones_vivo', filter: `id=eq.${id}` }, (p) => revisar(p.new))
+        .subscribe();
+    } catch { }
+  };
+  conectar();
+  // en pausa por inactividad se cierra el canal de tiempo real; al reanudar se reconecta y se consulta enseguida
+  quitarPausa.push(alEntrarEnPausa(() => { if (canal) { try { supabase.removeChannel(canal); } catch { } canal = null; } }),
+    alReanudar(() => { if (!canal) conectar(); revisar(); }));
   cada(() => revisar(), 2500);
   return { forzar: (s) => { previa = s; } };
 }
@@ -297,7 +306,7 @@ async function preguntaPlazo() {
       const el = $('#reloj'); if (el) { el.textContent = '⏱ ' + fmtSeg(r); el.className = 'badge titulo ' + (r <= 30 ? 'red' : 'amber'); }
       if (r <= 0) terminarPlazo();
     };
-    tick(); P.reloj = cada(tick, 1000);
+    tick(); P.reloj = cada(tick, 1000, { local: true });
   }
   pintarPregunta($('#preg'), p, {
     colores: true,
@@ -505,9 +514,10 @@ function revelar() {
 
 async function refrescarStats() {
   const s = C.sesion;
-  if (!s) return;
+  if (!s || (s.estado === 'finalizado' && C.statsFinal === s.id)) return;   // terminada: los resultados ya no cambian (se leen una vez más y listo)
   let st;
   try { st = await rpc('vivo_estadisticas', { p_sesion: s.id }); } catch { return; }
+  C.statsFinal = s.estado === 'finalizado' ? s.id : null;
   C.stats = st;
   C.skew = Date.now() - Date.parse(st.ahora);
   const parts = st.participantes;

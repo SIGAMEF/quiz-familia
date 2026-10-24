@@ -11,6 +11,7 @@ import { esPregunta, tieneCorrecta, crearSimulacion, tiempoDe, quedan } from './
 import { formarLocal, resumenReparto } from './agrupar.js';
 import { candidatosLocal, sortearLocal, restantes, ruletaGirando, ahoraServidor } from './ruleta.js';
 import { faseJuego } from './juego-hoja.js';
+import { problemas, necesitaUnirse } from './revision.js';
 
 const esCelular = () => innerWidth < innerHeight && innerWidth < 820;
 // el enlace sin "https://" para leerlo en la pantalla
@@ -26,13 +27,15 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
   ov.className = 'pres' + (vivo ? ' en-vivo' : '');
   ov.innerHTML = `<div class="escenario" data-esc><div class="marco" data-marco></div></div>
     <div class="pres-reloj" data-reloj hidden></div>
+    <div class="pres-qr-esquina" data-qr-esquina hidden></div>
     <div class="pres-ctrl" data-ctrl>
       <button data-acc="ant" title="Anterior (←)" aria-label="Hoja anterior">◀</button>
       <span class="cont" data-cont></span>
       <button data-acc="sig" title="Siguiente (→)" aria-label="Hoja siguiente">▶</button>
-      ${vivo ? `<button class="pres-pin" data-acc="qr" title="Mostrar el QR, el PIN y el enlace"><small>PIN</small> <b data-pin></b></button>
+      ${vivo ? `<button class="pres-pin" data-acc="qr" title="Mostrar el QR, el PIN y el enlace (para los que llegan tarde)">📲<span class="pres-txt"> Mostrar QR</span> <small>PIN</small> <b data-pin></b></button>
         <button data-acc="enlace" title="Copiar el enlace para entrar desde una computadora o compartirlo por chat">🔗<span class="pres-txt"> Enlace</span></button><span class="cont" data-gente></span>` : ''}
       <span class="pres-herr" data-herr></span>
+      <span class="pres-aviso" data-aviso hidden tabindex="0">⚠</span>
       ${vivo ? `<button data-acc="pausa" title="Pausar o reanudar"></button><button data-acc="fin" title="Finalizar la sesión">⏹<span class="pres-txt"> Finalizar</span></button>` : ''}
       <button data-acc="pc" title="Pantalla completa (F)" aria-label="Pantalla completa">⛶</button>
       <button data-acc="salir" title="Salir (Esc)" aria-label="Salir de la presentación">✕</button>
@@ -44,14 +47,15 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
 
   const $ = (s) => ov.querySelector(s);
   const hoja = () => hojas[i];
-  const interactiva = (h) => esPregunta(h.tipo) || h.tipo === 'agrupar' || h.tipo === 'ruleta' || h.tipo === 'juego';
+  const interactiva = (h) => esPregunta(h.tipo) || ['agrupar', 'unirse', 'ruleta', 'juego'].includes(h.tipo);
+  const registro = (h) => h.tipo === 'agrupar' || h.tipo === 'unirse';
   // la ruleta con nombres escritos funciona sin simular; con grupos o participantes, hay que simularlos
   const simulable = (h) => interactiva(h) && !(h.tipo === 'ruleta' && (h.config?.origen || 'nombres') === 'nombres');
 
   // ---------- datos de la zona (simulación o sesión real) ----------
   const resSim = (h) => {
     if (!sim) return null;
-    if (h.tipo === 'agrupar') return { participantes: sim.unidos, grupos: sim.grupos[h.id] || [], pin: null, url: null, profe: true, registro_abierto: sim.abierto };
+    if (registro(h)) return { participantes: sim.unidos, grupos: sim.grupos[h.id] || [], pin: null, url: null, profe: true, registro_abierto: sim.abierto };
     if (!esPregunta(h.tipo)) return null;
     const e = sim.estado(h);
     if (h.config?.modo !== 'grupo') return e;
@@ -130,11 +134,12 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
       const r = res(h), cerrado = vivo ? !s.respuestas_abiertas : !!r?.cerrado, revelar = vivo ? s.revelar : !!r?.revelar;
       herr += boton('cerrar', cerrado ? '🔓' : '🔒', cerrado ? 'Abrir las respuestas' : 'Cerrar las respuestas', { activo: cerrado, desact: !vivo && !sim });
       if (tieneCorrecta(h)) herr += boton('revelar', '👁<span class="pres-txt"> Revelar</span>', 'Revelar la respuesta correcta', { activo: revelar, desact: !vivo && !sim });
-    } else if (h.tipo === 'agrupar' && (vivo || sim)) {
+    } else if (registro(h) && (vivo || sim)) {
       const r = res(h), abierto = r.registro_abierto, grupos = r.grupos || [];
       herr += boton('registro', abierto ? '🔒<span class="pres-txt"> Cerrar registro</span>' : '🔓<span class="pres-txt"> Abrir registro</span>', abierto ? 'Ya no se aceptan nuevos participantes' : 'Aceptar nuevos participantes');
       if (vivo && !abierto) herr += boton('tardios', `🕓<span class="pres-txt"> Tardíos: ${s.tardios ? 'sí' : 'no'}</span>`, 'Permitir que entren tarde aunque el registro esté cerrado', { activo: s.tardios });
-      if (!grupos.length) herr += boton('formar', '👥<span class="pres-txt"> Formar grupos</span>', 'Formar grupos al azar');
+      if (h.tipo === 'unirse') { /* solo registro: no se forman grupos */ }
+      else if (!grupos.length) herr += boton('formar', '👥<span class="pres-txt"> Formar grupos</span>', 'Formar grupos al azar');
       else {
         const conf = grupos.every(g => g.confirmado);
         if (!conf) herr += boton('mezclar', '🔀<span class="pres-txt"> Volver a mezclar</span>', 'Rehacer el sorteo') + boton('confirmar', '✅<span class="pres-txt"> Confirmar grupos</span>', 'Guardar los grupos y mostrarlos en los celulares');
@@ -152,6 +157,18 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
     }
     const cont = $('[data-herr]');
     if (cont.innerHTML !== herr) cont.innerHTML = herr;
+    // avisos de la revisión del proyecto (en la presentación no se exige nada)
+    const av = problemas(hojas, i), chip = $('[data-aviso]');
+    chip.hidden = !av.length;
+    chip.title = av.map(x => '⚠ ' + x.txt).join('\n');
+    // en vivo: en una hoja interactiva sin nadie unido, el QR y el PIN en una esquina
+    const esquina = $('[data-qr-esquina]');
+    const mostrarEsquina = !!vivo && necesitaUnirse(h) && !vivo.datos.participantes.length;
+    if (mostrarEsquina && esquina.hidden) {
+      esquina.innerHTML = `<div data-qr-e></div><b>${esc(s.pin.replace(/(\d{3})(\d{3})/, '$1 $2'))}</b><small>Únete con el QR o el PIN</small>`;
+      dibujarQR(esquina.querySelector('[data-qr-e]'), vivo.url, 130);
+    }
+    esquina.hidden = !mostrarEsquina;
   };
 
   // ---------- acciones ----------
@@ -178,7 +195,7 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
     if (!sim) return;
     const h = hoja();
     let cambio = false;
-    if (h.tipo === 'agrupar' && sim.abierto && sim.unidos.length < sim.participantes.length) {
+    if (registro(h) && sim.abierto && sim.unidos.length < sim.participantes.length) {
       const p = sim.participantes[sim.unidos.length];
       // si ya hay grupos confirmados, el que llega tarde entra al grupo más chico
       const g = (sim.grupos[h.id] || []).filter(x => x.confirmado).sort((a, b) => sim.unidos.filter(u => u.grupo_id === a.id).length - sim.unidos.filter(u => u.grupo_id === b.id).length)[0];

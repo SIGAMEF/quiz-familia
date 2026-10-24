@@ -63,13 +63,16 @@ const temas = [
   ...SETS_TRIVIA.map(s => ({ ...s, juegos: ['trivia'], n: `${s.preguntas.length} preguntas` })),
   ...SETS_QUIZ.map(s => ({ ...s, juegos: ['quiz'], n: `${s.preguntas.length} preguntas` }))
 ];
-let filtro = '';
+const FILTROS = ['ahorcado', 'sopa', 'memoria', 'frase', 'trivia', 'quiz', 'relampago', 'ordena', 'rompecabezas', 'proyecto'];
+// ?f=sopa: abre la biblioteca filtrada en esa sección (el botón "Ver en la página" de Mis actividades)
+let filtro = PREVIA ? '' : new URLSearchParams(location.search).get('f') || '';
+if (!FILTROS.includes(filtro)) filtro = '';
 const corto = (k) => ({ ahorcado: 'Ahorcado', sopa: 'Sopa', ordena: 'Ordena', memoria: 'Memorama', frase: 'Frase', trivia: 'Trivia', quiz: 'Quiz', rompecabezas: 'Rompecabezas', relampago: 'Relámpago', proyecto: 'Proyecto' }[k]);
 // los proyectos de los profesores no son un juego de la lista: se abren en proyecto.html
 const INFO = (k) => JUEGOS[k] || { proyecto: { nombre: 'Proyecto en grupo', ico: '🎨', color: '#E5484D' } }[k] || { nombre: k, ico: '🎲', color: '#8E86AC' };
 const enlaceProfe = (t) => t.tipo === 'quiz' ? `juegos.html?q=${t.id}` : t.tipo === 'proyecto' ? `proyecto.html?p=${t.id}` : `juegos.html?g=${t.id}`;
 const pintarFiltro = () => {
-  $('#filtro').innerHTML = [['', 'Todos'], ...['ahorcado', 'sopa', 'memoria', 'frase', 'trivia', 'quiz', 'relampago', 'ordena', 'rompecabezas', 'proyecto'].map(k => [k, `${INFO(k).ico} ${corto(k)}`])]
+  $('#filtro').innerHTML = [['', 'Todos'], ...FILTROS.map(k => [k, `${INFO(k).ico} ${corto(k)}`])]
     .map(([k, t]) => `<button type="button" data-f="${k}" aria-pressed="${k === filtro}">${esc(t)}</button>`).join('');
   $$('[data-f]').forEach(b => b.onclick = () => { filtro = b.dataset.f; pintarFiltro(); pintarBiblioteca(); });
 };

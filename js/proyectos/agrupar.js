@@ -140,14 +140,15 @@ export function pintarRegistro(cont, { titulo = '', subtitulo = '', alUnirse, ce
 }
 
 // "Estás en el 🟦 Grupo 3: Los Leones" con sus compañeros; o la espera mientras se forman
-export function pintarMiGrupo(cont, yo) {
-  const g = yo?.grupo;
+// soloRegistro: hoja Unirse (no se forman grupos)
+export function pintarMiGrupo(cont, yo, { soloRegistro = false } = {}) {
+  const g = soloRegistro ? null : yo?.grupo;
   const caja = document.createElement('div');
   caja.className = 'part';
   caja.innerHTML = g ? `<div class="part-card mi-grupo" style="--c:${esc(g.color)}">
       <div class="part-tipo" style="text-align:center;">Estás en el</div>
       <div class="mi-grupo-nombre">${esc(g.emoji || '')} ${esc(g.nombre)}</div>
       <div class="mi-grupo-lista">${(g.companeros || []).map(p => `<span class="${p.yo ? 'yo' : ''}">${cara(p, 'g')}<b>${esc(p.alias)}${p.yo ? ' (tú)' : ''}</b></span>`).join('')}</div></div>`
-    : `<div class="part-card"><div class="part-hecho">${cara(yo || {}, 'xl')}<b>¡Ya estás registrado, ${esc(yo?.alias || '')}!</b><small>Espera a que el profesor forme los grupos.</small></div></div>`;
+    : `<div class="part-card"><div class="part-hecho">${cara(yo || {}, 'xl')}<b>¡Ya estás registrado, ${esc(yo?.alias || '')}!</b><small>${soloRegistro ? 'Espera a que empiece la actividad. ¡Mira la pantalla!' : 'Espera a que el profesor forme los grupos.'}</small></div></div>`;
   cont.appendChild(caja);
 }

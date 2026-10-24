@@ -234,6 +234,7 @@ declare id uuid; vf uuid := gen_random_uuid(); ag uuid := gen_random_uuid(); jg 
 begin
   perform pg_temp.como('prof1');
   id := public.proyecto_crear('Proyecto a su ritmo', jsonb_build_array(
+    jsonb_build_object('id', gen_random_uuid(), 'tipo', 'unirse', 'diseno', '{"elementos":[]}'::jsonb, 'config', '{}'::jsonb),
     jsonb_build_object('id', vf, 'tipo', 'vf', 'diseno', '{"elementos":[]}'::jsonb, 'config', '{"enunciado":"El Sol es una estrella","correcta":true}'::jsonb),
     jsonb_build_object('id', ag, 'tipo', 'agrupar', 'diseno', '{"elementos":[]}'::jsonb, 'config', '{}'::jsonb),
     jsonb_build_object('id', jg, 'tipo', 'juego', 'diseno', '{"elementos":[]}'::jsonb, 'config', '{"juego":{"tipo":"trivia","titulo":"T","segundos":0,"contenido":{}}}'::jsonb)));
@@ -271,7 +272,7 @@ begin
   v := public.proyecto_ritmo_abrir(pg_temp.id_de('pub'), null, null, 'Invitada', '🦊');
   i := (v->'intento'->>'id')::uuid; t := (v->'intento'->>'token')::uuid;
   insert into t_txt values ('int', i::text), ('tok_r', t::text);
-  if jsonb_array_length(v->'hojas') <> 2 then raise exception 'FALLO: las hojas en vivo (Agrupar) no debían ir: %', jsonb_array_length(v->'hojas'); end if;
+  if jsonb_array_length(v->'hojas') <> 2 then raise exception 'FALLO: las hojas en vivo (Unirse y Agrupar) no debían ir: %', jsonb_array_length(v->'hojas'); end if;
   if v->'hojas'->0->'config' ? 'correcta' then raise exception 'FALLO: la respuesta correcta se mandó antes de responder'; end if;
   -- con el token vuelve al mismo intento
   if (public.proyecto_ritmo_abrir(pg_temp.id_de('pub'), null, t)->'intento'->>'id')::uuid <> i then raise exception 'FALLO: con el token no volvió a su avance'; end if;
