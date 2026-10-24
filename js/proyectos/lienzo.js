@@ -7,6 +7,8 @@
 // ============================================================
 import { estiloFondo, fuenteValida, colorValido, urlSegura, FORMAS, limpiarNodos, URL_FUENTES } from './recursos.js';
 import { esPregunta, pintarZona, textoEnunciado, pintarParticipante } from './preguntas.js';
+import { pintarZonaAgrupar, pintarRegistro } from './agrupar.js';
+import { pintarZonaRuleta, pintarRuletaCelular } from './ruleta.js';
 
 export const ASPECTO = 16 / 9;
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -189,8 +191,10 @@ function crearElemento(el, modo, ctx) {
       d.innerHTML = `<div class="pe-video-prev">${mini ? `<img src="${mini}" alt="" draggable="false">` : ''}<span>▶</span></div>`;
     }
   } else if (el.tipo === 'zona') {
-    if (!ctx.hoja || !esPregunta(ctx.hoja.tipo)) return null;
-    pintarZona(d, ctx.hoja, ctx.res || null);
+    if (ctx.hoja?.tipo === 'agrupar') pintarZonaAgrupar(d, ctx.hoja, ctx.res || null);
+    else if (ctx.hoja?.tipo === 'ruleta') pintarZonaRuleta(d, ctx.hoja, ctx.res || null, { animar: modo === 'ver' });
+    else if (ctx.hoja && esPregunta(ctx.hoja.tipo)) pintarZona(d, ctx.hoja, ctx.res || null);
+    else return null;
   } else {
     return null;
   }
@@ -264,10 +268,13 @@ export function repintarElemento(lienzo, el, modo = 'editor', ctx = {}) {
 }
 
 // Lo que ve el participante en su celular para una hoja
-// (preguntas: el formulario para responder; contenido: "Mira la pantalla" o la hoja acomodada al celular)
-export function pintarCelular(cont, hoja, nombreProyecto = '', { modo = 'ver', alEnviar, nota } = {}) {
+// (preguntas: el formulario para responder; agrupar: el registro; ruleta: la ruleta girando;
+//  contenido: "Mira la pantalla" o la hoja acomodada)
+// vivo: { respuestas, cerrado, revelar, modoGrupo } cuando hay una sesión real; ruleta: { candidatos, sorteos, yo }
+export function pintarCelular(cont, hoja, nombreProyecto = '', { modo = 'ver', alEnviar, nota, vivo = null, alUnirse, ruleta = null } = {}) {
   asegurarFuentes();
-  if (esPregunta(hoja?.tipo)) {
+  const conRuleta = hoja?.tipo === 'ruleta' && (hoja.config?.celular || 'ruleta') === 'ruleta';
+  if (esPregunta(hoja?.tipo) || hoja?.tipo === 'agrupar' || conRuleta) {
     const pantalla = document.createElement('div');
     pantalla.className = 'movil-pantalla';
     const fondo = document.createElement('div');
@@ -275,7 +282,9 @@ export function pintarCelular(cont, hoja, nombreProyecto = '', { modo = 'ver', a
     pintarFondo(fondo, hoja.diseno?.fondo);
     const scroll = document.createElement('div');
     scroll.className = 'movil-scroll part-scroll';
-    pintarParticipante(scroll, hoja, { alEnviar, nota });
+    if (hoja.tipo === 'agrupar') pintarRegistro(scroll, { titulo: nombreProyecto, subtitulo: 'Únete con tu nombre', alUnirse });
+    else if (conRuleta) pintarRuletaCelular(scroll, hoja, ruleta, nombreProyecto);
+    else pintarParticipante(scroll, hoja, { alEnviar, nota, ...(vivo || {}) });
     pantalla.append(fondo, scroll);
     cont.replaceChildren(pantalla);
     return { pantalla, lienzo: null, manual: false };

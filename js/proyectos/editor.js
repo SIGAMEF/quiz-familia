@@ -12,6 +12,9 @@ import {
 } from './recursos.js';
 import { TIPOS_PREGUNTA, esPregunta, configInicial, huecos, LETRAS, COLORES_OPCION, textoEnunciado } from './preguntas.js';
 import { presentar } from './presentar.js';
+import { crearVivo, borrarFotos, enlaceParticipante } from './vivo-profe.js';
+import { configAgruparInicial, resumenReparto } from './agrupar.js';
+import { configRuletaInicial, candidatosLocal, PALETAS, ORIGENES } from './ruleta.js';
 
 const raiz = $('#raiz');
 const params = new URLSearchParams(location.search);
@@ -26,7 +29,7 @@ const TIPOS_HOJA = [
   { k: 'lluvia', ico: '💭', txt: 'Lluvia de ideas' }, { k: 'agrupar', ico: '👥', txt: 'Agrupar' }, { k: 'ruleta', ico: '🎡', txt: 'Ruleta' }
 ];
 const ICO_HOJA = Object.fromEntries(TIPOS_HOJA.map(t => [t.k, t.ico]));
-const DISPONIBLES = ['contenido', 'pregunta', 'vf', 'opcion', 'completar', 'lluvia'];   // Agrupar y Ruleta: próximas fases
+const DISPONIBLES = TIPOS_HOJA.map(t => t.k);
 const RECURSOS = [
   ['texto', '🔤', 'Texto'], ['fondo', '🎨', 'Fondo'], ['imagen', '🖼', 'Imagen'], ['iconos', '⭐', 'Iconos'],
   ['emojis', '😀', 'Emojis'], ['formas', '🔷', 'Formas'], ['video', '🎬', 'Video'], ['plantillas', '🧩', 'Plantillas']
@@ -40,6 +43,8 @@ const uid = () => crypto.randomUUID();
 const clonar = (o) => JSON.parse(JSON.stringify(o));
 const r1 = (n) => Math.round(n * 10) / 10;
 const esMovil = () => matchMedia('(max-width: 860px)').matches;
+// Hojas con área de respuestas / participantes / ruleta (en el celular se ve un formulario o la ruleta, no la hoja)
+const interactiva = (tipo) => esPregunta(tipo) || tipo === 'agrupar' || tipo === 'ruleta';
 
 async function rpc(nombre, args) {
   const { data, error } = await supabase.rpc(nombre, args);
@@ -53,7 +58,7 @@ const elSel = () => hoja()?.diseno.elementos.find(e => e.id === selId) || null;
 
 // En la vista Celular solo se edita si la hoja (de contenido) está "ajustada a mano"
 const enCelular = () => vista === 'celular';
-const celularManual = () => enCelular() && !esPregunta(hoja().tipo) && !!hoja().diseno.movil?.manual;
+const celularManual = () => enCelular() && !interactiva(hoja().tipo) && !!hoja().diseno.movil?.manual;
 const editableAqui = () => vista === 'web' || celularManual();
 const fmt = () => enCelular() ? 'manual' : 'web';
 // Geometría del elemento en la vista actual: en Web el propio elemento; en Celular su posición aparte (diseno.movil.pos)
@@ -167,6 +172,21 @@ function hojaNueva(tipo = 'contenido') {
   const color = tit && oscuro({ tipo: 'color', valor: tit.color }) !== oscuro(fondo) ? tit.color : oscuro(fondo) ? '#FFFFFF' : '#2D2A45';
   const titulo = { id: uid(), tipo: 'texto', texto: 'Escribe un título', x: 8, y: 8, w: 84, h: 16, rot: 0,
     fuente: tit?.fuente || 'Baloo 2', tam: 5, color, alinear: 'center', negrita: true };
+  if (tipo === 'ruleta') {
+    // si ya hay grupos antes, la ruleta sortea entre ellos
+    const config = configRuletaInicial();
+    if (hojas.some(x => x.tipo === 'agrupar')) config.origen = 'grupos';
+    return { id: uid(), tipo, config, diseno: { fondo, elementos: [
+      { ...titulo, texto: '¡Gira la ruleta!', y: 4, h: 14 },
+      { id: uid(), tipo: 'zona', x: 6, y: 20, w: 88, h: 76, rot: 0 }
+    ] } };
+  }
+  if (tipo === 'agrupar') {
+    return { id: uid(), tipo, config: configAgruparInicial(), diseno: { fondo, elementos: [
+      { ...titulo, texto: '¡Formemos grupos!', y: 4, h: 14 },
+      { id: uid(), tipo: 'zona', x: 4, y: 21, w: 92, h: 75, rot: 0 }
+    ] } };
+  }
   if (!esPregunta(tipo)) return { id: uid(), tipo, config: { celular: 'mirar' }, diseno: { fondo, elementos: [titulo] } };
   // hoja de pregunta: el enunciado (vinculado a la configuración) y el área de respuestas
   return {
@@ -349,8 +369,10 @@ function montar() {
       <button class="btn btn-sm btn-ghost btn-icon ocultar-movil" data-deshacer title="Deshacer (Ctrl+Z)" aria-label="Deshacer">↶</button>
       <button class="btn btn-sm btn-ghost btn-icon ocultar-movil" data-rehacer title="Rehacer (Ctrl+Y)" aria-label="Rehacer">↷</button>
       <div class="pestanas ed-vistas"><button data-vista="web" class="activo" title="Vista web (proyector)">🖥<span class="ocultar-movil"> Web</span></button><button data-vista="celular" title="Vista del celular">📱<span class="ocultar-movil"> Celular</span></button></div>
-      <button class="btn btn-primary btn-sm" data-presentar title="Presentar">▶<span class="ocultar-movil"> Presentar</span></button>
+      <button class="btn btn-sm btn-outline" data-presentar title="Presentar sin participantes (puedes simularlos)">▶<span class="ocultar-movil"> Presentar</span></button>
+      <button class="btn btn-primary btn-sm" data-envivo title="Presentar en vivo: los participantes entran con PIN o QR">📡<span class="ocultar-movil"> En vivo</span></button>
     </header>
+    <div class="ed-banner" data-banner hidden></div>
     <aside class="ed-izq" data-izq></aside>
     <main class="ed-centro">
       <div class="escenario" data-escenario></div>
@@ -373,6 +395,7 @@ function montar() {
   $('[data-deshacer2]').onclick = () => moverHist(-1);
   $$('[data-vista]').forEach(b => b.onclick = () => cambiarVista(b.dataset.vista));
   $('[data-presentar]').onclick = () => abrirPresentacion(actual);
+  $('[data-envivo]').onclick = iniciarVivo;
   $('[data-estado]').onclick = () => { if (!conflicto && sucio) guardar(); };
   $$('[data-tab]').forEach(b => b.onclick = () => alternarPanelMovil(b.dataset.tab));
   conectarLienzo();
@@ -380,6 +403,55 @@ function montar() {
   conectarSoltarArchivos();
   pintarTodo();
   registrar();
+}
+
+// ---------- Sesión en vivo ----------
+let sesionActiva = null;
+async function revisarSesion() {
+  try { sesionActiva = await rpc('proyecto_sesion_activa', { p_proyecto: ID }); } catch { sesionActiva = null; }
+  pintarBanner();
+}
+function pintarBanner() {
+  const b = $('[data-banner]');
+  if (!b) return;
+  b.hidden = !sesionActiva;
+  if (!sesionActiva) return;
+  const s = sesionActiva;
+  b.innerHTML = `<span>📡 <b>Tienes una sesión en curso</b> (hoja ${s.hoja_indice} de ${s.total_hojas}, ${s.participantes} ${s.participantes === 1 ? 'participante' : 'participantes'} · PIN ${esc(s.pin)}${s.estado === 'pausada' ? ' · en pausa' : ''})</span>
+    <span class="row" style="gap:6px;"><button class="btn btn-sm btn-primary" data-continuar>Continuar</button><button class="btn btn-sm btn-outline" data-reiniciar>Reiniciar</button>
+    <button class="btn btn-sm btn-ghost" data-finalizar title="Cerrar la sesión: el PIN deja de funcionar">Finalizar</button></span>`;
+  $('[data-continuar]', b).onclick = iniciarVivo;
+  $('[data-reiniciar]', b).onclick = async () => {
+    if (!await confirmar('Se borrarán los participantes, sus respuestas y los grupos de esta sesión, y habrá un PIN nuevo. El diseño del proyecto no cambia.', { titulo: '¿Reiniciar la sesión?', boton: 'Reiniciar' })) return;
+    try {
+      const r = await rpc('proyecto_reiniciar_sesion', { p_sesion: s.id });
+      await borrarFotos(r.fotos);
+      toast('Sesión reiniciada · PIN nuevo: ' + r.sesion.pin);
+    } catch (e) { toast(mensajeError(e), 'error'); }
+    revisarSesion();
+  };
+  $('[data-finalizar]', b).onclick = async () => {
+    if (!await confirmar('El PIN dejará de funcionar. Los resultados quedan guardados en “Resultados” del proyecto.', { titulo: '¿Finalizar la sesión?', boton: 'Finalizar', peligro: false })) return;
+    try { await rpc('proyecto_finalizar', { p_sesion: s.id }); toast('Sesión finalizada'); } catch (e) { toast(mensajeError(e), 'error'); }
+    revisarSesion();
+  };
+}
+// Inicia la sesión en vivo (o continúa la que está abierta) y abre la presentación con el control del profesor
+async function iniciarVivo() {
+  terminarEdicionTexto();
+  if (sucio || guardando) {
+    await guardar();
+    for (let k = 0; k < 40 && (sucio || guardando); k++) await new Promise(r => setTimeout(r, 150));
+    if (sucio) return toast('Primero hay que guardar el proyecto. Revisa tu conexión.', 'error');
+  }
+  let s;
+  try { s = await rpc('proyecto_iniciar_sesion', { p_proyecto: ID }); }
+  catch (e) { return toast(mensajeError(e), 'error'); }
+  const vivo = crearVivo(s, { alError: (m) => toast('Se perdió la conexión con la sesión: ' + m, 'error') });
+  await vivo.iniciar();
+  const inicio = Math.max(0, hojas.findIndex(h => h.id === vivo.sesion.hoja_id));
+  if (!sesionActiva) toast('Sesión iniciada · PIN ' + s.pin);
+  presentar(hojas, { inicio, vivo, alSalir: (i) => { irAHoja(i); revisarSesion(); } });
 }
 
 function abrirPresentacion(desde) {
@@ -421,12 +493,13 @@ function pintarLienzo() {
     return;
   }
   // Celular: el teléfono y, al lado, un aviso grande que explica qué se puede hacer aquí
-  const h = hoja(), preg = esPregunta(h.tipo), manual = celularManual();
+  const h = hoja(), preg = interactiva(h.tipo), manual = celularManual();
   escn.innerHTML = `<div class="cel-vista"><div class="cel-marco" data-cel></div><div class="cel-aviso card" data-aviso></div></div>`;
   const cel = $('[data-cel]');
   lienzo = null;
   if (preg) {
-    pintarCelular(cel, h, proyecto.nombre, { alEnviar: () => toast('Vista previa: la respuesta no se guarda') });
+    pintarCelular(cel, h, proyecto.nombre, { alEnviar: () => toast('Vista previa: la respuesta no se guarda'),
+      alUnirse: () => { toast('Vista previa: en vivo, aquí se registra el participante'); } });
   } else {
     const r = pintarHojaMovil(cel, h, { modo: 'editor' });
     if (manual) {
@@ -439,7 +512,12 @@ function pintarLienzo() {
   }
   const aviso = $('[data-aviso]');
   if (preg) {
-    aviso.innerHTML = `<div class="cel-aviso-ico">🙋</div><h3>Así responde el participante</h3>
+    const ruletaCel = (h.config?.celular || 'ruleta') === 'ruleta';
+    aviso.innerHTML = h.tipo === 'ruleta' ? `<div class="cel-aviso-ico">🎡</div><h3>${ruletaCel ? 'El participante ve la ruleta' : 'El participante mira la pantalla'}</h3>
+      <p>${ruletaCel ? 'Cuando giras, la ruleta gira también en cada celular y se detiene en el mismo elegido. Si le toca a él (o a su grupo), lo verá en grande.' : 'En el celular solo verá “Mira la pantalla 👀”. Puedes cambiarlo en Propiedades.'}</p>
+      <button class="btn btn-primary btn-block" data-editar-web>✏️ Editar en Web</button>` : h.tipo === 'agrupar' ? `<div class="cel-aviso-ico">👥</div><h3>Así se registra el participante</h3>
+      <p>Escribe su nombre, un alias opcional y elige un avatar o sube una foto. Cuando formes los grupos, verá “Estás en el Grupo…” con sus compañeros.</p>
+      <button class="btn btn-primary btn-block" data-editar-web>✏️ Editar en Web</button>` : `<div class="cel-aviso-ico">🙋</div><h3>Así responde el participante</h3>
       <p>Es una vista previa: puedes probar el formulario, pero no se guarda nada. Los textos, colores y opciones se cambian en la vista Web y en el panel de la derecha.</p>
       <button class="btn btn-primary btn-block" data-editar-web>✏️ Editar en Web</button>`;
   } else if (manual) {
@@ -996,7 +1074,7 @@ function aplicarPlantilla(p) {
   h.diseno.fondo = clonar(p.fondo);
   const textos = h.diseno.elementos.filter(e => e.tipo === 'texto');
   const vacia = !h.diseno.elementos.length || (textos.length === h.diseno.elementos.length && textos.every(t => /^(Escribe un título|Título|Subtítulo)$/.test(t.texto)));
-  if (!esPregunta(h.tipo) && vacia) {
+  if (!interactiva(h.tipo) && vacia) {
     h.diseno.elementos = hojaDePlantilla(p).diseno.elementos;
     delete h.diseno.movil;
   } else {
@@ -1120,7 +1198,9 @@ function pintarPropiedades() {
       ${mini ? `<img src="${esc(mini)}" alt="" style="border-radius:10px; margin-bottom:8px;">` : ''}
       <p class="hint" style="margin-bottom:8px;">Se reproduce al presentar. Pulsa ▶ Presentar para probarlo.</p>`;
   } else if (el.tipo === 'zona') {
-    esp = `<p class="hint" style="margin:0 0 8px;">Aquí aparecen las respuestas en vivo (y las simuladas al presentar). Muévela o cambia su tamaño; las opciones de la pregunta están en el panel de la hoja.</p>`;
+    esp = hoja().tipo === 'ruleta'
+      ? `<p class="hint" style="margin:0 0 8px;">Aquí gira la ruleta, con el elegido y el historial. Muévela o cambia su tamaño; los nombres y opciones están en el panel de la hoja.</p>`
+      : `<p class="hint" style="margin:0 0 8px;">Aquí aparecen las respuestas en vivo (y las simuladas al presentar). Muévela o cambia su tamaño; las opciones de la pregunta están en el panel de la hoja.</p>`;
   }
   const enCel = enCelular();
   p.innerHTML = `<div class="panel-cab"><b>${esc(NOMBRE_EL[el.tipo] || 'Elemento')}</b>${enCel ? '<span class="badge">📱 celular</span>' : ''}<span class="grow"></span>
@@ -1214,9 +1294,11 @@ function seccionPregunta(p) {
         <button class="btn btn-sm btn-ghost btn-icon" data-op-del="${i}" ${ops.length <= 2 ? 'disabled' : ''} aria-label="Quitar opción">✕</button></div>`).join('')}</div>
       ${ops.length < 6 ? '<button class="btn btn-sm" data-op-mas>➕ Agregar opción</button>' : ''}`;
   }
+  const hayGrupos = hojas.slice(0, actual).some(x => x.tipo === 'agrupar');
   cuerpo += `<label class="lbl">Responde</label>
-    <label class="check" style="display:flex; margin-bottom:4px;"><input type="radio" name="modo" checked> 🙋 Cada participante</label>
-    <label class="check" style="display:flex; opacity:.55;" title="Disponible cuando exista la hoja Agrupar (Fase 2)"><input type="radio" name="modo" disabled> 👥 Una por grupo (próximamente)</label>`;
+    <label class="check" style="display:flex; margin-bottom:4px;"><input type="radio" name="modo" value="persona" ${c.modo !== 'grupo' ? 'checked' : ''}> 🙋 Cada participante</label>
+    <label class="check" style="display:flex; ${hayGrupos ? '' : 'opacity:.55;'}" ${hayGrupos ? '' : 'title="Agrega antes una hoja Agrupar"'}><input type="radio" name="modo" value="grupo" ${c.modo === 'grupo' ? 'checked' : ''} ${hayGrupos ? '' : 'disabled'}> 👥 Una respuesta por grupo</label>
+    ${hayGrupos ? '' : `<p class="hint">${c.modo === 'grupo' ? '⚠️ Esta pregunta es “por grupo” pero ya no hay una hoja Agrupar antes. ' : ''}Para responder en grupo, agrega antes una hoja <b>Agrupar</b>.</p>`}`;
   const falta = [];
   if (!h.diseno.elementos.some(e => e.tipo === 'zona')) falta.push('<button class="btn btn-sm" data-poner="zona">➕ Volver a poner el área de respuestas</button>');
   if (!h.diseno.elementos.some(e => e.vinculo === 'enunciado')) falta.push('<button class="btn btn-sm" data-poner="enunciado">➕ Volver a poner el enunciado</button>');
@@ -1237,6 +1319,7 @@ function seccionPregunta(p) {
     c.aceptadas[+inp.dataset.acept] = inp.value.split(',').map(x => x.trim()).filter(Boolean);
     confirmarCambio();
   });
+  $$('input[name=modo]', s).forEach(r => r.onchange = () => { c.modo = r.value; confirmarCambio(); });
   $$('input[name=vfok]', s).forEach(r => r.onchange = () => { c.correcta = r.value === '' ? null : r.value === 'true'; confirmarCambio(); });
   $$('[data-op-txt]', s).forEach(inp => {
     inp.oninput = () => { c.opciones[+inp.dataset.opTxt].texto = inp.value; repintarZona(); };
@@ -1263,14 +1346,107 @@ function seccionPregunta(p) {
   });
 }
 
+function seccionAgrupar(p) {
+  const c = hoja().config;
+  const s = document.createElement('div');
+  const pintarEjemplo = () => { $('[data-ejemplo]', s).textContent = 'Con 24 participantes: ' + resumenReparto(24, c.cantidad, c.por).replace('Quedarán', 'quedarían'); };
+  s.innerHTML = `<h4>👥 Agrupar</h4>
+    <p class="hint" style="margin:0 0 8px;">En vivo, los participantes se registran con el QR o el PIN y aparecen en la pantalla. Después cierras el registro y formas los grupos al azar (equilibrados).</p>
+    <label class="check" style="display:flex; margin-bottom:4px;"><input type="radio" name="por" value="grupos" ${c.por !== 'personas' ? 'checked' : ''}> Por número de grupos</label>
+    <label class="check" style="display:flex; margin-bottom:8px;"><input type="radio" name="por" value="personas" ${c.por === 'personas' ? 'checked' : ''}> Por personas en cada grupo</label>
+    ${fila(c.por === 'personas' ? 'Personas' : 'Grupos', `<input class="input" type="number" min="1" max="60" data-cant value="${c.cantidad ?? 4}" style="width:90px;">`)}
+    <p class="hint" data-ejemplo></p>
+    <label class="lbl">Nombres de los grupos (opcional, uno por línea)</label>
+    <textarea class="input" data-nombres style="min-height:80px;" placeholder="Los Leones&#10;Las Águilas&#10;…">${esc((c.nombres || []).join('\n'))}</textarea>
+    <p class="hint">Si faltan nombres, quedan como “Grupo 1”, “Grupo 2”… También se cambian en vivo.</p>
+    <p class="hint" style="margin-top:8px;">Pruébala con <b>▶ Presentar → 🎭 Simular</b>.</p>`;
+  p.appendChild(s);
+  pintarEjemplo();
+  $$('input[name=por]', s).forEach(r => r.onchange = () => { c.por = r.value; confirmarCambio(); });
+  const cant = $('[data-cant]', s);
+  cant.oninput = () => { c.cantidad = Math.max(1, Math.min(60, Math.round(Number(cant.value) || 1))); pintarEjemplo(); };
+  cant.onchange = () => confirmarCambio({ repintar: 'nada' });
+  $('[data-nombres]', s).onchange = (e) => { c.nombres = e.target.value.split('\n').map(x => x.trim()).filter(Boolean).slice(0, 60); confirmarCambio({ repintar: 'nada' }); };
+}
+
+function seccionRuleta(p) {
+  const h = hoja(), c = h.config;
+  const agrupar = hojas.slice(0, actual).map((x, i) => ({ x, i })).filter(({ x }) => x.tipo === 'agrupar');
+  const origen = c.origen || 'nombres';
+  const repintarZona = () => {
+    const z = h.diseno.elementos.find(e => e.tipo === 'zona');
+    if (z && lienzo) repintarElemento(lienzo, z, 'editor', ctxHoja());
+    if (enCelular()) pintarLienzo();
+  };
+  const s = document.createElement('div');
+  s.innerHTML = `<h4>🎡 Ruleta</h4>
+    <label class="lbl">¿Entre quiénes sortea?</label>
+    ${Object.entries(ORIGENES).map(([k, o]) => {
+      const off = k === 'grupos' && !agrupar.length;
+      return `<label class="check" style="display:flex; margin-bottom:4px; ${off ? 'opacity:.55;' : ''}" ${off ? 'title="Agrega antes una hoja Agrupar"' : ''}><input type="radio" name="origen" value="${k}" ${origen === k ? 'checked' : ''} ${off ? 'disabled' : ''}> ${o.ico} ${o.nombre}</label>`;
+    }).join('')}
+    ${origen === 'nombres' ? `<label class="lbl">Nombres (uno por línea, o pega una lista)</label>
+      <textarea class="input" data-lista style="min-height:120px;" placeholder="Ana&#10;Bruno&#10;Carla">${esc((c.lista || []).join('\n'))}</textarea>
+      <p class="hint" data-cuantos></p>` : ''}
+    ${origen === 'grupos' ? (agrupar.length > 1 ? fila('De la hoja', `<select class="input" data-hoja-grupos><option value="">La última hoja Agrupar</option>${agrupar.map(({ x, i }) => `<option value="${x.id}" ${c.hoja_grupos === x.id ? 'selected' : ''}>Hoja ${i + 1} · Agrupar</option>`).join('')}</select>`) : '')
+      + `<p class="hint">${agrupar.length ? 'En vivo, la ruleta muestra los grupos con sus nombres y colores.' : '⚠️ Para sortear grupos, agrega antes una hoja <b>Agrupar</b>.'}</p>` : ''}
+    ${origen === 'participantes' ? '<p class="hint">En vivo, la ruleta muestra a los participantes que se unieron con el PIN.</p>' : ''}
+    <label class="lbl">¿Puede repetir?</label>
+    <label class="check" style="display:flex; margin-bottom:4px;"><input type="radio" name="repetir" value="no" ${c.repetir ? '' : 'checked'}> No: el elegido sale de la ruleta</label>
+    <label class="check" style="display:flex;"><input type="radio" name="repetir" value="si" ${c.repetir ? 'checked' : ''}> Sí: puede volver a salir</label>
+    <label class="lbl">Colores de los gajos${origen === 'grupos' ? ' <span style="text-transform:none;">(los grupos usan su color)</span>' : ''}</label>
+    <div class="grupo-btn" style="flex-wrap:wrap;">${Object.entries(PALETAS).map(([k, pal]) => `<button class="btn btn-sm ${(c.paleta || 'arcoiris') === k ? 'btn-primary' : 'btn-outline'}" data-paleta="${k}">
+      <span class="zr-muestra">${pal.colores.slice(0, 4).map(x => `<i style="background:${x}"></i>`).join('')}</span> ${pal.nombre}</button>`).join('')}</div>
+    <div style="margin-top:10px;">${fila('Duración', `<input type="range" min="2" max="12" step="1" data-dur value="${c.duracion ?? 5}"><b data-ver-dur>${c.duracion ?? 5} s</b>`)}</div>
+    <label class="check" style="display:flex; margin-top:6px;"><input type="checkbox" data-sonido ${c.sonido === false ? '' : 'checked'}> 🔊 Sonido al girar (en la pantalla)</label>
+    <label class="lbl">En el celular del participante</label>
+    <label class="check" style="display:flex; margin-bottom:4px;"><input type="radio" name="celr" value="ruleta" ${(c.celular || 'ruleta') === 'ruleta' ? 'checked' : ''}> 🎡 Ve la ruleta girar</label>
+    <label class="check" style="display:flex;"><input type="radio" name="celr" value="mirar" ${c.celular === 'mirar' ? 'checked' : ''}> 👀 “Mira la pantalla”</label>
+    ${h.diseno.elementos.some(e => e.tipo === 'zona') ? '' : '<button class="btn btn-sm" data-poner-zona style="margin-top:10px;">➕ Volver a poner la ruleta</button>'}
+    <p class="hint" style="margin-top:10px;">Pruébala con <b>▶ Presentar → 🎡 GIRAR</b>${origen === 'nombres' ? '' : ' (pulsa antes 🎭 Simular)'}: los sorteos de prueba no se guardan.</p>`;
+  p.appendChild(s);
+  const cuantos = () => {
+    const q = $('[data-cuantos]', s);
+    if (!q) return;
+    const n = candidatosLocal(h).length;
+    q.textContent = n ? `${n} ${n === 1 ? 'nombre' : 'nombres'} en la ruleta (sin repetidos).` : 'Escribe al menos un nombre.';
+  };
+  cuantos();
+  $$('input[name=origen]', s).forEach(r => r.onchange = () => { c.origen = r.value; confirmarCambio(); });
+  const lista = $('[data-lista]', s);
+  if (lista) {
+    const leer = () => lista.value.split('\n').map(x => x.trim()).filter(Boolean).slice(0, 200);
+    lista.oninput = () => { c.lista = leer(); cuantos(); repintarZona(); };
+    lista.onchange = () => { c.lista = leer(); confirmarCambio({ repintar: 'nada' }); };
+  }
+  const hg = $('[data-hoja-grupos]', s);
+  if (hg) hg.onchange = () => { c.hoja_grupos = hg.value || null; confirmarCambio({ repintar: 'nada' }); };
+  $$('input[name=repetir]', s).forEach(r => r.onchange = () => { c.repetir = r.value === 'si'; confirmarCambio(); });
+  $$('[data-paleta]', s).forEach(b => b.onclick = () => { c.paleta = b.dataset.paleta; confirmarCambio(); });
+  const dur = $('[data-dur]', s);
+  dur.oninput = () => { $('[data-ver-dur]', s).textContent = dur.value + ' s'; };
+  dur.onchange = () => { c.duracion = Number(dur.value); confirmarCambio({ repintar: 'nada' }); };
+  $('[data-sonido]', s).onchange = (e) => { c.sonido = e.target.checked; confirmarCambio({ repintar: 'nada' }); };
+  $$('input[name=celr]', s).forEach(r => r.onchange = () => { c.celular = r.value; confirmarCambio({ repintar: enCelular() ? 'hoja' : 'nada' }); });
+  const pz = $('[data-poner-zona]', s);
+  if (pz) pz.onclick = () => {
+    const nueva = hojaNueva('ruleta').diseno.elementos.find(e => e.tipo === 'zona');
+    h.diseno.elementos.push(nueva);
+    selId = nueva.id;
+    confirmarCambio();
+  };
+}
+
 function pintarPropsHoja(p) {
   const h = hoja();
-  const preg = esPregunta(h.tipo);
+  const preg = interactiva(h.tipo);
   const cel = h.config?.celular || 'mirar';
   const els = h.diseno.elementos;
   const tipo = TIPOS_HOJA.find(t => t.k === h.tipo);
   p.innerHTML = `<div class="panel-cab"><b>Hoja ${actual + 1} de ${hojas.length}</b><span class="grow"></span><span class="badge">${tipo?.ico || ''} ${esc(tipo?.txt || h.tipo)}</span></div>`;
-  if (preg) seccionPregunta(p);
+  if (esPregunta(h.tipo)) seccionPregunta(p);
+  if (h.tipo === 'agrupar') seccionAgrupar(p);
+  if (h.tipo === 'ruleta') seccionRuleta(p);
   if (h.diseno.fondo?.tipo === 'imagen') seccionFondoImagen(p);
   p.insertAdjacentHTML('beforeend', `
     ${h.diseno.fondo?.tipo === 'imagen' ? '' : `<h4>Fondo</h4>
@@ -1312,7 +1488,9 @@ if (perfil) {
       base = proyecto.updated_at;
       if (!proyecto.editable) throw new Error('Tu cuenta no puede modificar este proyecto.');
       montar();
+      await revisarSesion();
       if (params.get('presentar')) abrirPresentacion(0);
+      else if (params.get('vivo')) iniciarVivo();
     } catch (e) { console.error(e); pantallaError(mensajeError(e)); }
   }
 }

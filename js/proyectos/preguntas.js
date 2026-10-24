@@ -123,18 +123,53 @@ export function pintarZona(d, hoja, res) {
 const vacio = (ico, txt) => `<div class="zona-vacia"><span>${ico}</span>${esc(txt)}</div>`;
 
 // ======================= FORMULARIO DEL PARTICIPANTE (celular) =======================
-// alEnviar(valor) se llama al responder. En la vista previa del editor no se guarda nada.
-export function pintarParticipante(cont, hoja, { alEnviar = () => {}, nota = '' } = {}) {
+// Texto corto de una respuesta (para "¡Respuesta enviada!" y la corrección)
+export function textoRespuesta(hoja, valor) {
+  const c = hoja.config || {};
+  if (!valor) return '';
+  if (hoja.tipo === 'vf') return valor.valor ? 'Verdadero' : 'Falso';
+  if (hoja.tipo === 'opcion') return (c.opciones || []).find(o => o.id === valor.opcion)?.texto || '';
+  if (hoja.tipo === 'completar') return (valor.textos || []).join(' · ');
+  return valor.texto || '';
+}
+function textoCorrecta(hoja) {
+  const c = hoja.config || {};
+  if (hoja.tipo === 'vf') return c.correcta ? 'Verdadero' : 'Falso';
+  if (hoja.tipo === 'opcion') return (c.opciones || []).filter(o => (c.correctas || []).includes(o.id)).map(o => o.texto).join(' / ');
+  if (hoja.tipo === 'completar') return (c.aceptadas || []).map(a => a[0] || '').join(' · ');
+  return '';
+}
+
+// Opciones:
+// - alEnviar(valor): puede devolver una promesa; si falla, se muestra el error y se conserva lo escrito.
+// - respuestas: en vivo, lo que ya respondió (o su grupo): [{ valor, alias, mia }]. Sin "respuestas" es una vista previa.
+// - cerrado, revelar, modoGrupo, nota
+export function pintarParticipante(cont, hoja, { alEnviar = () => {}, nota = '', respuestas = null, cerrado = false, revelar = false, modoGrupo = false } = {}) {
   const c = hoja.config || {};
   const tipo = TIPOS_PREGUNTA[hoja.tipo];
-  let enviadas = [];   // lluvia: varias ideas
+  const enVivo = Array.isArray(respuestas);
+  let enviadas = enVivo ? respuestas.map(r => r.valor?.texto).filter(Boolean) : [];   // lluvia: varias ideas
+  let previa = null;                // vista previa: lo último enviado
+  let cambiando = false;
   const caja = document.createElement('div');
   caja.className = 'part';
-  const pintar = (hecho = null) => {
+  const max = Math.max(1, Math.min(10, Number(c.max) || 3));
+
+  const pintar = () => {
+    const actual = enVivo ? respuestas[0] : previa;
     let cuerpo = '';
-    if (hecho) {
-      cuerpo = `<div class="part-hecho">✅<b>¡Respuesta enviada!</b><small>${esc(hecho)}</small></div>
-        <button class="part-btn sec" data-otra>Cambiar respuesta</button>`;
+    if (hoja.tipo !== 'lluvia' && actual && !cambiando) {
+      const otro = enVivo && modoGrupo && !actual.mia ? `<small>Respondió ${esc(actual.alias)} por tu grupo</small>` : '';
+      let correccion = '';
+      if (revelar && tieneCorrecta(hoja)) {
+        correccion = esCorrecta(hoja, actual.valor) ? '<div class="part-ok">✅ ¡Correcto!</div>'
+          : `<div class="part-mal">❌ La respuesta correcta era: <b>${esc(textoCorrecta(hoja))}</b></div>`;
+      }
+      cuerpo = `<div class="part-hecho">✅<b>¡Respuesta enviada!</b><small>${esc(textoRespuesta(hoja, actual.valor))}</small>${otro}</div>${correccion}
+        ${cerrado ? '<div class="part-cuenta" style="text-align:center;">🔒 Las respuestas están cerradas</div>' : '<button class="part-btn sec" data-otra>Cambiar respuesta</button>'}`;
+    } else if (cerrado && !(hoja.tipo === 'lluvia' && enviadas.length)) {
+      cuerpo = `<div class="part-hecho">🔒<b>Las respuestas están cerradas</b><small>Mira la pantalla.</small></div>`;
+      if (revelar && tieneCorrecta(hoja)) cuerpo += `<div class="part-ok">La respuesta correcta era: <b>${esc(textoCorrecta(hoja))}</b></div>`;
     } else if (hoja.tipo === 'vf') {
       cuerpo = `<div class="part-ops dos"><button class="part-op" data-v="1" style="--c:#2FAE6C">✔<span>Verdadero</span></button>
         <button class="part-op" data-v="0" style="--c:#E14D72">✘<span>Falso</span></button></div>`;
@@ -149,35 +184,52 @@ export function pintarParticipante(cont, hoja, { alEnviar = () => {}, nota = '' 
       cuerpo = `<div class="part-frase">${partes.map((p, i) => esc(p) + (i < partes.length - 1 ? `<input class="part-hueco" data-h="${i}" autocomplete="off" aria-label="Espacio ${i + 1}">` : '')).join('')}</div>
         <button class="part-btn" data-enviar>Enviar</button>`;
     } else if (hoja.tipo === 'lluvia') {
-      const max = Math.max(1, Math.min(10, Number(c.max) || 3));
       const quedan = max - enviadas.length;
-      cuerpo = quedan > 0 ? `<input class="part-campo" data-t maxlength="60" placeholder="Escribe una idea corta">
+      cuerpo = quedan > 0 && !cerrado ? `<input class="part-campo" data-t maxlength="60" placeholder="Escribe una idea corta">
         <button class="part-btn" data-enviar>Enviar idea</button><div class="part-cuenta">Puedes enviar ${quedan} ${quedan === 1 ? 'idea más' : 'ideas más'}</div>`
-        : '<div class="part-hecho">✅<b>¡Gracias por tus ideas!</b></div>';
+        : `<div class="part-hecho">✅<b>¡Gracias por tus ideas!</b>${cerrado ? '<small>🔒 Las respuestas están cerradas</small>' : ''}</div>`;
       if (enviadas.length) cuerpo += `<div class="part-ideas">${enviadas.map(t => `<span>${esc(t)}</span>`).join('')}</div>`;
     }
-    caja.innerHTML = `<div class="part-card"><div class="part-tipo">${tipo?.ico || ''} ${esc(tipo?.nombre || '')}</div>
-      <div class="part-enun">${esc(textoEnunciado(hoja)) || '<i>(sin enunciado)</i>'}</div>${cuerpo}</div>${nota ? `<div class="part-nota">${esc(nota)}</div>` : ''}`;
-    const enviar = (valor, resumen) => { alEnviar(valor); if (hoja.tipo === 'lluvia') { enviadas.push(valor.texto); pintar(); } else pintar(resumen); };
-    caja.querySelectorAll('[data-v]').forEach(b => b.onclick = () => enviar({ valor: b.dataset.v === '1' }, b.dataset.v === '1' ? 'Verdadero' : 'Falso'));
-    caja.querySelectorAll('[data-op]').forEach(b => b.onclick = () => enviar({ opcion: b.dataset.op }, b.querySelector('span').textContent));
+    caja.innerHTML = `<div class="part-card"><div class="part-tipo">${tipo?.ico || ''} ${esc(tipo?.nombre || '')}${modoGrupo ? ' · 👥 responde tu grupo' : ''}</div>
+      <div class="part-enun">${esc(textoEnunciado(hoja)) || '<i>(sin enunciado)</i>'}</div>${cuerpo}<div class="reg-err" data-err aria-live="polite"></div></div>${nota ? `<div class="part-nota">${esc(nota)}</div>` : ''}`;
+
+    const err = caja.querySelector('[data-err]');
+    const enviar = async (valor, boton) => {
+      err.textContent = '';
+      caja.querySelectorAll('button').forEach(b => { b.disabled = true; });
+      try {
+        await alEnviar(valor);
+        if (hoja.tipo === 'lluvia') enviadas.push(valor.texto);
+        else if (enVivo) respuestas = [{ valor, alias: '', mia: true }];
+        else previa = { valor };
+        cambiando = false;
+        pintar();
+      } catch (x) {
+        caja.querySelectorAll('button').forEach(b => { b.disabled = false; });
+        err.textContent = x?.message || 'No se pudo enviar. Inténtalo otra vez.';
+        boton?.focus();
+      }
+    };
+    caja.querySelectorAll('[data-v]').forEach(b => b.onclick = () => enviar({ valor: b.dataset.v === '1' }, b));
+    caja.querySelectorAll('[data-op]').forEach(b => b.onclick = () => enviar({ opcion: b.dataset.op }, b));
     const t = caja.querySelector('[data-t]'), n = caja.querySelector('[data-n]');
     if (t && n) t.oninput = () => { n.textContent = t.value.length; };
     const btn = caja.querySelector('[data-enviar]');
     if (btn) btn.onclick = () => {
       if (hoja.tipo === 'completar') {
-        const textos = [...caja.querySelectorAll('[data-h]')].map(i => i.value.trim());
-        if (textos.some(x => !x)) return caja.querySelector('[data-h]:placeholder-shown, [data-h]')?.focus();
-        enviar({ textos }, textos.join(' · '));
+        const campos = [...caja.querySelectorAll('[data-h]')];
+        const vacio = campos.find(i => !i.value.trim());
+        if (vacio) return vacio.focus();
+        enviar({ textos: campos.map(i => i.value.trim()) }, btn);
       } else {
         const v = t.value.trim();
         if (!v) return t.focus();
-        enviar({ texto: v }, v);
+        enviar({ texto: v }, btn);
       }
     };
     if (t) t.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey && t.tagName === 'INPUT') { e.preventDefault(); btn?.click(); } };
     const otra = caja.querySelector('[data-otra]');
-    if (otra) otra.onclick = () => pintar();
+    if (otra) otra.onclick = () => { cambiando = true; pintar(); };
   };
   pintar();
   cont.appendChild(caja);
@@ -194,7 +246,7 @@ const IDEAS = ['amor', 'unión', 'alegría', 'respeto', 'apoyo', 'paz', 'diversi
   'ayuda', 'cariño', 'paciencia', 'esfuerzo', 'música', 'comida', 'juegos', 'abrazos'];
 
 export function crearSimulacion() {
-  const participantes = barajar(NOMBRES).slice(0, 10 + Math.floor(Math.random() * 21)).map(alias => ({ alias, avatar: azar(AVATARES) }));
+  const participantes = barajar(NOMBRES).slice(0, 10 + Math.floor(Math.random() * 21)).map((alias, i) => ({ id: 'sim' + i, alias, avatar: azar(AVATARES) }));
   const estados = new Map();
   const estado = (hoja) => {
     if (!estados.has(hoja.id)) {

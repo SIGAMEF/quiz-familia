@@ -77,6 +77,8 @@ function pantallaPin(error = '') {
     if (!s) {
       const sala = await rpc('sala_por_codigo', { p_codigo: pin }).catch(() => null);   // ¿es una sala de juegos?
       if (sala) { location.href = `juegos.html?sala=${pin}`; return; }
+      const proyecto = await rpc('proyecto_por_pin', { p_pin: pin }).catch(() => null);   // ¿es un proyecto en grupo?
+      if (proyecto) { location.href = `proyecto.html?pin=${pin}`; return; }
       return pantallaPin('No hay ninguna sesión abierta con ese PIN.');
     }
     history.replaceState(null, '', `vivo.html?s=${s.id}`);
@@ -556,7 +558,9 @@ else if (params.get('pin')) {
   rpc('vivo_por_codigo', { p_codigo: pin }).then(async s => {
     if (s) return entrarSesion(s.id);
     const sala = await rpc('sala_por_codigo', { p_codigo: pin }).catch(() => null);
-    if (sala) location.href = `juegos.html?sala=${pin}`; else pantallaPin('PIN no válido');
+    if (sala) { location.href = `juegos.html?sala=${pin}`; return; }
+    const proyecto = await rpc('proyecto_por_pin', { p_pin: pin }).catch(() => null);
+    if (proyecto) location.href = `proyecto.html?pin=${pin}`; else pantallaPin('PIN no válido');
   }).catch(() => pantallaPin());
 }
 else pantallaPin();
