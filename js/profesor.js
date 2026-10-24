@@ -10,6 +10,7 @@ import { descargarPlantilla, leerExcel, leerPegado, filaAPregunta, descargarErro
 import { montarEditorQuiz, montarListaPreguntas } from './editor-quiz.js';
 import { vistaJuegos } from './editor-juegos.js';
 import { imprimir } from './juegos/imprimir.js';
+import { vistaProyectos } from './proyectos/lista.js';
 
 const raiz = $('#raiz');
 let perfil = null;
@@ -23,6 +24,7 @@ const VISTAS = {
   grupos: { ico: '👥', txt: 'Grupos y alumnos' },
   publicar: { ico: '📣', txt: 'Publicar' },
   vivo: { ico: '🏆', txt: 'En vivo' },
+  proyectos: { ico: '🎨', txt: 'Proyectos en grupo' },
   libreta: { ico: '📒', txt: 'Libreta de notas' }
 };
 
@@ -66,7 +68,7 @@ function enrutar() {
   const titulos = { ...Object.fromEntries(Object.entries(VISTAS).map(([k, v]) => [k, v.txt])), perfil: 'Mi perfil', quiz: 'Editar quiz' };
   $('#tituloVista').textContent = titulos[vista] || 'Inicio';
   window.scrollTo(0, 0);
-  const vistas = { inicio: vInicio, quizzes: vQuizzes, juegos: () => vistaJuegos(contenido, { rpc, misGrupos }), quiz: vQuiz, banco: vBanco, carga: vCarga, grupos: vGrupos, publicar: vPublicar, vivo: vVivo, libreta: vLibreta, perfil: vPerfil };
+  const vistas = { inicio: vInicio, quizzes: vQuizzes, juegos: () => vistaJuegos(contenido, { rpc, misGrupos }), quiz: vQuiz, banco: vBanco, carga: vCarga, grupos: vGrupos, publicar: vPublicar, vivo: vVivo, proyectos: () => vistaProyectos(contenido, { rpc, panel: 'profesor' }), libreta: vLibreta, perfil: vPerfil };
   (vistas[vista] || vInicio)(param ? decodeURIComponent(param) : '');
 }
 

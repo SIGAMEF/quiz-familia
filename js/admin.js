@@ -6,6 +6,7 @@ import {
   exigirRol, salir, menuUsuario, cierreInactividad, avatarHtml, fmtFecha
 } from './comun.js';
 import { montarEditorQuiz } from './editor-quiz.js';
+import { vistaProyectos } from './proyectos/lista.js';
 
 const raiz = $('#raiz');
 let perfil = null;
@@ -18,6 +19,7 @@ const VISTAS = {
   alumnos: { ico: '🎒', txt: 'Alumnos' },
   quizzes: { ico: '📚', txt: 'Quizzes' },
   publicos: { ico: '🌐', txt: 'Juegos públicos' },
+  proyectos: { ico: '🎨', txt: 'Proyectos en grupo' },
   periodos: { ico: '📅', txt: 'Periodos' }
 };
 const MENSAJE_DEFECTO = 'Tu cuenta fue restringida. Comunícate con el administrador de QuizApp.';
@@ -56,7 +58,7 @@ function enrutar() {
   $$('[data-ir]').forEach(b => b.classList.toggle('activo', b.dataset.ir === clave));
   $('#tituloVista').textContent = vista === 'quiz' ? 'Editar quiz' : (VISTAS[vista]?.txt || 'Resumen');
   window.scrollTo(0, 0);
-  const v = { inicio: vInicio, profesores: vProfesores, instituciones: vInstituciones, alumnos: vAlumnos, quizzes: vQuizzes, quiz: vQuiz, periodos: vPeriodos, publicos: vPublicos };
+  const v = { inicio: vInicio, profesores: vProfesores, instituciones: vInstituciones, alumnos: vAlumnos, quizzes: vQuizzes, quiz: vQuiz, periodos: vPeriodos, publicos: vPublicos, proyectos: () => vistaProyectos(contenido, { rpc, panel: 'admin' }) };
   (v[vista] || vInicio)(param ? decodeURIComponent(param) : '');
 }
 
