@@ -9,6 +9,7 @@ import { estiloFondo, fuenteValida, colorValido, urlSegura, FORMAS, limpiarNodos
 import { esPregunta, pintarZona, textoEnunciado, pintarParticipante } from './preguntas.js';
 import { pintarZonaAgrupar, pintarRegistro } from './agrupar.js';
 import { pintarZonaRuleta, pintarRuletaCelular } from './ruleta.js';
+import { pintarZonaJuego, pintarEsperaJuego } from './juego-hoja.js';
 
 export const ASPECTO = 16 / 9;
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -193,6 +194,7 @@ function crearElemento(el, modo, ctx) {
   } else if (el.tipo === 'zona') {
     if (ctx.hoja?.tipo === 'agrupar') pintarZonaAgrupar(d, ctx.hoja, ctx.res || null);
     else if (ctx.hoja?.tipo === 'ruleta') pintarZonaRuleta(d, ctx.hoja, ctx.res || null, { animar: modo === 'ver' });
+    else if (ctx.hoja?.tipo === 'juego') pintarZonaJuego(d, ctx.hoja, ctx.res || null);
     else if (ctx.hoja && esPregunta(ctx.hoja.tipo)) pintarZona(d, ctx.hoja, ctx.res || null);
     else return null;
   } else {
@@ -274,7 +276,7 @@ export function repintarElemento(lienzo, el, modo = 'editor', ctx = {}) {
 export function pintarCelular(cont, hoja, nombreProyecto = '', { modo = 'ver', alEnviar, nota, vivo = null, alUnirse, ruleta = null } = {}) {
   asegurarFuentes();
   const conRuleta = hoja?.tipo === 'ruleta' && (hoja.config?.celular || 'ruleta') === 'ruleta';
-  if (esPregunta(hoja?.tipo) || hoja?.tipo === 'agrupar' || conRuleta) {
+  if (esPregunta(hoja?.tipo) || hoja?.tipo === 'agrupar' || conRuleta || hoja?.tipo === 'juego') {
     const pantalla = document.createElement('div');
     pantalla.className = 'movil-pantalla';
     const fondo = document.createElement('div');
@@ -284,6 +286,7 @@ export function pintarCelular(cont, hoja, nombreProyecto = '', { modo = 'ver', a
     scroll.className = 'movil-scroll part-scroll';
     if (hoja.tipo === 'agrupar') pintarRegistro(scroll, { titulo: nombreProyecto, subtitulo: 'Únete con tu nombre', alUnirse });
     else if (conRuleta) pintarRuletaCelular(scroll, hoja, ruleta, nombreProyecto);
+    else if (hoja.tipo === 'juego') pintarEsperaJuego(scroll, hoja);
     else pintarParticipante(scroll, hoja, { alEnviar, nota, ...(vivo || {}) });
     pantalla.append(fondo, scroll);
     cont.replaceChildren(pantalla);

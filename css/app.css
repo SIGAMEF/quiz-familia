@@ -265,3 +265,34 @@ img.zoom { max-width: 100%; border-radius: 12px; margin-bottom: 12px; cursor: zo
   .fila-ed.par .flecha-par { display: none; }
   .fila-ed.par .lado-ed + .lado-ed { grid-column: 2; grid-row: 2; }
 }
+
+/* ---------- Mis actividades: catálogo de tipos (tarjetas como las de la portada) ---------- */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; margin-top: 6px; }
+.cat-tarjeta { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding: 0 0 12px; border: none; border-radius: 18px; background: #fff; cursor: pointer;
+  font: inherit; color: var(--ink); box-shadow: 0 0 0 2px color-mix(in srgb, var(--c) 30%, #fff), 0 6px 14px rgba(30,25,70,.08); overflow: hidden; transition: transform .15s, box-shadow .15s; }
+.cat-tarjeta:hover, .cat-tarjeta:focus-visible { transform: translateY(-3px); outline: none; box-shadow: 0 0 0 3px var(--c), 0 12px 24px rgba(30,25,70,.14); }
+.cat-arte { width: 100%; aspect-ratio: 16 / 9; display: grid; place-items: center; font-size: 46px;
+  background: radial-gradient(circle at 30% 20%, rgba(255,255,255,.7), transparent 55%), linear-gradient(160deg, color-mix(in srgb, var(--c) 30%, #fff), color-mix(in srgb, var(--c) 62%, #fff)); }
+.cat-cinta { margin-top: -16px; padding: 3px 14px 5px; border-radius: 11px; color: #fff; font-family: 'Baloo 2', sans-serif; font-size: 17px; line-height: 1.1;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 85%, #fff), var(--c)); text-shadow: 0 2px 0 var(--c2); box-shadow: 0 3px 0 var(--c2); }
+.cat-tarjeta small { padding: 0 12px; color: var(--muted); font-weight: 700; font-size: 12.5px; line-height: 1.35; }
+.act-ico { display: inline-grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border-radius: 12px; font-size: 22px; margin-right: 8px;
+  background: color-mix(in srgb, var(--c) 16%, #fff); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--c) 35%, #fff); }
+.act-ico.chico { width: 26px; height: 26px; font-size: 15px; border-radius: 8px; margin-right: 2px; vertical-align: -5px; }
+/* selector de visibilidad */
+.vis-sel { display: inline-flex; align-items: center; border-radius: 20px; padding: 0 2px; background: #F1EEFB; }
+.vis-sel select { border: none; background: transparent; font: 800 12.5px 'Nunito', sans-serif; color: var(--ink); padding: 5px 6px; border-radius: 20px; cursor: pointer; max-width: 160px; }
+.vis-sel.vis-grupos { background: var(--green-bg); }
+.vis-sel.vis-publico { background: #E0F2FE; }
+.vis-sel.vis-destacado { background: var(--amber-bg); box-shadow: inset 0 0 0 2px var(--amber-strong); }
+/* preguntas de Trivia y Quiz relámpago */
+.preg-ed { gap: 10px; }
+.fila-preg { border: 1px solid var(--line); border-radius: 12px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+.fila-preg .num { font-weight: 800; color: var(--muted); font-size: 12px; min-width: 18px; text-align: right; }
+.preg-ops { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding-left: 24px; }
+.preg-op { display: flex; align-items: center; gap: 4px; }
+.preg-op span { width: 22px; text-align: center; font-weight: 900; color: var(--red); }
+.preg-op.ok span { color: var(--green); }
+.preg-op.ok .input { border-color: var(--green-strong, #7BD389); background: var(--green-bg); }
+@media (max-width: 560px) { .preg-ops { grid-template-columns: 1fr; padding-left: 0; } }

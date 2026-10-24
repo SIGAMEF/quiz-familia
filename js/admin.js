@@ -19,7 +19,7 @@ const VISTAS = {
   instituciones: { ico: '🏫', txt: 'Instituciones' },
   alumnos: { ico: '🎒', txt: 'Alumnos' },
   quizzes: { ico: '📚', txt: 'Quizzes' },
-  publicos: { ico: '🌐', txt: 'Juegos públicos' },
+  publicos: { ico: '🌐', txt: 'Públicos y destacados' },
   proyectos: { ico: '🎨', txt: 'Proyectos en grupo' },
   periodos: { ico: '📅', txt: 'Periodos' }
 };
@@ -64,25 +64,32 @@ function enrutar() {
 }
 
 // ======================= JUEGOS PÚBLICOS =======================
-const ICO_TIPO = { sopa: '🔎', ahorcado: '🦘', memoria: '🃏', ordena: '🔀', frase: '🔤', rompecabezas: '🧩', quiz: '📝' };
+const ICO_TIPO = { sopa: '🔎', ahorcado: '🦘', memoria: '🃏', ordena: '🔀', frase: '🔤', rompecabezas: '🧩', quiz: '📝', trivia: '📖', relampago: '⚡', proyecto: '🎨' };
+const enlacePublico = (j) => j.clase === 'quiz' ? `juegos.html?q=${j.id}` : j.clase === 'proyecto' ? `proyecto.html?p=${j.id}` : `juegos.html?g=${j.id}`;
+// Moderación: lo público y lo destacado en la portada (quizzes, juegos y proyectos)
 async function vPublicos() {
   spinner();
   let lista;
   try { lista = await rpc('admin_juegos'); } catch (e) { return falla(e); }
+  const destacados = lista.filter(j => j.destacado).length;
   contenido.innerHTML = `<div class="card"><h2>🌐 Lo que se ve en la página principal</h2>
-    <p class="sub">Juegos y quizzes que los profesores marcaron como públicos. Puedes quitarlos de la página si no corresponden.</p>
-    ${lista.length ? `<div class="tabla-wrap"><table class="tabla"><thead><tr><th>Juego</th><th>Autor</th><th>Elementos</th><th>Jugadas</th><th>Público</th><th></th></tr></thead><tbody>
-    ${lista.map(j => `<tr data-k="${j.clase}:${j.id}"><td>${ICO_TIPO[j.tipo] || '🎲'} <b>${esc(j.titulo)}</b><br><span class="small muted">${esc(j.tipo)}${j.tema ? ' · ' + esc(j.tema) : ''}</span></td>
+    <p class="sub">Quizzes, juegos y proyectos que los profesores hicieron públicos. Los ⭐ destacados salen además en la portada, en “Creado por nuestros profesores” (${destacados}).
+      Puedes quitarlos de la portada o de la página si no corresponden; el profesor los conserva en su panel.</p>
+    ${lista.length ? `<div class="tabla-wrap"><table class="tabla"><thead><tr><th>Actividad</th><th>Autor</th><th>Elementos</th><th>Jugadas</th><th>En la portada</th><th></th></tr></thead><tbody>
+    ${lista.map(j => `<tr data-k="${j.clase}:${j.id}" ${j.destacado ? 'style="background:var(--amber-bg, #FFF6DD);"' : ''}><td>${ICO_TIPO[j.tipo] || '🎲'} <b>${esc(j.titulo)}</b><br><span class="small muted">${esc(j.tipo)}${j.tema ? ' · ' + esc(j.tema) : ''}</span></td>
       <td>${esc(j.autor)}</td><td>${j.n}</td><td>${j.jugadas}</td>
-      <td>${j.publico ? '<span class="badge green">Sí</span>' : '<span class="badge gray">No</span>'}</td>
-      <td><div class="row" style="gap:4px; flex-wrap:nowrap;"><a class="btn btn-sm" target="_blank" rel="noopener" href="juegos.html?${j.clase === 'quiz' ? 'q' : 'g'}=${j.id}">▶</a>
-        ${j.publico ? '<button class="btn btn-sm btn-red" data-quitar>Quitar de públicos</button>' : ''}</div></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Todavía nadie compartió juegos públicos.</div>'}</div>`;
-  $$('[data-quitar]', contenido).forEach(b => b.onclick = async () => {
+      <td>${j.destacado ? '<span class="badge amber">⭐ Destacado</span>' : '<span class="badge gray">🌐 Solo biblioteca</span>'}</td>
+      <td><div class="row" style="gap:4px; flex-wrap:nowrap;"><a class="btn btn-sm" target="_blank" rel="noopener" href="${enlacePublico(j)}" title="Abrir">▶</a>
+        ${j.destacado ? '<button class="btn btn-sm btn-amber" data-nivel="publico" title="Deja de salir en la portada, pero sigue en la biblioteca">Quitar destacado</button>' : ''}
+        <button class="btn btn-sm btn-red" data-nivel="privado">Quitar de públicos</button></div></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Todavía nadie compartió actividades públicas.</div>'}</div>`;
+  $$('[data-nivel]', contenido).forEach(b => b.onclick = async () => {
     const [clase, id] = b.closest('[data-k]').dataset.k.split(':');
-    if (!await confirmar('Dejará de aparecer en la página principal. El profesor lo conserva en su panel.', { titulo: '¿Quitar de públicos?', boton: 'Quitar' })) return;
-    const { error } = await supabase.from(clase === 'quiz' ? 'quizzes' : 'juegos').update({ publico: false }).eq('id', id);
+    const quitarTodo = b.dataset.nivel === 'privado';
+    if (!await confirmar(quitarTodo ? 'Dejará de aparecer en la página principal. El profesor lo conserva en su panel.' : 'Dejará de salir en la portada, pero seguirá en la biblioteca.',
+      { titulo: quitarTodo ? '¿Quitar de públicos?' : '¿Quitar el destacado?', boton: 'Quitar' })) return;
+    const { error } = await supabase.rpc('actividad_visibilidad', { p_clase: clase, p_id: id, p_nivel: b.dataset.nivel });
     if (error) return toast(mensajeError(error), 'error');
-    toast('Quitado de la página principal'); vPublicos();
+    toast(quitarTodo ? 'Quitado de la página principal' : 'Quitado de la portada'); vPublicos();
   });
 }
 

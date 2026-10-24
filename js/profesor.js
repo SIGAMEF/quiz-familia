@@ -8,23 +8,24 @@ import {
 } from './comun.js';
 import { descargarPlantilla, leerExcel, leerPegado, filaAPregunta, descargarErrores, descargarLibreta, descargarResultados } from './excel.js';
 import { montarEditorQuiz, montarListaPreguntas } from './editor-quiz.js';
-import { vistaJuegos } from './editor-juegos.js';
+import { htmlTarjetaJuego, conectarTarjetaJuego, abrirEditor, publicarJuego } from './editor-juegos.js';
+import { JUEGOS } from './juegos/contenido.js';
+import { elegirActividad } from './catalogo.js';
+import { pintarVisibilidad, chipsFiltro } from './visibilidad.js';
 import { imprimir } from './juegos/imprimir.js';
-import { vistaProyectos } from './proyectos/lista.js';
+import { htmlTarjetaProyecto, conectarTarjetaProyecto, crearProyecto, publicarProyecto } from './proyectos/lista.js';
 
 const raiz = $('#raiz');
 let perfil = null;
 
 const VISTAS = {
   inicio: { ico: '🏠', txt: 'Inicio' },
-  quizzes: { ico: '📚', txt: 'Mis quizzes' },
-  juegos: { ico: '🎲', txt: 'Mis juegos' },
+  quizzes: { ico: '📚', txt: 'Mis actividades' },   // quizzes, juegos y proyectos juntos
   carga: { ico: '📥', txt: 'Carga masiva' },
   banco: { ico: '🔎', txt: 'Todas mis preguntas' },
   grupos: { ico: '👥', txt: 'Grupos y alumnos' },
   publicar: { ico: '📣', txt: 'Publicar' },
   vivo: { ico: '🏆', txt: 'En vivo' },
-  proyectos: { ico: '🎨', txt: 'Proyectos en grupo' },
   libreta: { ico: '📒', txt: 'Libreta de notas' }
 };
 
@@ -63,12 +64,12 @@ export function ir(vista, param = '') { location.hash = vista + (param ? '/' + p
 
 function enrutar() {
   const [vista, param] = (location.hash.slice(1) || 'inicio').split('/');
-  const clave = vista === 'quiz' ? 'quizzes' : vista;
+  const clave = ['quiz', 'juegos', 'proyectos'].includes(vista) ? 'quizzes' : vista;
   $$('[data-ir]').forEach(b => b.classList.toggle('activo', b.dataset.ir === clave));
-  const titulos = { ...Object.fromEntries(Object.entries(VISTAS).map(([k, v]) => [k, v.txt])), perfil: 'Mi perfil', quiz: 'Editar quiz' };
+  const titulos = { ...Object.fromEntries(Object.entries(VISTAS).map(([k, v]) => [k, v.txt])), perfil: 'Mi perfil', quiz: 'Editar quiz', juegos: 'Mis actividades', proyectos: 'Mis actividades' };
   $('#tituloVista').textContent = titulos[vista] || 'Inicio';
   window.scrollTo(0, 0);
-  const vistas = { inicio: vInicio, quizzes: vQuizzes, juegos: () => vistaJuegos(contenido, { rpc, misGrupos }), quiz: vQuiz, banco: vBanco, carga: vCarga, grupos: vGrupos, publicar: vPublicar, vivo: vVivo, proyectos: () => vistaProyectos(contenido, { rpc, panel: 'profesor' }), libreta: vLibreta, perfil: vPerfil };
+  const vistas = { inicio: vInicio, quizzes: vQuizzes, juegos: () => vQuizzes('juegos'), quiz: vQuiz, banco: vBanco, carga: vCarga, grupos: vGrupos, publicar: vPublicar, vivo: vVivo, proyectos: () => vQuizzes('proyectos'), libreta: vLibreta, perfil: vPerfil };
   (vistas[vista] || vInicio)(param ? decodeURIComponent(param) : '');
 }
 
@@ -93,7 +94,7 @@ async function vInicio() {
   try {
     const [r, quizzes, grupos] = await Promise.all([rpc('resumen_profesor'), misQuizzes(), misGrupos()]);
     const pasos = [
-      { ok: r.quizzes > 0, txt: 'Crea o carga tu primer quiz', ir: 'quizzes' },
+      { ok: r.quizzes > 0, txt: 'Crea tu primera actividad: un quiz, un juego o un proyecto', ir: 'quizzes' },
       { ok: r.grupos > 0, txt: 'Crea un grupo y comparte el enlace o QR con tus alumnos', ir: 'grupos' },
       { ok: r.publicaciones > 0, txt: 'Publica un quiz en tu grupo', ir: 'publicar' }
     ];
@@ -110,7 +111,7 @@ async function vInicio() {
         <div class="card"><div class="row between"><h2>📚 Quizzes recientes</h2><button class="btn btn-sm" data-ir2="quizzes">Ver todos</button></div>
           ${quizzes.slice(0, 5).map(q => `<div class="row" style="padding:8px 0; border-bottom:1px solid var(--line);"><span class="grow"><b>${esc(q.titulo)}</b><br><span class="small muted">${q.n_preguntas} preguntas · ${fmtFecha(q.updated_at)}</span></span>
             <button class="btn btn-sm" data-quiz="${q.id}">Abrir</button></div>`).join('') || '<div class="empty">Aún no tienes quizzes.</div>'}
-          <div class="row" style="margin-top:12px;"><button class="btn btn-primary btn-sm" data-nuevo>➕ Nuevo quiz</button><button class="btn btn-sm" data-ir2="carga">📥 Carga masiva</button></div></div>
+          <div class="row" style="margin-top:12px;"><button class="btn btn-primary btn-sm" data-nuevo>➕ Nuevo</button><button class="btn btn-sm" data-ir2="carga">📥 Carga masiva</button></div></div>
         <div class="card"><div class="row between"><h2>👥 Mis grupos</h2><button class="btn btn-sm" data-ir2="grupos">Gestionar</button></div>
           ${grupos.slice(0, 6).map(g => `<div class="row" style="padding:8px 0; border-bottom:1px solid var(--line);"><span class="grow"><b>${esc(g.nombre)}</b><br><span class="small muted">${g.n_alumnos} alumnos · código ${esc(g.codigo_invitacion)}</span></span>
             <button class="btn btn-sm" data-copiar="${esc(enlaceGrupo(g))}">🔗 Enlace</button></div>`).join('') || '<div class="empty">Aún no tienes grupos.</div>'}</div>
@@ -118,7 +119,7 @@ async function vInicio() {
     $$('[data-ir2]', contenido).forEach(b => b.onclick = () => ir(b.dataset.ir2));
     $$('[data-quiz]', contenido).forEach(b => b.onclick = () => ir('quiz', b.dataset.quiz));
     $$('[data-copiar]', contenido).forEach(b => b.onclick = () => copiar(b.dataset.copiar));
-    $('[data-nuevo]', contenido).onclick = nuevoQuiz;
+    $('[data-nuevo]', contenido).onclick = () => nuevaActividad();
   } catch (e) { falla(e); }
 }
 
@@ -134,55 +135,96 @@ async function nuevoQuiz() {
   ir('quiz', data.id);
 }
 
-async function vQuizzes() {
+// ======================= MIS ACTIVIDADES (quizzes, juegos y proyectos juntos) =======================
+// filtroIni: 'quizzes' | 'juegos' | 'proyectos' (los enlaces #juegos y #proyectos abren esta lista ya filtrada)
+const FILTROS = [['', 'Todos'], ['quiz', '📝 Quizzes'], ['juego', '🎲 Juegos'], ['proyecto', '🎨 Proyectos']];
+
+// "+ Nuevo": tarjetas de todos los tipos; cada una abre su editor
+async function nuevaActividad(alGuardar = () => vQuizzes()) {
+  const t = await elegirActividad();
+  if (!t) return;
+  if (t === 'quiz') return nuevoQuiz();
+  if (t === 'proyecto') return crearProyecto({ rpc, panel: 'profesor' });
+  abrirEditor(t, null, alGuardar);
+}
+
+function htmlTarjetaQuiz(q) {
+  return `<div class="card act-card" data-q="${q.id}" style="margin:0; display:flex; flex-direction:column;">
+      <div class="row" style="align-items:flex-start; flex-wrap:nowrap;"><span class="act-ico" style="--c:#8E5BE8" title="Quiz tradicional">📝</span>
+        <h3 class="grow">${esc(q.titulo)}</h3>${q.tema ? `<span class="badge">${esc(q.tema)}</span>` : ''}</div>
+      <p class="small muted" style="font-weight:700; margin:4px 0 8px;">Quiz · ${q.n_preguntas} preguntas · ${q.puntos} pts · ${q.n_publicaciones ? `📣 publicado ${q.n_publicaciones === 1 ? '1 vez' : q.n_publicaciones + ' veces'}` : 'sin publicar'}</p>
+      ${(q.subtemas || []).length ? `<div class="chips" style="margin-bottom:8px;">${q.subtemas.slice(0, 5).map(s => `<span class="badge gray">${esc(s)}</span>`).join('')}${q.subtemas.length > 5 ? `<span class="badge gray">+${q.subtemas.length - 5}</span>` : ''}</div>` : ''}
+      <div class="row" style="gap:6px; margin-bottom:6px;"><span data-visibilidad></span></div>
+      <p class="small muted" style="margin-top:auto;">Editado ${fmtFecha(q.updated_at, true)}</p>
+      <div class="row" style="gap:6px; margin-top:10px;">
+        <button class="btn btn-sm btn-primary" data-acc="editar">✏️ Editar</button>
+        <button class="btn btn-sm btn-green" data-acc="publicar">📣 Publicar</button>
+        <button class="btn btn-sm btn-amber" data-acc="vivo">🏆 En vivo</button>
+        <button class="btn btn-sm" data-acc="duplicar" title="Duplicar">⧉</button>
+        <button class="btn btn-sm" data-acc="ficha" title="Imprimir ficha">🖨</button>
+        <button class="btn btn-sm" data-acc="solucion" title="Imprimir solución">🖨✔</button>
+        <button class="btn btn-sm btn-red" data-acc="eliminar" title="Eliminar">🗑</button>
+      </div>
+    </div>`;
+}
+
+async function vQuizzes(filtroIni = '') {
   spinner();
-  let quizzes;
-  try { quizzes = await misQuizzes(); } catch (e) { return falla(e); }
-  const temas = [...new Set(quizzes.map(q => q.tema).filter(Boolean))].sort();
+  let quizzes, juegos, proyectos, grupos;
+  try {
+    [quizzes, juegos, proyectos, grupos] = await Promise.all([misQuizzes(), rpc('mis_juegos_profesor'), rpc('mis_proyectos'), misGrupos()]);
+  } catch (e) { return falla(e); }
+  let filtro = { quizzes: 'quiz', juegos: 'juego', proyectos: 'proyecto' }[filtroIni] || '';
+  const items = [
+    ...quizzes.map(q => ({ clase: 'quiz', d: q, titulo: q.titulo, tema: q.tema, buscar: `${q.titulo} ${q.tema || ''} ${(q.subtemas || []).join(' ')}`, fecha: q.updated_at })),
+    ...juegos.map(j => ({ clase: 'juego', d: j, titulo: j.titulo, tema: j.tema, buscar: `${j.titulo} ${j.tema || ''} ${JUEGOS[j.tipo]?.nombre || ''}`, fecha: j.updated_at })),
+    ...proyectos.map(p => ({ clase: 'proyecto', d: p, titulo: p.nombre, tema: null, buscar: `${p.nombre} proyecto`, fecha: p.updated_at }))
+  ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+  const temas = [...new Set(items.map(x => x.tema).filter(Boolean))].sort();
   contenido.innerHTML = `
-    <div class="row" style="margin-bottom:14px;">
-      <button class="btn btn-primary" data-nuevo>➕ Nuevo quiz (manual)</button>
-      <button class="btn" data-carga>📥 Carga masiva (Excel)</button>
+    <div class="row" style="margin-bottom:10px;">
+      <button class="btn btn-primary" data-nuevo>➕ Nuevo</button>
+      <button class="btn" data-carga title="Subir preguntas de quiz desde Excel">📥 Carga masiva</button>
       <span class="grow"></span>
-      <input class="input" data-buscar placeholder="🔍 Buscar quiz..." style="max-width:260px;">
+      <input class="input" data-buscar placeholder="🔍 Buscar..." style="max-width:260px;">
       <select class="input" data-tema style="width:auto;"><option value="">Todos los temas</option>${temas.map(t => `<option>${esc(t)}</option>`).join('')}</select>
     </div>
+    <div class="chips" data-filtro style="margin-bottom:14px;"></div>
     <div class="grid grid-auto" data-lista></div>`;
-  $('[data-nuevo]', contenido).onclick = nuevoQuiz;
+  const recargar = () => vQuizzes(filtroIni);
+  $('[data-nuevo]', contenido).onclick = () => nuevaActividad(recargar);
   $('[data-carga]', contenido).onclick = () => ir('carga');
   const lista = $('[data-lista]', contenido);
+  const pintarFiltro = () => chipsFiltro($('[data-filtro]', contenido),
+    FILTROS.map(([k, t]) => [k, `${t} (${k ? items.filter(x => x.clase === k).length : items.length})`]), filtro,
+    (k) => { filtro = k; pintarFiltro(); pintar(); });
   const pintar = () => {
     const txt = $('[data-buscar]', contenido).value, tema = $('[data-tema]', contenido).value;
-    const vis = quizzes.filter(q => (!tema || q.tema === tema) && (!txt || coincide(`${q.titulo} ${q.tema || ''} ${(q.subtemas || []).join(' ')}`, txt)));
-    lista.innerHTML = vis.map(q => `
-      <div class="card" style="margin:0; display:flex; flex-direction:column;">
-        <div class="row between" style="align-items:flex-start;"><h3 class="grow">${esc(q.titulo)}</h3>${q.tema ? `<span class="badge">${esc(q.tema)}</span>` : ''}</div>
-        <p class="small muted" style="font-weight:700; margin:4px 0 8px;">${q.n_preguntas} preguntas · ${q.puntos} pts · ${q.n_publicaciones ? `📣 publicado ${q.n_publicaciones === 1 ? '1 vez' : q.n_publicaciones + ' veces'}` : 'sin publicar'}</p>
-        ${(q.subtemas || []).length ? `<div class="chips" style="margin-bottom:8px;">${q.subtemas.slice(0, 5).map(s => `<span class="badge gray">${esc(s)}</span>`).join('')}${q.subtemas.length > 5 ? `<span class="badge gray">+${q.subtemas.length - 5}</span>` : ''}</div>` : ''}
-        <label class="chip check" style="align-self:flex-start; margin-bottom:6px;" title="Aparece en la página principal; se juega sin ver las respuestas"><input type="checkbox" data-publico="${q.id}" ${q.publico ? 'checked' : ''}> 🌐 Público</label>
-        <p class="small muted" style="margin-top:auto;">Editado ${fmtFecha(q.updated_at, true)}</p>
-        <div class="row" style="gap:6px; margin-top:10px;">
-          <button class="btn btn-sm btn-primary" data-acc="editar" data-id="${q.id}">✏️ Editar</button>
-          <button class="btn btn-sm btn-green" data-acc="publicar" data-id="${q.id}">📣 Publicar</button>
-          <button class="btn btn-sm btn-amber" data-acc="vivo" data-id="${q.id}">🏆 En vivo</button>
-          <button class="btn btn-sm" data-acc="duplicar" data-id="${q.id}" title="Duplicar">⧉</button>
-          <button class="btn btn-sm" data-acc="ficha" data-id="${q.id}" title="Imprimir ficha">🖨</button>
-          <button class="btn btn-sm" data-acc="solucion" data-id="${q.id}" title="Imprimir solución">🖨✔</button>
-          <button class="btn btn-sm btn-red" data-acc="eliminar" data-id="${q.id}" title="Eliminar">🗑</button>
-        </div>
-      </div>`).join('') || `<div class="empty card" style="grid-column:1/-1;"><span class="big">📚</span>${quizzes.length ? 'Ningún quiz coincide.' : 'Todavía no tienes quizzes. Crea uno a mano o súbelos desde Excel.'}</div>`;
-    $$('[data-acc]', lista).forEach(b => b.onclick = () => accionQuiz(b.dataset.acc, quizzes.find(q => q.id === b.dataset.id)));
-    $$('[data-publico]', lista).forEach(c => c.onchange = async () => {
-      const q = quizzes.find(x => x.id === c.dataset.publico);
-      if (c.checked && q.n_publicaciones && !await confirmar('Al hacerlo público, cualquiera podrá jugarlo y conocer las preguntas (las respuestas no se muestran antes de responder).\nSi lo usas como examen, mejor haz una copia para compartir.', { titulo: '¿Hacer público este quiz?', boton: 'Hacer público', peligro: false })) { c.checked = false; return; }
-      const { error } = await supabase.from('quizzes').update({ publico: c.checked }).eq('id', q.id);
-      if (error) { c.checked = !c.checked; return toast(mensajeError(error), 'error'); }
-      q.publico = c.checked; toast(q.publico ? 'Ahora aparece en la página principal' : 'Ya no es público');
-    });
+    const vis = items.filter(x => (!filtro || x.clase === filtro) && (!tema || x.tema === tema) && (!txt || coincide(x.buscar, txt)));
+    lista.innerHTML = vis.map(x => x.clase === 'quiz' ? htmlTarjetaQuiz(x.d) : x.clase === 'juego' ? htmlTarjetaJuego(x.d) : htmlTarjetaProyecto(x.d)).join('')
+      || `<div class="empty card" style="grid-column:1/-1;"><span class="big">📚</span>${items.length ? 'Nada coincide con la búsqueda.' : 'Todavía no tienes actividades. Toca “➕ Nuevo” y elige qué crear: un quiz, un juego o un proyecto en grupo.'}</div>`;
+    for (const x of vis) {
+      if (x.clase === 'quiz') {
+        const card = $(`[data-q="${x.d.id}"]`, lista);
+        $$('[data-acc]', card).forEach(b => b.onclick = () => accionQuiz(b.dataset.acc, x.d));
+        pintarVisibilidad($('[data-visibilidad]', card), { clase: 'quiz', item: x.d, publicadas: x.d.n_publicaciones_activas ?? x.d.n_publicaciones,
+          alGrupos: () => ir('publicar', x.d.id), alCambiar: recargar });
+      } else if (x.clase === 'juego') {
+        const card = $(`[data-j="${x.d.id}"]`, lista);
+        conectarTarjetaJuego(card, x.d, { rpc, grupos, recargar });
+        pintarVisibilidad($('[data-visibilidad]', card), { clase: 'juego', item: x.d, publicadas: x.d.publicaciones.filter(p => p.activo).length,
+          alGrupos: () => publicarJuego(x.d, grupos, recargar), alCambiar: recargar });
+      } else {
+        const card = $(`[data-proy="${x.d.id}"]`, lista);
+        conectarTarjetaProyecto(card, x.d, { rpc, panel: 'profesor', recargar });
+        pintarVisibilidad($('[data-visibilidad]', card), { clase: 'proyecto', item: { ...x.d, titulo: x.d.nombre }, publicadas: x.d.n_publicaciones_activas || 0,
+          alGrupos: () => publicarProyecto(x.d, { rpc, grupos, recargar }), alCambiar: recargar });
+      }
+    }
   };
   $('[data-buscar]', contenido).oninput = pintar;
   $('[data-tema]', contenido).onchange = pintar;
-  pintar();
+  pintarFiltro(); pintar();
 }
 
 async function accionQuiz(acc, q) {

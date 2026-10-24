@@ -7,7 +7,7 @@ import { sopaDe } from './sopa.js';
 
 const CARGADORES = {
   ahorcado: () => import('./ahorcado.js'), sopa: () => import('./sopa.js'), memoria: () => import('./memoria.js'),
-  ordena: () => import('./ordena.js'), quiz: () => import('./quiz.js'), trivia: () => import('./quiz.js'),
+  ordena: () => import('./ordena.js'), quiz: () => import('./quiz.js'), trivia: () => import('./quiz.js'), relampago: () => import('./quiz.js'),
   frase: () => import('./frase.js'), rompecabezas: () => import('./rompecabezas.js'), quizpublico: () => import('./quizlibre.js')
 };
 const avatarDe = (a) => /^(https?:|data:)/.test(a || '') ? `<img src="${esc(a)}" alt="">` : esc(a || '🙂');
@@ -17,7 +17,7 @@ const leerSesion = (sala) => { try { return JSON.parse(sessionStorage.getItem('s
 // Lo que juegan todos: el mismo tema, el mismo orden (semilla) y, en la sopa, la misma grilla
 export function contenidoSala({ juego, set, campo, valor, pistas }) {
   if (juego === 'rompecabezas' && set.id === 'foto') throw new Error('Para jugar en línea con una foto, el profesor debe crear el rompecabezas en su panel.');
-  const tipo = juego === 'quiz' && set.remoto ? 'quizpublico' : juego;
+  const tipo = juego === 'quiz' && set.remoto ? 'quizpublico' : juego === 'relampago' ? 'quiz' : juego;   // el relámpago usa el módulo del Quiz
   const opciones = { [campo]: valor, pistas, semilla: Math.floor(Math.random() * 2 ** 31) };
   if (juego === 'sopa') { const s = sopaDe(set, valor, pistas); opciones.sopa = { grilla: s.grilla, ubicaciones: s.ubicaciones }; }
   return { juego: tipo, set, opciones };

@@ -10,6 +10,7 @@ import { pintarHoja, pintarHojaMovil, repintarElemento } from './lienzo.js';
 import { esPregunta, tieneCorrecta, crearSimulacion, tiempoDe, quedan } from './preguntas.js';
 import { formarLocal, resumenReparto } from './agrupar.js';
 import { candidatosLocal, sortearLocal, restantes, ruletaGirando, ahoraServidor } from './ruleta.js';
+import { faseJuego } from './juego-hoja.js';
 
 const esCelular = () => innerWidth < innerHeight && innerWidth < 820;
 // el enlace sin "https://" para leerlo en la pantalla
@@ -43,7 +44,7 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
 
   const $ = (s) => ov.querySelector(s);
   const hoja = () => hojas[i];
-  const interactiva = (h) => esPregunta(h.tipo) || h.tipo === 'agrupar' || h.tipo === 'ruleta';
+  const interactiva = (h) => esPregunta(h.tipo) || h.tipo === 'agrupar' || h.tipo === 'ruleta' || h.tipo === 'juego';
   // la ruleta con nombres escritos funciona sin simular; con grupos o participantes, hay que simularlos
   const simulable = (h) => interactiva(h) && !(h.tipo === 'ruleta' && (h.config?.origen || 'nombres') === 'nombres');
 
@@ -69,7 +70,18 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
     const participantes = sim.unidos.length ? sim.unidos : sim.participantes;   // sin hoja Agrupar, todos los simulados
     return { candidatos: candidatosLocal(h, { participantes, grupos: sim.grupos[de] || [] }), sorteos, profe: true, local: true };
   }
-  const res = (h = hoja()) => vivo ? vivo.res(h) : h.tipo === 'ruleta' ? resRuletaLocal(h) : resSim(h);
+  // hoja de juego en la simulación: puntajes falsos que suben mientras "juegan"
+  function resJuegoSim(h) {
+    if (!sim) return { participantes: [], respuestas: [], inicio: null, profe: false };
+    const j = sim.juegos[h.id];
+    const gente = sim.unidos.length ? sim.unidos : sim.participantes;
+    const conf = Object.values(sim.grupos).flat().filter(g => g.confirmado);
+    const hg = conf.at(-1)?.hoja_id ?? Object.keys(sim.grupos).find(k => sim.grupos[k].some(g => g.confirmado));
+    return { participantes: gente, grupos: hg ? sim.grupos[hg] : [], modoGrupo: h.config?.modo === 'grupo', profe: true,
+      inicio: j ? j.inicio : null, abiertas: j ? j.abiertas : true,
+      respuestas: j ? Object.entries(j.puntos).map(([pid, v]) => { const p = gente.find(x => x.id === pid); return { participante_id: pid, alias: p?.alias, avatar: p?.avatar, grupo_id: p?.grupo_id, valor: v }; }) : [] };
+  }
+  const res = (h = hoja()) => vivo ? vivo.res(h) : h.tipo === 'ruleta' ? resRuletaLocal(h) : h.tipo === 'juego' ? resJuegoSim(h) : resSim(h);
 
   const pintar = () => {
     const escn = $('[data-esc]');
@@ -128,6 +140,11 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
         if (!conf) herr += boton('mezclar', '🔀<span class="pres-txt"> Volver a mezclar</span>', 'Rehacer el sorteo') + boton('confirmar', '✅<span class="pres-txt"> Confirmar grupos</span>', 'Guardar los grupos y mostrarlos en los celulares');
         herr += boton('nombres', '✏️<span class="pres-txt"> Nombres</span>', 'Nombre, color y emoji de cada grupo');
       }
+    } else if (h.tipo === 'juego' && (vivo || sim)) {
+      const r = res(h), f = faseJuego(h, r, vivo ? ahoraServidor() : Date.now());
+      if (f === 'espera') herr += boton('jiniciar', '▶<span class="pres-txt"> Empezar juego</span>', 'Todos empiezan a la vez en su celular');
+      if (f === 'cuenta' || f === 'jugando') herr += boton('jterminar', '⏹<span class="pres-txt"> Terminar juego</span>', 'Termina la partida para todos');
+      if (f !== 'espera') herr += boton('jreiniciar', '🔄<span class="pres-txt"> Jugar otra vez</span>', 'Borra los puntajes de esta hoja y vuelve a empezar');
     } else if (h.tipo === 'ruleta') {
       const r = res(h), quedan = r.cargando ? [] : restantes(h, r.candidatos || [], r.sorteos || []);
       herr += boton('girar', '🎡<span class="pres-txt"> GIRAR</span>', quedan.length ? 'Girar la ruleta' : 'No queda nadie en la ruleta', { desact: !quedan.length || ruletaGirando(h.id) });
@@ -168,6 +185,14 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
       sim.unidos.push({ ...p, grupo_id: g?.id || null });
       cambio = true;
     } else if (esPregunta(h.tipo)) cambio = sim.paso(h);
+    else if (h.tipo === 'juego' && sim.juegos[h.id] && faseJuego(h, resJuegoSim(h), Date.now()) === 'jugando') {
+      const j = sim.juegos[h.id];
+      for (const p of (sim.unidos.length ? sim.unidos : sim.participantes)) {
+        const v = j.puntos[p.id] || (j.puntos[p.id] = { puntos: 0, terminado: false });
+        if (!v.terminado && Math.random() < 0.35) { v.puntos += 20 + Math.floor(Math.random() * 120); cambio = true; }
+        if (!v.terminado && v.puntos > 600 && Math.random() < 0.05) v.terminado = true;
+      }
+    }
     if (cambio) pintarZona();
     tSim = setTimeout(latido, 450);
   };
@@ -224,6 +249,18 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
     };
   }
 
+  // ---------- hoja de juego ----------
+  async function accionJuego(que) {
+    const h = hoja();
+    if (que === 'reiniciar' && !await preguntar('¿Jugar otra vez?', 'Se borran los puntajes de esta hoja y todos vuelven a empezar.', 'Jugar otra vez')) return;
+    if (vivo) return intentar(() => vivo.juego(que));
+    if (!sim) return toast('Pulsa 🎭 Simular para probar el juego con participantes falsos.', 'error');
+    if (que === 'iniciar') sim.juegos[h.id] = { inicio: Date.now() + 4000, abiertas: true, puntos: {} };
+    else if (que === 'terminar') { if (sim.juegos[h.id]) sim.juegos[h.id].abiertas = false; }
+    else delete sim.juegos[h.id];
+    claveZona = ''; pintarZona();
+  }
+
   // ---------- ruleta ----------
   function girar(h) {
     if (ruletaGirando(h.id)) return;
@@ -272,7 +309,7 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
     sim: () => {
       if (sim) { sim = null; clearTimeout(tSim); pintar(); return; }
       sim = crearSimulacion();
-      Object.assign(sim, { unidos: [], grupos: {}, abierto: true });
+      Object.assign(sim, { unidos: [], grupos: {}, abierto: true, juegos: {} });
       pintar();
       latido();
     },
@@ -299,6 +336,9 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
     nombres: () => editarNombres(hoja()),
     girar: () => girar(hoja()),
     rreiniciar: () => reiniciarRuleta(hoja()),
+    jiniciar: () => accionJuego('iniciar'),
+    jterminar: () => accionJuego('terminar'),
+    jreiniciar: () => accionJuego('reiniciar'),
     pausa: () => intentar(() => vivo.pausar(vivo.sesion.estado !== 'pausada')),
     fin: async () => {
       if (!await preguntar('¿Finalizar la sesión?', 'El PIN dejará de funcionar. Los resultados quedan guardados en “Resultados” del proyecto.', 'Finalizar')) return;
@@ -314,6 +354,8 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
   ov.addEventListener('click', async (e) => {
     if (e.target.closest('[data-copiar-enlace]')) return vivo && copiar(vivo.url);
     if (e.target.closest('[data-ruleta-girar]')) return girar(hoja());
+    const ja = e.target.closest('[data-juego-accion]');
+    if (ja) return accionJuego(ja.dataset.juegoAccion);
     if (e.target.closest('[data-ruleta-reiniciar]')) return reiniciarRuleta(hoja());
     const x = e.target.closest('[data-expulsar]');
     if (!x) return;
@@ -410,7 +452,7 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
   let x0 = null, y0 = null;
   escn.addEventListener('pointerdown', (e) => { x0 = e.clientX; y0 = e.clientY; });
   escn.addEventListener('pointerup', (e) => {
-    if (x0 == null || e.target.closest('.pe-video, .movil-scroll .pe-zona, .zona-agrupar, .zona-ruleta, button')) { x0 = null; return; }
+    if (x0 == null || e.target.closest('.pe-video, .movil-scroll .pe-zona, .zona-agrupar, .zona-ruleta, .zona-juego-hoja, button')) { x0 = null; return; }
     const dx = e.clientX - x0, dy = e.clientY - y0;
     x0 = null;
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) { mostrar(dx < 0 ? i + 1 : i - 1); return; }

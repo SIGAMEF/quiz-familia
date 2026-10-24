@@ -67,6 +67,7 @@ export function crearVivo(sesion, { alCambiar = () => {}, alError = () => {} } =
     mover: (p, g) => accion('proyecto_mover_participante', { p_participante: p, p_grupo: g }),
     girar: (hoja) => accion('ruleta_girar', { p_sesion: id(), p_hoja: hoja }),
     reiniciarRuleta: (hoja) => accion('ruleta_reiniciar', { p_sesion: id(), p_hoja: hoja }),
+    juego: (que) => accion('proyecto_juego', { p_sesion: id(), p_accion: que }),   // 'iniciar' | 'terminar' | 'reiniciar'
     async reiniciar() {
       const r = await rpc('proyecto_reiniciar_sesion', { p_sesion: id() });
       await borrarFotos(r.fotos);
@@ -80,6 +81,15 @@ export function crearVivo(sesion, { alCambiar = () => {}, alError = () => {} } =
       if (hoja.tipo === 'agrupar') {
         return { participantes: datos.participantes, grupos: datos.grupos.filter(g => g.hoja_id === hoja.id),
           pin: s.pin, url: enlaceParticipante(s.pin), profe: true, registro_abierto: s.registro_abierto };
+      }
+      if (hoja.tipo === 'juego') {
+        const actual = s.hoja_id === hoja.id;
+        // los grupos confirmados más recientes (de la última hoja Agrupar que se usó)
+        const conf = datos.grupos.filter(g => g.confirmado).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        const hg = conf.at(-1)?.hoja_id;
+        return { participantes: datos.participantes, respuestas: actual ? datos.respuestas : [], grupos: conf.filter(g => g.hoja_id === hg),
+          modoGrupo: hoja.config?.modo === 'grupo', inicio: actual && s.juego_inicio ? Date.parse(s.juego_inicio) : null,
+          abiertas: actual && s.respuestas_abiertas, servidor: true, profe: true };
       }
       if (hoja.tipo === 'ruleta') {
         const r = datos.ruleta;

@@ -8,13 +8,15 @@ import { pintarCelular, pintarFondo } from './lienzo.js';
 import { pintarMiGrupo } from './agrupar.js';
 import { esPregunta, quedan } from './preguntas.js';
 import { ajustarReloj, ahoraServidor } from './ruleta.js';
+import { juegoCelular } from './juego-hoja.js';
 
 const raiz = document.getElementById('raiz');
 const params = new URLSearchParams(location.search);
 let pin = (params.get('pin') || '').replace(/\D/g, '');
 let yo = null;          // { token, participante_id, foto_clave, sesion_id }
 let hoja = null, version = null, clave = '', tSondeo = null;
-let ultimo = null, agotadoVisto = false;   // último estado y si ya se dibujó "se acabó el tiempo"
+let ultimo = null, agotadoVisto = false;
+let juegoVivo = null;   // hoja de juego: la partida que se está jugando (no se redibuja en cada consulta)   // último estado y si ya se dibujó "se acabó el tiempo"
 
 async function rpc(nombre, args) {
   const { data, error } = await supabase.rpc(nombre, args);
@@ -124,8 +126,28 @@ async function sondear() {
 // Segundos que quedan para responder la pregunta actual (null si no tiene tiempo)
 const restante = (e) => hoja && e?.sesion?.hoja_id === hoja.id ? quedan(hoja, Date.parse(e.sesion.hoja_inicio), ahoraServidor()) : null;
 
+// Hoja de juego: la partida se monta una vez y solo se actualiza (el lugar en el ranking, si el profesor la termina)
+function pintarJuego(e) {
+  const k = `${hoja.id}|${e.sesion.juego_inicio || ''}|${version}`;
+  if (juegoVivo?.clave === k && juegoVivo.cont.isConnected) { juegoVivo.actualizar(e); return; }
+  juegoVivo?.destruir();
+  clave = '';
+  document.body.className = 'participante';
+  const g = e.yo.grupo;
+  raiz.innerHTML = `<div class="part-barra"><span class="part-yo">${e.yo.foto_url ? `<img src="${esc(e.yo.foto_url)}" alt="">` : esc(e.yo.avatar || '🙂')}</span>
+      <b>${esc(e.yo.alias)}</b>${g ? `<span class="part-grupo" style="--c:${esc(g.color)}">${esc(g.emoji || '')} ${esc(g.nombre)}</span>` : ''}
+      <span class="grow"></span><small>${esc(e.proyecto)}</small></div>
+    <div class="part-pantalla part-con-juego" data-cel></div>`;
+  juegoVivo = juegoCelular(raiz.querySelector('[data-cel]'), hoja, e, {
+    enviar: (valor) => rpc('proyecto_responder', { p_pin: pin, p_token: yo.token, p_hoja: hoja.id, p_valor: valor })
+  });
+  juegoVivo.clave = k;
+}
+
 function pintar(e) {
   ultimo = e;
+  if (hoja?.tipo === 'juego' && e.sesion.hoja_id === hoja.id) return pintarJuego(e);
+  if (juegoVivo) { juegoVivo.destruir(); juegoVivo = null; }
   const agotado = (restante(e) ?? 1) <= 0;
   agotadoVisto = agotado;
   // solo se vuelve a dibujar si algo cambió (así no se borra lo que el participante está escribiendo)

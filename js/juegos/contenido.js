@@ -22,7 +22,10 @@ export const JUEGOS = {
   trivia:   { nombre: 'Trivia Bíblica', ico: '📖', usa: 'trivia', color: '#7B4FD6',
               desc: 'Pon a prueba tu conocimiento de la Biblia.' },
   ordena:   { nombre: 'Ordena la palabra', ico: '🔀', usa: 'palabras', color: '#27AE60',
-              desc: 'Las letras están revueltas: ordénalas con ayuda de la pista.' }
+              desc: 'Las letras están revueltas: ordénalas con ayuda de la pista.' },
+  // los que crean los profesores con sus propias preguntas (se juegan con el módulo del Quiz)
+  relampago: { nombre: 'Quiz relámpago', ico: '⚡', usa: 'preguntas', color: '#E8A400',
+              desc: '15 segundos por pregunta: mientras más rápido respondas, más puntos.' }
 };
 
 const p = (palabra, pista) => ({ palabra, pista });

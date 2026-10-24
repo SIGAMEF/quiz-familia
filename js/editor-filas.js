@@ -16,11 +16,12 @@ export function leerLineas(txt) {
 }
 
 /**
- * clase: 'palabras' | 'frases' | 'parejas'
+ * clase: 'palabras' | 'frases' | 'parejas' | 'preguntas' (Trivia y Quiz relámpago)
  * datos: los datos actuales del juego
  * alCambiar(): se llama cuando cambia algo (la sopa lo usa para pedir generar otra vez)
  */
 export function montarFilas(cont, clase, datos, { alCambiar = () => {} } = {}) {
+  if (clase === 'preguntas') return montarPreguntas(cont, datos, { alCambiar });
   let filas;
   if (clase === 'parejas') filas = (datos.parejas || []).map(p => ({ a: lado(p[0]), b: lado(p[1]) }));
   else if (clase === 'frases') filas = (datos.frases || []).map(f => ({ texto: f.frase, pista: f.pista || '', imagen: f.imagen || '' }));
@@ -116,5 +117,56 @@ export function montarFilas(cont, clase, datos, { alCambiar = () => {} } = {}) {
       return { palabras: llenas.map(f => ({ palabra: f.texto.trim().toUpperCase().replace(/\s+/g, ' '), pista: f.pista.trim(), ...(f.imagen ? { imagen: f.imagen } : {}) })) };
     },
     sinImagen() { return clase === 'parejas' ? 0 : filas.filter(f => f.texto.trim() && !f.imagen).length; }
+  };
+}
+
+
+// ---------- Preguntas de Trivia y Quiz relámpago: enunciado, la correcta y de 1 a 3 incorrectas ----------
+// datos.preguntas: [{ enunciado, opciones: [correcta, incorrecta, ...] }]
+function montarPreguntas(cont, datos, { alCambiar }) {
+  const vacia = () => ({ enunciado: '', opciones: ['', '', '', ''] });
+  let filas = (datos.preguntas || []).map(p => ({ enunciado: p.enunciado || '', opciones: [...(p.opciones || []), '', '', '', ''].slice(0, 4) }));
+  if (!filas.length) filas = [vacia(), vacia()];
+  const completa = (f) => f.enunciado.trim() && f.opciones[0].trim() && f.opciones.slice(1).some(o => o.trim());
+  const pintar = () => {
+    cont.innerHTML = `<div class="filas-ed preg-ed">${filas.map((f, i) => `
+        <div class="fila-preg" data-i="${i}">
+          <div class="row" style="gap:6px; flex-wrap:nowrap;"><span class="num">${i + 1}</span>
+            <input class="input grow" data-e="${i}" value="${esc(f.enunciado)}" placeholder="Pregunta" maxlength="200">
+            <button type="button" class="btn btn-sm btn-ghost" data-quitar="${i}" title="Quitar">✕</button></div>
+          <div class="preg-ops">
+            <label class="preg-op ok"><span>✔</span><input class="input" data-o="${i}.0" value="${esc(f.opciones[0])}" placeholder="Respuesta correcta" maxlength="100"></label>
+            ${[1, 2, 3].map(k => `<label class="preg-op"><span>✘</span><input class="input" data-o="${i}.${k}" value="${esc(f.opciones[k])}" placeholder="Incorrecta${k > 1 ? ' (opcional)' : ''}" maxlength="100"></label>`).join('')}
+          </div>
+        </div>`).join('')}</div>
+      <div class="row" style="margin-top:8px; gap:6px;">
+        <button type="button" class="btn btn-sm" data-agregar>➕ Agregar pregunta</button>
+        <button type="button" class="btn btn-sm" data-pegar>📋 Pegar una lista</button>
+        <span class="small muted">${filas.filter(completa).length} completas · el orden de las respuestas se mezcla al jugar</span>
+      </div>`;
+    $$('[data-e]', cont).forEach(inp => inp.oninput = () => { filas[inp.dataset.e].enunciado = inp.value; alCambiar(); });
+    $$('[data-o]', cont).forEach(inp => inp.oninput = () => { const [i, k] = inp.dataset.o.split('.'); filas[i].opciones[k] = inp.value; alCambiar(); });
+    $$('[data-quitar]', cont).forEach(b => b.onclick = () => { filas.splice(Number(b.dataset.quitar), 1); if (!filas.length) filas.push(vacia()); pintar(); alCambiar(); });
+    $('[data-agregar]', cont).onclick = () => { filas.push(vacia()); pintar(); $$('[data-e]', cont).at(-1)?.focus(); };
+    $('[data-pegar]', cont).onclick = () => {
+      const ayuda = 'Una pregunta por línea: ¿Capital del Perú? | Lima | Cusco | Arequipa';
+      const m = abrirModal(`<h3>📋 Pegar preguntas</h3><p class="hint">${ayuda}. La primera respuesta es la correcta. También puedes pegar columnas copiadas de Excel.</p>
+        <textarea class="input" rows="10" data-txt placeholder="${esc(ayuda)}"></textarea>
+        <div class="modal-pie"><button class="btn btn-outline" data-cerrar>Cancelar</button><button class="btn btn-primary" data-ok>Agregar a la lista</button></div>`);
+      $('[data-ok]', m.el).onclick = () => {
+        const nuevas = leerLineas($('[data-txt]', m.el).value).filter(c => c[0] && c[1] && c[2]);
+        if (!nuevas.length) return toast('Escribe la pregunta, la correcta y al menos una incorrecta, separadas con |', 'error');
+        filas = filas.filter(f => f.enunciado.trim() || f.opciones.some(o => o.trim()));
+        nuevas.forEach(c => filas.push({ enunciado: c[0], opciones: [...c.slice(1, 5), '', '', ''].slice(0, 4) }));
+        m.cerrar(); pintar(); alCambiar();
+      };
+    };
+  };
+  pintar();
+  return {
+    leer() {
+      return { preguntas: filas.filter(completa).map(f => ({ enunciado: f.enunciado.trim(), opciones: [f.opciones[0].trim(), ...f.opciones.slice(1).map(o => o.trim()).filter(Boolean)] })) };
+    },
+    sinImagen() { return 0; }
   };
 }

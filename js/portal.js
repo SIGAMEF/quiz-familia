@@ -64,32 +64,20 @@ const temas = [
   ...SETS_QUIZ.map(s => ({ ...s, juegos: ['quiz'], n: `${s.preguntas.length} preguntas` }))
 ];
 let filtro = '';
-const corto = (k) => ({ ahorcado: 'Ahorcado', sopa: 'Sopa', ordena: 'Ordena', memoria: 'Memorama', frase: 'Frase', trivia: 'Trivia', quiz: 'Quiz', rompecabezas: 'Rompecabezas' }[k]);
+const corto = (k) => ({ ahorcado: 'Ahorcado', sopa: 'Sopa', ordena: 'Ordena', memoria: 'Memorama', frase: 'Frase', trivia: 'Trivia', quiz: 'Quiz', rompecabezas: 'Rompecabezas', relampago: 'Relámpago', proyecto: 'Proyecto' }[k]);
+// los proyectos de los profesores no son un juego de la lista: se abren en proyecto.html
+const INFO = (k) => JUEGOS[k] || { proyecto: { nombre: 'Proyecto en grupo', ico: '🎨', color: '#E5484D' } }[k] || { nombre: k, ico: '🎲', color: '#8E86AC' };
+const enlaceProfe = (t) => t.tipo === 'quiz' ? `juegos.html?q=${t.id}` : t.tipo === 'proyecto' ? `proyecto.html?p=${t.id}` : `juegos.html?g=${t.id}`;
 const pintarFiltro = () => {
-  $('#filtro').innerHTML = [['', 'Todos'], ...['ahorcado', 'sopa', 'memoria', 'frase', 'trivia', 'quiz', 'ordena', 'rompecabezas'].map(k => [k, `${JUEGOS[k].ico} ${corto(k)}`])]
+  $('#filtro').innerHTML = [['', 'Todos'], ...['ahorcado', 'sopa', 'memoria', 'frase', 'trivia', 'quiz', 'relampago', 'ordena', 'rompecabezas', 'proyecto'].map(k => [k, `${INFO(k).ico} ${corto(k)}`])]
     .map(([k, t]) => `<button type="button" data-f="${k}" aria-pressed="${k === filtro}">${esc(t)}</button>`).join('');
-  $$('[data-f]').forEach(b => b.onclick = () => { filtro = b.dataset.f; pintarFiltro(); pintarBiblioteca();
-
-// ---------- Juegos y quizzes que los profesores hicieron públicos ----------
-if (!PREVIA) (async () => {
-  try {
-    const { supabase } = await import('./comun.js');
-    const { data, error } = await supabase.rpc('biblioteca_libre');
-    if (error || !data?.length) return;
-    const UNIDAD = { memoria: 'parejas', frase: 'frases', rompecabezas: 'piezas', quiz: 'preguntas' };
-    temas.unshift(...data.map(t => ({
-      id: t.id, titulo: t.titulo, ico: t.tipo === 'quiz' ? '📝' : JUEGOS[t.tipo].ico, categoria: t.tema || '', autor: t.autor,
-      n: `${t.n} ${UNIDAD[t.tipo] || 'palabras'}`, juegos: [t.tipo], href: t.tipo === 'quiz' ? `juegos.html?q=${t.id}` : `juegos.html?g=${t.id}`
-    })));
-    pintarBiblioteca();
-  } catch { /* sin conexión: quedan los temas incluidos */ }
-})(); });
+  $$('[data-f]').forEach(b => b.onclick = () => { filtro = b.dataset.f; pintarFiltro(); pintarBiblioteca(); });
 };
 const pintarBiblioteca = () => {
   $('#biblioteca').innerHTML = temas.filter(t => !filtro || t.juegos.includes(filtro)).map(t => `<li>
       <span class="bib-ico" aria-hidden="true">${t.ico}</span>
       <span class="bib-txt"><b>${esc(t.titulo)}</b><small>${esc(t.categoria || '')}${t.categoria ? ' · ' : ''}${esc(t.n)}${t.autor && t.autor !== 'QuizApp' ? ` · por ${esc(t.autor)}` : ''}</small></span>
-      <span class="bib-jugar">${t.juegos.filter(j => !filtro || j === filtro).map(j => `<a class="b3 chico" style="--b:${JUEGOS[j].color}" href="${t.href || enlaceJuego(j, t.id)}" aria-label="Jugar ${esc(JUEGOS[j].nombre)}: ${esc(t.titulo)}">${JUEGOS[j].ico} ${esc(corto(j))}</a>`).join('')}</span>
+      <span class="bib-jugar">${t.juegos.filter(j => !filtro || j === filtro).map(j => `<a class="b3 chico" style="--b:${INFO(j).color}" href="${t.href || enlaceJuego(j, t.id)}" aria-label="${j === 'proyecto' ? 'Abrir' : 'Jugar'} ${esc(INFO(j).nombre)}: ${esc(t.titulo)}">${INFO(j).ico} ${esc(corto(j))}</a>`).join('')}</span>
     </li>`).join('');
 };
 pintarFiltro(); pintarBiblioteca();
@@ -100,13 +88,33 @@ if (!PREVIA) (async () => {
     const { supabase } = await import('./comun.js');
     const { data, error } = await supabase.rpc('biblioteca_libre');
     if (error || !data?.length) return;
-    const UNIDAD = { memoria: 'parejas', frase: 'frases', rompecabezas: 'piezas', quiz: 'preguntas' };
     temas.unshift(...data.map(t => ({
-      id: t.id, titulo: t.titulo, ico: t.tipo === 'quiz' ? '📝' : JUEGOS[t.tipo].ico, categoria: t.tema || '', autor: t.autor,
-      n: `${t.n} ${UNIDAD[t.tipo] || 'palabras'}`, juegos: [t.tipo], href: t.tipo === 'quiz' ? `juegos.html?q=${t.id}` : `juegos.html?g=${t.id}`
+      id: t.id, titulo: t.titulo, ico: t.tipo === 'quiz' ? '📝' : INFO(t.tipo).ico, categoria: t.tema || '', autor: t.autor,
+      n: `${t.n} ${UNIDAD[t.tipo] || 'palabras'}`, juegos: [t.tipo], href: enlaceProfe(t)
     })));
     pintarBiblioteca();
   } catch { /* sin conexión: quedan los temas incluidos */ }
+})();
+const UNIDAD = { memoria: 'parejas', frase: 'frases', rompecabezas: 'piezas', quiz: 'preguntas', trivia: 'preguntas', relampago: 'preguntas', proyecto: 'hojas' };
+
+// ---------- Fila "Creado por nuestros profesores" (lo que destacaron en la portada) ----------
+if (!PREVIA) (async () => {
+  try {
+    const { supabase } = await import('./comun.js');
+    const { data, error } = await supabase.rpc('portada_destacados');
+    if (error || !data?.length) return;
+    $('#filaDestacados').innerHTML = data.map(t => {
+      const i = t.tipo === 'quiz' ? { nombre: 'Quiz', ico: '📝', color: '#8E5BE8' } : INFO(t.tipo);
+      return `<li class="dest-tarjeta" style="--c:${i.color}">
+        <a href="${enlaceProfe(t)}" aria-label="${esc(i.nombre)}: ${esc(t.titulo)}, por ${esc(t.autor)}">
+          <span class="dest-ico" aria-hidden="true">${i.ico}</span>
+          <b>${esc(t.titulo)}</b>
+          <small>${esc(t.tipo === 'trivia' ? 'Trivia' : i.nombre)} · ${t.n} ${UNIDAD[t.tipo] || 'palabras'}</small>
+          <small class="dest-autor">por ${esc(t.autor)}</small>
+          <span class="fam-jugar" aria-hidden="true">${t.tipo === 'proyecto' ? 'Abrir' : 'Jugar'} <b>›</b></span></a></li>`;
+    }).join('');
+    $('#destacados').hidden = false;
+  } catch { /* sin conexión: la portada funciona igual */ }
 })();
 
 // ---------- Avisos de la vista previa ----------

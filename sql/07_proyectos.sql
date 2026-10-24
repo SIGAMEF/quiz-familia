@@ -19,15 +19,23 @@ create table if not exists public.proyecto_hojas (
   proyecto_id uuid not null references public.proyectos(id) on delete cascade,
   orden       int not null default 0,
   tipo        text not null default 'contenido'
-              check (tipo in ('contenido','pregunta','vf','opcion','completar','lluvia','agrupar','ruleta')),
+              check (tipo in ('contenido','pregunta','vf','opcion','completar','lluvia','agrupar','ruleta','juego')),
   diseno      jsonb not null default '{}'::jsonb,   -- fondo + elementos (posiciones en % del lienzo)
   config      jsonb not null default '{}'::jsonb,   -- configuración propia del tipo de hoja
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
 create index if not exists proyecto_hojas_proyecto_idx on public.proyecto_hojas (proyecto_id, orden);
+-- (si la tabla ya existía, se actualizan los tipos permitidos: "juego" es una hoja con un juego de Mis actividades)
+alter table public.proyecto_hojas drop constraint if exists proyecto_hojas_tipo_check;
+alter table public.proyecto_hojas add constraint proyecto_hojas_tipo_check
+  check (tipo in ('contenido','pregunta','vf','opcion','completar','lluvia','agrupar','ruleta','juego'));
 
 -- Permisos fila por fila: se leen y borran con la tabla; se crean y guardan con las funciones de abajo
+-- Visibilidad (Mis actividades): público = en la biblioteca de la portada; destacado = en la fila "Creado por nuestros profesores"
+alter table public.proyectos add column if not exists publico boolean not null default false;
+alter table public.proyectos add column if not exists destacado boolean not null default false;
+
 alter table public.proyectos enable row level security;
 alter table public.proyecto_hojas enable row level security;
 
@@ -97,7 +105,7 @@ begin
     exception when others then raise exception 'La hoja % no tiene un id válido', i; end;
     if v_id is null then raise exception 'La hoja % no tiene id', i; end if;
     if v_id = any(v_ids) then raise exception 'La hoja % está repetida', i; end if;
-    if coalesce(h->>'tipo', '') not in ('contenido','pregunta','vf','opcion','completar','lluvia','agrupar','ruleta') then
+    if coalesce(h->>'tipo', '') not in ('contenido','pregunta','vf','opcion','completar','lluvia','agrupar','ruleta','juego') then
       raise exception 'La hoja % tiene un tipo no válido', i;
     end if;
     if jsonb_typeof(coalesce(h->'diseno', '{}')) <> 'object' or jsonb_typeof(coalesce(h->'config', '{}')) <> 'object' then
@@ -210,6 +218,8 @@ create table if not exists public.proyecto_sesiones (
 create unique index if not exists proyecto_sesiones_pin_activo on public.proyecto_sesiones (pin) where estado <> 'finalizada';
 -- cuándo empezó la hoja actual (o se volvieron a abrir las respuestas): para el tiempo por pregunta
 alter table public.proyecto_sesiones add column if not exists hoja_inicio timestamptz not null default now();
+-- hojas de juego: cuándo empieza la partida para todos (null = esperando que el profesor la inicie)
+alter table public.proyecto_sesiones add column if not exists juego_inicio timestamptz;
 create index if not exists proyecto_sesiones_proyecto_idx on public.proyecto_sesiones (proyecto_id);
 
 create table if not exists public.sesion_grupos (
@@ -313,13 +323,47 @@ language sql stable security definer set search_path = public as $$
     'total_hojas', (select count(*) from proyecto_hojas where proyecto_id = s.proyecto_id),
     'participantes', (select count(*) from sesion_participantes where sesion_id = s.id and not expulsado),
     'registro_abierto', s.registro_abierto, 'tardios', s.tardios,
-    'respuestas_abiertas', s.respuestas_abiertas, 'revelar', s.revelar, 'hoja_inicio', s.hoja_inicio,
+    'respuestas_abiertas', s.respuestas_abiertas, 'revelar', s.revelar, 'hoja_inicio', s.hoja_inicio, 'juego_inicio', s.juego_inicio,
     'created_at', s.created_at, 'updated_at', s.updated_at, 'finalizada_en', s.finalizada_en);
 $$;
 
 -- Ruta dentro del bucket de una URL pública de foto (para borrarla)
 create or replace function public._ruta_foto(p_url text) returns text
 language sql immutable as $$ select nullif(substring(p_url from '/preguntas-imagenes/(proyectos/sesiones/[^?]+)$'), '') $$;
+
+-- =====================================================================
+-- FASE D — PROYECTO "A SU RITMO" (publicado a grupos, con enlace para invitados, o público)
+-- El alumno abre el proyecto y avanza solo; se guardan sus respuestas y puntajes.
+-- =====================================================================
+create table if not exists public.proyecto_publicaciones (
+  id                uuid primary key default gen_random_uuid(),
+  proyecto_id       uuid not null references public.proyectos(id) on delete cascade,
+  grupo_id          uuid not null references public.grupos(id) on delete cascade,
+  activo            boolean not null default true,
+  permite_invitados boolean not null default false,   -- con el enlace o QR lo abren también personas sin cuenta
+  created_at        timestamptz not null default now(),
+  unique (proyecto_id, grupo_id)
+);
+create table if not exists public.proyecto_intentos (
+  id             uuid primary key default gen_random_uuid(),
+  proyecto_id    uuid not null references public.proyectos(id) on delete cascade,
+  publicacion_id uuid references public.proyecto_publicaciones(id) on delete cascade,   -- null: abierto desde la biblioteca (público)
+  alumno_id      uuid references public.perfiles(id) on delete cascade,
+  alias          text,
+  avatar         text,
+  token          uuid not null default gen_random_uuid(),
+  hoja_actual    int not null default 0,
+  respuestas     jsonb not null default '{}'::jsonb,   -- { hoja_id: { valor, correcta } }
+  juegos         jsonb not null default '{}'::jsonb,   -- { hoja_id: { puntos, veces } } (el mejor puntaje)
+  completado     boolean not null default false,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
+);
+create unique index if not exists proyecto_intentos_alumno on public.proyecto_intentos (publicacion_id, alumno_id) where alumno_id is not null;
+create index if not exists proyecto_intentos_proyecto_idx on public.proyecto_intentos (proyecto_id);
+create index if not exists proyecto_intentos_token_idx on public.proyecto_intentos (token);
+alter table public.proyecto_publicaciones enable row level security;
+alter table public.proyecto_intentos enable row level security;
 
 -- ---------- Lista del profesor (o del admin: sus propios proyectos) ----------
 create or replace function public.mis_proyectos() returns jsonb
@@ -331,7 +375,10 @@ language sql stable security definer set search_path = public as $$
                 from proyecto_hojas h where h.proyecto_id = p.id order by h.orden, h.created_at limit 1),
     'sesion', (select _sesion_resumen(s) from proyecto_sesiones s where s.proyecto_id = p.id and s.estado <> 'finalizada'
                order by s.created_at desc limit 1),
-    'n_sesiones', (select count(*) from proyecto_sesiones s where s.proyecto_id = p.id)
+    'n_sesiones', (select count(*) from proyecto_sesiones s where s.proyecto_id = p.id),
+    'publico', p.publico, 'destacado', p.destacado,
+    'n_publicaciones_activas', (select count(*) from proyecto_publicaciones pp where pp.proyecto_id = p.id and pp.activo),
+    'n_intentos', (select count(*) from proyecto_intentos i where i.proyecto_id = p.id)
   ) order by p.updated_at desc), '[]'::jsonb)
   from proyectos p where p.profesor_id = auth.uid();
 $$;
@@ -371,7 +418,7 @@ begin
   v := _sesion_profe(p_sesion);
   if v.estado = 'finalizada' then raise exception 'La sesión ya terminó.'; end if;
   if not exists (select 1 from proyecto_hojas where id = p_hoja and proyecto_id = v.proyecto_id) then raise exception 'Esa hoja no es de este proyecto.'; end if;
-  update proyecto_sesiones set hoja_id = p_hoja, respuestas_abiertas = true, revelar = false, hoja_inicio = now(), updated_at = now()
+  update proyecto_sesiones set hoja_id = p_hoja, respuestas_abiertas = true, revelar = false, hoja_inicio = now(), juego_inicio = null, updated_at = now()
   where id = p_sesion returning * into v;
   return _sesion_resumen(v);
 end $$;
@@ -441,7 +488,7 @@ begin
   delete from sesion_participantes where sesion_id = p_sesion;
   delete from sesion_grupos where sesion_id = p_sesion;
   update proyecto_sesiones set pin = _nuevo_pin(), estado = 'activa', registro_abierto = true, tardios = false,
-         respuestas_abiertas = true, revelar = false, hoja_inicio = now(), updated_at = now(),
+         respuestas_abiertas = true, revelar = false, hoja_inicio = now(), juego_inicio = null, updated_at = now(),
          hoja_id = (select id from proyecto_hojas where proyecto_id = v.proyecto_id order by orden, created_at limit 1)
   where id = p_sesion returning * into v;
   return jsonb_build_object('sesion', _sesion_resumen(v), 'fotos', v_fotos);
@@ -689,7 +736,13 @@ begin
   return jsonb_build_object(
     'estado', v.estado, 'proyecto', (select nombre from proyectos where id = v.proyecto_id), 'pin', v.pin, 'ahora', now(),
     'ruleta', case when h.tipo = 'ruleta' then _ruleta_estado(v.id, h) end,
-    'sesion', jsonb_build_object('hoja_id', v.hoja_id, 'abiertas', v.respuestas_abiertas, 'revelar', v_rev, 'hoja_inicio', v.hoja_inicio,
+    -- hoja de juego: mi lugar en el ranking (como en las salas)
+    'juego', case when h.tipo = 'juego' then (select jsonb_build_object('total', count(*),
+               'pos', 1 + count(*) filter (where (r.valor->>'puntos')::numeric >
+                                             coalesce((select (m.valor->>'puntos')::numeric from sesion_respuestas m
+                                                       where m.sesion_id = v.id and m.hoja_id = h.id and m.participante_id = v_p.id), -1)))
+             from sesion_respuestas r where r.sesion_id = v.id and r.hoja_id = h.id) end,
+    'sesion', jsonb_build_object('hoja_id', v.hoja_id, 'abiertas', v.respuestas_abiertas, 'revelar', v_rev, 'hoja_inicio', v.hoja_inicio, 'juego_inicio', v.juego_inicio,
                                  'registro_abierto', v.registro_abierto),
     'version', v_version,
     'hoja', case when h.id is null or v_version = p_version then null
@@ -703,6 +756,49 @@ begin
                      and (r.participante_id = v_p.id or (h.config->>'modo' = 'grupo' and v_p.grupo_id is not null and r.grupo_id = v_p.grupo_id))));
 end $$;
 
+-- ---------- Hojas de juego (sopa, ahorcado, memorama…) ----------
+-- El profesor inicia la partida para todos (con 4 s de cuenta atrás), la termina o la vuelve a jugar.
+create or replace function public.proyecto_juego(p_sesion uuid, p_accion text) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v proyecto_sesiones%rowtype;
+begin
+  v := _sesion_profe(p_sesion);
+  if v.estado = 'finalizada' then raise exception 'La sesión ya terminó.'; end if;
+  if not exists (select 1 from proyecto_hojas where id = v.hoja_id and tipo = 'juego') then raise exception 'La hoja actual no es un juego.'; end if;
+  if p_accion = 'iniciar' then
+    update proyecto_sesiones set juego_inicio = now() + interval '4 seconds', respuestas_abiertas = true, updated_at = now() where id = p_sesion returning * into v;
+  elsif p_accion = 'terminar' then
+    update proyecto_sesiones set respuestas_abiertas = false, updated_at = now() where id = p_sesion returning * into v;
+  elsif p_accion = 'reiniciar' then
+    delete from sesion_respuestas where sesion_id = p_sesion and hoja_id = v.hoja_id;
+    update proyecto_sesiones set juego_inicio = null, respuestas_abiertas = true, updated_at = now() where id = p_sesion returning * into v;
+  else raise exception 'Acción no válida';
+  end if;
+  return _sesion_resumen(v);
+end $$;
+
+-- Puntaje de un participante en la hoja de juego: { puntos, terminado, detalle }. Se actualiza mientras juega.
+create or replace function public._proyecto_puntaje_juego(v public.proyecto_sesiones, v_p public.sesion_participantes, h public.proyecto_hojas, p_valor jsonb) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_seg int := coalesce((h.config->'juego'->>'segundos')::int, 0); v_id uuid; v_prev jsonb; v_valor jsonb;
+begin
+  if v.juego_inicio is null or now() < v.juego_inicio - interval '2 seconds' then raise exception 'El juego todavía no empieza.'; end if;
+  if v_seg > 0 and now() > v.juego_inicio + make_interval(secs => v_seg + 5) then raise exception 'Se acabó el tiempo del juego.'; end if;
+  if jsonb_typeof(p_valor->'puntos') is distinct from 'number' or (p_valor->>'puntos')::numeric not between 0 and 10000000 then raise exception 'Puntaje no válido.'; end if;
+  v_valor := jsonb_build_object('puntos', round((p_valor->>'puntos')::numeric), 'terminado', coalesce((p_valor->>'terminado')::boolean, false),
+                                'detalle', left(coalesce(p_valor->>'detalle', ''), 200), 'segundos', round(extract(epoch from now() - v.juego_inicio)));
+  select id, valor into v_id, v_prev from sesion_respuestas where sesion_id = v.id and hoja_id = h.id and participante_id = v_p.id;
+  if v_id is null then
+    insert into sesion_respuestas (sesion_id, hoja_id, participante_id, grupo_id, valor) values (v.id, h.id, v_p.id, v_p.grupo_id, v_valor);
+  elsif coalesce((v_prev->>'terminado')::boolean, false) then
+    raise exception 'Ya terminaste este juego.';
+  else
+    update sesion_respuestas set valor = v_valor, grupo_id = v_p.grupo_id, updated_at = now() where id = v_id;
+  end if;
+  return jsonb_build_object('ok', true);
+end $$;
+revoke execute on function public._proyecto_puntaje_juego(public.proyecto_sesiones, public.sesion_participantes, public.proyecto_hojas, jsonb) from public, anon, authenticated;
+
 create or replace function public.proyecto_responder(p_pin text, p_token uuid, p_hoja uuid, p_valor jsonb) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare v_p sesion_participantes%rowtype; v proyecto_sesiones%rowtype; h proyecto_hojas%rowtype; v_grupo uuid; v_n int; v_lim int; v_id uuid;
@@ -713,6 +809,7 @@ begin
   if v.hoja_id is distinct from p_hoja then raise exception 'Esa pregunta ya pasó.'; end if;
   if not v.respuestas_abiertas then raise exception 'Las respuestas están cerradas.'; end if;
   select * into h from proyecto_hojas where id = p_hoja;
+  if found and h.tipo = 'juego' then return _proyecto_puntaje_juego(v, v_p, h, p_valor); end if;
   if not found or h.tipo not in ('pregunta','vf','opcion','completar','lluvia') then raise exception 'Esta hoja no tiene pregunta.'; end if;
   -- tiempo por pregunta (con 2 s de margen por la demora de la red)
   if coalesce((h.config->>'tiempo')::int, 0) > 0
@@ -903,3 +1000,209 @@ end $$;
 
 revoke execute on function public._ruleta_candidatos(uuid, public.proyecto_hojas) from public, anon, authenticated;
 revoke execute on function public._ruleta_estado(uuid, public.proyecto_hojas) from public, anon, authenticated;
+
+-- ======================= FASE D — A SU RITMO: funciones =======================
+-- ---------- Profesor: publicar en grupos ----------
+create or replace function public.publicar_proyecto(p_proyecto uuid, p_grupos uuid[]) returns int
+language plpgsql security definer set search_path = public as $$
+declare g uuid; n int := 0;
+begin
+  perform _proyecto_editable(p_proyecto);
+  foreach g in array coalesce(p_grupos, '{}') loop
+    if not (es_dueno_grupo(g) or es_admin()) then raise exception 'Uno de los grupos no es tuyo'; end if;
+    insert into proyecto_publicaciones (proyecto_id, grupo_id) values (p_proyecto, g)
+    on conflict (proyecto_id, grupo_id) do update set activo = true;
+    n := n + 1;
+  end loop;
+  -- los grupos que no vienen quedan apagados (sus resultados se conservan)
+  update proyecto_publicaciones set activo = false where proyecto_id = p_proyecto and not (grupo_id = any(coalesce(p_grupos, '{}')));
+  return n;
+end $$;
+
+create or replace function public.proyecto_publicacion_invitados(p_pub uuid, p_permite boolean) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_proy uuid;
+begin
+  select proyecto_id into v_proy from proyecto_publicaciones where id = p_pub;
+  if not found then raise exception 'Esa publicación ya no existe.'; end if;
+  perform _proyecto_editable(v_proy);
+  update proyecto_publicaciones set permite_invitados = p_permite where id = p_pub;
+end $$;
+
+create or replace function public.publicaciones_proyecto(p_proyecto uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+begin
+  perform _proyecto_editable(p_proyecto);
+  return (select coalesce(jsonb_agg(jsonb_build_object('id', pp.id, 'grupo_id', g.id, 'grupo', g.nombre, 'activo', pp.activo,
+      'permite_invitados', pp.permite_invitados,
+      'intentos', (select count(*) from proyecto_intentos i where i.publicacion_id = pp.id),
+      'completados', (select count(*) from proyecto_intentos i where i.publicacion_id = pp.id and i.completado)) order by g.nombre), '[]'::jsonb)
+    from proyecto_publicaciones pp join grupos g on g.id = pp.grupo_id where pp.proyecto_id = p_proyecto);
+end $$;
+
+-- ---------- Calificación (en el servidor: las respuestas correctas no se mandan antes de responder) ----------
+create or replace function public._ritmo_calificar(h public.proyecto_hojas, v jsonb) returns jsonb
+language plpgsql stable set search_path = public as $$
+declare c jsonb := h.config; ok boolean; n int; i int; v_txt text;
+begin
+  if h.tipo = 'vf' then
+    if c->'correcta' is null or jsonb_typeof(c->'correcta') <> 'boolean' then return jsonb_build_object('correcta', null); end if;
+    return jsonb_build_object('correcta', (v->'valor') = (c->'correcta'), 'correcta_texto', case when (c->>'correcta')::boolean then 'Verdadero' else 'Falso' end,
+                              'config', jsonb_build_object('correcta', c->'correcta'));
+  elsif h.tipo = 'opcion' then
+    if jsonb_array_length(coalesce(c->'correctas', '[]')) = 0 then return jsonb_build_object('correcta', null); end if;
+    select string_agg(o->>'texto', ' / ') into v_txt from jsonb_array_elements(c->'opciones') o where (c->'correctas') ? (o->>'id');
+    return jsonb_build_object('correcta', (c->'correctas') ? (v->>'opcion'), 'correcta_texto', v_txt, 'config', jsonb_build_object('correctas', c->'correctas'));
+  elsif h.tipo = 'completar' then
+    n := greatest(1, (select count(*) from regexp_matches(coalesce(c->>'frase', ''), '_{3,}', 'g')));
+    ok := true;
+    for i in 0 .. n - 1 loop
+      if not exists (select 1 from jsonb_array_elements_text(coalesce(c->'aceptadas'->i, '[]')) a
+                     where _normalizar(a) = _normalizar(coalesce(v->'textos'->>i, ''))) then ok := false; end if;
+    end loop;
+    select string_agg(coalesce(c->'aceptadas'->x->>0, ''), ' · ') into v_txt from generate_series(0, n - 1) x;
+    return jsonb_build_object('correcta', ok, 'correcta_texto', v_txt, 'config', jsonb_build_object('aceptadas', c->'aceptadas'));
+  end if;
+  return jsonb_build_object('correcta', null);   -- pregunta abierta y lluvia de ideas: sin respuesta correcta
+end $$;
+
+-- ---------- Alumno o invitado ----------
+-- Intento de quien llama: alumno con su cuenta, o invitado con su token
+create or replace function public._ritmo_intento(p_intento uuid, p_token uuid) returns public.proyecto_intentos
+language plpgsql stable security definer set search_path = public as $$
+declare v proyecto_intentos%rowtype;
+begin
+  select * into v from proyecto_intentos where id = p_intento
+    and ((alumno_id is not null and alumno_id = auth.uid()) or (alumno_id is null and token = p_token));
+  if not found then raise exception 'Tu avance ya no es válido. Vuelve a abrir el proyecto.'; end if;
+  return v;
+end $$;
+
+-- Abre el proyecto: con p_pub (publicado a un grupo) o p_proyecto (público, desde la biblioteca).
+-- Alumno del grupo: su intento (se crea la primera vez). Invitado: con su token, o se crea con su nombre.
+create or replace function public.proyecto_ritmo_abrir(p_pub uuid default null, p_proyecto uuid default null, p_token uuid default null,
+  p_alias text default null, p_avatar text default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_pub proyecto_publicaciones%rowtype; v_proy proyectos%rowtype; v_int proyecto_intentos%rowtype; v_miembro boolean := false;
+begin
+  if p_pub is not null then
+    select * into v_pub from proyecto_publicaciones where id = p_pub and activo;
+    if not found then raise exception 'Este proyecto ya no está publicado.'; end if;
+    select * into v_proy from proyectos where id = v_pub.proyecto_id;
+    v_miembro := auth.uid() is not null and es_miembro_grupo(v_pub.grupo_id);
+  else
+    select * into v_proy from proyectos where id = p_proyecto and publico;
+    if not found then raise exception 'Este proyecto no es público.'; end if;
+  end if;
+  if v_miembro then
+    select * into v_int from proyecto_intentos where publicacion_id = p_pub and alumno_id = auth.uid();
+    if not found then
+      insert into proyecto_intentos (proyecto_id, publicacion_id, alumno_id, alias, avatar)
+      select v_proy.id, p_pub, auth.uid(), coalesce(nullif(pf.nombre, ''), pf.usuario), pf.avatar from perfiles pf where pf.id = auth.uid()
+      returning * into v_int;
+    end if;
+  else
+    if p_pub is not null and not v_pub.permite_invitados then
+      return jsonb_build_object('necesita', 'cuenta', 'proyecto', v_proy.nombre);
+    end if;
+    if p_token is not null then
+      select * into v_int from proyecto_intentos where token = p_token and alumno_id is null and proyecto_id = v_proy.id
+        and publicacion_id is not distinct from p_pub;
+    end if;
+    if v_int.id is null then
+      if length(trim(coalesce(p_alias, ''))) = 0 then return jsonb_build_object('necesita', 'nombre', 'proyecto', v_proy.nombre); end if;
+      insert into proyecto_intentos (proyecto_id, publicacion_id, alias, avatar)
+      values (v_proy.id, p_pub, left(trim(p_alias), 30), left(nullif(trim(coalesce(p_avatar, '')), ''), 16))
+      returning * into v_int;
+    end if;
+  end if;
+  return jsonb_build_object(
+    'proyecto', jsonb_build_object('id', v_proy.id, 'nombre', v_proy.nombre),
+    'intento', jsonb_build_object('id', v_int.id, 'token', case when v_int.alumno_id is null then v_int.token end, 'alias', v_int.alias, 'avatar', v_int.avatar,
+                                  'hoja_actual', v_int.hoja_actual, 'respuestas', v_int.respuestas, 'juegos', v_int.juegos, 'completado', v_int.completado),
+    -- las hojas en vivo (Agrupar y Ruleta) no van; las respuestas correctas, solo las ya respondidas
+    'hojas', (select coalesce(jsonb_agg(jsonb_build_object('id', h.id, 'tipo', h.tipo, 'diseno', h.diseno,
+                'config', case when v_int.respuestas ? h.id::text then h.config else _config_publica(h, false) end)
+              order by h.orden, h.created_at), '[]'::jsonb)
+              from proyecto_hojas h where h.proyecto_id = v_proy.id and h.tipo not in ('agrupar','ruleta')));
+end $$;
+
+-- Responder una hoja (una vez) o guardar el puntaje de un juego (se queda el mejor). Devuelve la corrección.
+create or replace function public.proyecto_ritmo_responder(p_intento uuid, p_token uuid, p_hoja uuid, p_valor jsonb) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v proyecto_intentos%rowtype; h proyecto_hojas%rowtype; r jsonb; v_prev jsonb; v_pts numeric;
+begin
+  v := _ritmo_intento(p_intento, p_token);
+  select * into h from proyecto_hojas where id = p_hoja and proyecto_id = v.proyecto_id;
+  if not found then raise exception 'Esa hoja ya no está en el proyecto.'; end if;
+  if jsonb_typeof(p_valor) is distinct from 'object' or pg_column_size(p_valor) > 4000 then raise exception 'Respuesta no válida.'; end if;
+  if h.tipo = 'juego' then
+    if jsonb_typeof(p_valor->'puntos') is distinct from 'number' or (p_valor->>'puntos')::numeric not between 0 and 10000000 then raise exception 'Puntaje no válido.'; end if;
+    v_pts := round((p_valor->>'puntos')::numeric);
+    v_prev := v.juegos->p_hoja::text;
+    update proyecto_intentos set juegos = juegos || jsonb_build_object(p_hoja::text, jsonb_build_object(
+        'puntos', greatest(v_pts, coalesce((v_prev->>'puntos')::numeric, 0)), 'veces', coalesce((v_prev->>'veces')::int, 0) + 1)), updated_at = now()
+    where id = v.id;
+    return jsonb_build_object('mejor', greatest(v_pts, coalesce((v_prev->>'puntos')::numeric, 0)));
+  end if;
+  if h.tipo not in ('pregunta','vf','opcion','completar','lluvia') then raise exception 'Esta hoja no tiene pregunta.'; end if;
+  if v.respuestas ? p_hoja::text and h.tipo <> 'lluvia' then raise exception 'Ya respondiste esta pregunta.'; end if;
+  if h.tipo in ('pregunta','lluvia') and length(trim(coalesce(p_valor->>'texto', ''))) = 0 then raise exception 'Escribe tu respuesta.'; end if;
+  r := _ritmo_calificar(h, p_valor);
+  update proyecto_intentos set respuestas = respuestas || jsonb_build_object(p_hoja::text,
+      case when h.tipo = 'lluvia' then jsonb_build_object('valores', coalesce(respuestas->p_hoja::text->'valores', '[]'::jsonb) || jsonb_build_array(p_valor), 'correcta', null)
+           else jsonb_build_object('valor', p_valor, 'correcta', r->'correcta') end), updated_at = now()
+  where id = v.id;
+  return r;
+end $$;
+
+create or replace function public.proyecto_ritmo_avanzar(p_intento uuid, p_token uuid, p_hoja int, p_completado boolean default false) returns void
+language plpgsql security definer set search_path = public as $$
+declare v proyecto_intentos%rowtype;
+begin
+  v := _ritmo_intento(p_intento, p_token);
+  update proyecto_intentos set hoja_actual = greatest(0, least(coalesce(p_hoja, 0), 200)), completado = completado or coalesce(p_completado, false), updated_at = now()
+  where id = v.id;
+end $$;
+
+-- Proyectos publicados en los grupos del alumno (para su panel)
+create or replace function public.mis_proyectos_alumno() returns jsonb
+language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object('publicacion_id', pp.id, 'titulo', p.nombre, 'grupo', g.nombre,
+      'profesor', coalesce(pf.nombre, pf.usuario),
+      'hojas', (select count(*) from proyecto_hojas h where h.proyecto_id = p.id and h.tipo not in ('agrupar','ruleta')),
+      'hoja_actual', i.hoja_actual, 'completado', coalesce(i.completado, false), 'empezado', i.id is not null)
+    order by i.completado nulls first, pp.created_at desc), '[]'::jsonb)
+  from proyecto_publicaciones pp join proyectos p on p.id = pp.proyecto_id join grupos g on g.id = pp.grupo_id
+  join perfiles pf on pf.id = p.profesor_id
+  left join proyecto_intentos i on i.publicacion_id = pp.id and i.alumno_id = auth.uid()
+  where pp.activo and es_miembro_grupo(pp.grupo_id);
+$$;
+
+-- ---------- Profesor: resultados por alumno ----------
+create or replace function public.proyecto_ritmo_resultados(p_proyecto uuid) returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not exists (select 1 from proyectos where id = p_proyecto and (profesor_id = auth.uid() or es_admin())) then
+    raise exception 'Este proyecto pertenece a otro profesor.';
+  end if;
+  return (select coalesce(jsonb_agg(jsonb_build_object('id', i.id, 'grupo', coalesce(g.nombre, '🌐 Biblioteca (público)'),
+      'publicacion_id', i.publicacion_id, 'alumno', i.alumno_id is not null, 'alias', i.alias, 'avatar', i.avatar,
+      'hoja_actual', i.hoja_actual, 'completado', i.completado, 'updated_at', i.updated_at,
+      'respuestas', i.respuestas, 'juegos', i.juegos) order by g.nombre nulls last, i.alias), '[]'::jsonb)
+    from proyecto_intentos i left join proyecto_publicaciones pp on pp.id = i.publicacion_id left join grupos g on g.id = pp.grupo_id
+    where i.proyecto_id = p_proyecto);
+end $$;
+
+create or replace function public.proyecto_ritmo_borrar(p_intento uuid) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_proy uuid;
+begin
+  select proyecto_id into v_proy from proyecto_intentos where id = p_intento;
+  if not found then return; end if;
+  perform _proyecto_editable(v_proy);
+  delete from proyecto_intentos where id = p_intento;
+end $$;
+
+revoke execute on function public._ritmo_calificar(public.proyecto_hojas, jsonb) from public, anon, authenticated;
+revoke execute on function public._ritmo_intento(uuid, uuid) from public, anon, authenticated;

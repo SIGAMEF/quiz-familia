@@ -12,8 +12,8 @@ import { jugarPublicacion } from './partida.js';
 const app = $('#app');
 let perfil = null;
 let filtroGrupo = '';
-const ICO_JUEGO = { sopa: '🔎', ahorcado: '🦘', memoria: '🃏', ordena: '🔀', frase: '🔤', rompecabezas: '🧩' };
-const NOMBRE_JUEGO = { sopa: 'Sopa de letras', ahorcado: 'Ahorcado', memoria: 'Memorama', ordena: 'Ordena la palabra', frase: 'Ordena la frase', rompecabezas: 'Rompecabezas' };
+const ICO_JUEGO = { sopa: '🔎', ahorcado: '🦘', memoria: '🃏', ordena: '🔀', frase: '🔤', rompecabezas: '🧩', trivia: '📖', relampago: '⚡' };
+const NOMBRE_JUEGO = { sopa: 'Sopa de letras', ahorcado: 'Ahorcado', memoria: 'Memorama', ordena: 'Ordena la palabra', frase: 'Ordena la frase', rompecabezas: 'Rompecabezas', trivia: 'Trivia', relampago: 'Quiz relámpago' };
 
 async function rpc(nombre, args) {
   const { data, error } = await supabase.rpc(nombre, args);
@@ -25,8 +25,8 @@ async function rpc(nombre, args) {
 async function inicio() {
   detenerMusica(); callar();
   app.innerHTML = '<div class="center"><div class="spinner"></div></div>';
-  let pubs, grupos, historial, juegos;
-  try { [pubs, grupos, historial, juegos] = await Promise.all([rpc('mis_publicaciones'), rpc('mis_grupos'), rpc('mi_historial', { p_limite: 60 }), rpc('mis_juegos_alumno').catch(() => [])]); }
+  let pubs, grupos, historial, juegos, proyectos;
+  try { [pubs, grupos, historial, juegos, proyectos] = await Promise.all([rpc('mis_publicaciones'), rpc('mis_grupos'), rpc('mi_historial', { p_limite: 60 }), rpc('mis_juegos_alumno').catch(() => []), rpc('mis_proyectos_alumno').catch(() => [])]); }
   catch (e) { app.innerHTML = `<div class="empty">⚠️ ${esc(mensajeError(e))}<br><button class="btn btn-sm" style="margin-top:10px;" onclick="location.reload()">Reintentar</button></div>`; return; }
 
   // estadísticas
@@ -64,6 +64,11 @@ async function inicio() {
     ${!grupos.length ? `<div class="feedback neutro">Aún no estás en ningún grupo. Pide a tu profesor el enlace o el código del grupo y toca ⚙️ para unirte.</div>` : ''}
     ${profesores.length > 1 ? `<div class="chips" style="margin-bottom:12px;"><button class="chip ${filtroGrupo ? '' : 'activo'}" data-grupo="">Todos</button>
       ${profesores.map(g => `<button class="chip ${filtroGrupo === g.grupo ? 'activo' : ''}" data-grupo="${esc(g.grupo)}">${esc(g.curso || g.grupo)}</button>`).join('')}</div>` : ''}
+    ${proyectos.length ? `<h3 style="margin-bottom:10px;">🎨 Proyectos de tus profesores</h3>
+      <div class="stack" style="margin-bottom:18px;">${proyectos.map(p => `<a class="preg-card" href="proyecto.html?pub=${p.publicacion_id}" style="display:flex; gap:12px; align-items:center; text-decoration:none; color:inherit;">
+        <span style="font-size:30px; width:48px; text-align:center;">🎨</span>
+        <span class="grow"><b class="titulo" style="font-size:16px;">${esc(p.titulo)}</b><br><span class="small muted" style="font-weight:700;">${p.hojas} hojas · ${esc(p.profesor)} · a tu ritmo</span></span>
+        ${p.completado ? '<span class="badge green">✔ Terminado</span>' : p.empezado ? `<span class="badge">Hoja ${Math.min(p.hoja_actual + 1, p.hojas)} de ${p.hojas}</span>` : '<span class="badge amber">¡Nuevo!</span>'}</a>`).join('')}</div>` : ''}
     ${juegos.length ? `<h3 style="margin-bottom:10px;">🎲 Juegos de tus profesores</h3>
       <div class="stack" style="margin-bottom:18px;">${juegos.map(j => `<a class="preg-card" href="juegos.html?jp=${j.publicacion_id}" style="display:flex; gap:12px; align-items:center; text-decoration:none; color:inherit;">
         <span style="font-size:30px; width:48px; text-align:center;">${ICO_JUEGO[j.tipo] || '🎲'}</span>

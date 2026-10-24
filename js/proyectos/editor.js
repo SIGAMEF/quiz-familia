@@ -16,6 +16,9 @@ import { crearVivo, borrarFotos, enlaceParticipante } from './vivo-profe.js';
 import { configAgruparInicial, resumenReparto } from './agrupar.js';
 import { configRuletaInicial, candidatosLocal, PALETAS, ORIGENES } from './ruleta.js';
 import { guardarArchivo, medidas, pintarMisArchivos } from './archivos.js';
+import { configJuego, infoJuego, UNIDAD, TIEMPOS_JUEGO } from './juego-hoja.js';
+import { elegirActividad, TIPOS_JUEGO_CATALOGO, ACTIVIDADES } from '../catalogo.js';
+import { abrirEditor } from '../editor-juegos.js';
 
 const raiz = $('#raiz');
 const params = new URLSearchParams(location.search);
@@ -29,7 +32,7 @@ const TIPOS_HOJA = [
   { k: 'opcion', ico: '🔘', txt: 'Opción múltiple' }, { k: 'completar', ico: '✏️', txt: 'Completar' },
   { k: 'lluvia', ico: '💭', txt: 'Lluvia de ideas' }, { k: 'agrupar', ico: '👥', txt: 'Agrupar' }, { k: 'ruleta', ico: '🎡', txt: 'Ruleta' }
 ];
-const ICO_HOJA = Object.fromEntries(TIPOS_HOJA.map(t => [t.k, t.ico]));
+const ICO_HOJA = { ...Object.fromEntries(TIPOS_HOJA.map(t => [t.k, t.ico])), juego: '🎮' };   // las hojas de juego se agregan con "+ Más"
 const DISPONIBLES = TIPOS_HOJA.map(t => t.k);
 const RECURSOS = [
   ['archivos', '📁', 'Mis archivos'], ['texto', '🔤', 'Texto'], ['fondo', '🎨', 'Fondo'], ['imagen', '🖼', 'Imagen'], ['iconos', '⭐', 'Iconos'],
@@ -45,7 +48,7 @@ const clonar = (o) => JSON.parse(JSON.stringify(o));
 const r1 = (n) => Math.round(n * 10) / 10;
 const esMovil = () => matchMedia('(max-width: 860px)').matches;
 // Hojas con área de respuestas / participantes / ruleta (en el celular se ve un formulario o la ruleta, no la hoja)
-const interactiva = (tipo) => esPregunta(tipo) || tipo === 'agrupar' || tipo === 'ruleta';
+const interactiva = (tipo) => esPregunta(tipo) || tipo === 'agrupar' || tipo === 'ruleta' || tipo === 'juego';
 
 async function rpc(nombre, args) {
   const { data, error } = await supabase.rpc(nombre, args);
@@ -165,7 +168,7 @@ window.addEventListener('beforeunload', (e) => { if ((sucio || guardando) && !co
 document.addEventListener('visibilitychange', () => { if (document.hidden && sucio) guardar(); });
 
 // ======================= HOJAS Y ELEMENTOS NUEVOS =======================
-function hojaNueva(tipo = 'contenido') {
+function hojaNueva(tipo = 'contenido', cfgJuego = null) {
   const ref = hojas[hojas.length - 1];
   const tit = ref?.diseno.elementos.find(e => e.tipo === 'texto');
   const fondo = ref ? clonar(ref.diseno.fondo) : { tipo: 'color', valor: '#FFFFFF' };
@@ -173,6 +176,12 @@ function hojaNueva(tipo = 'contenido') {
   const color = tit && oscuro({ tipo: 'color', valor: tit.color }) !== oscuro(fondo) ? tit.color : oscuro(fondo) ? '#FFFFFF' : '#2D2A45';
   const titulo = { id: uid(), tipo: 'texto', texto: 'Escribe un título', x: 8, y: 8, w: 84, h: 16, rot: 0,
     fuente: tit?.fuente || 'Baloo 2', tam: 5, color, alinear: 'center', negrita: true };
+  if (tipo === 'juego') {
+    return { id: uid(), tipo, config: cfgJuego, diseno: { fondo, elementos: [
+      { ...titulo, texto: cfgJuego.juego.titulo, y: 3, h: 13 },
+      { id: uid(), tipo: 'zona', x: 6, y: 18, w: 88, h: 78, rot: 0 }
+    ] } };
+  }
   if (tipo === 'ruleta') {
     // si ya hay grupos antes, la ruleta sortea entre ellos
     const config = configRuletaInicial();
@@ -539,7 +548,9 @@ function pintarLienzo() {
   const aviso = $('[data-aviso]');
   if (preg) {
     const ruletaCel = (h.config?.celular || 'ruleta') === 'ruleta';
-    aviso.innerHTML = h.tipo === 'ruleta' ? `<div class="cel-aviso-ico">🎡</div><h3>${ruletaCel ? 'El participante ve la ruleta' : 'El participante mira la pantalla'}</h3>
+    aviso.innerHTML = h.tipo === 'juego' ? `<div class="cel-aviso-ico">${infoJuego(h.config.juego?.tipo).ico}</div><h3>Cada participante juega en su celular</h3>
+      <p>Mientras esperan ven esta pantalla. Cuando pulsas <b>▶ Empezar juego</b>, todos empiezan a la vez con el mismo cronómetro y la pantalla muestra el ranking en vivo.</p>
+      <button class="btn btn-primary btn-block" data-editar-web>✏️ Editar en Web</button>` : h.tipo === 'ruleta' ? `<div class="cel-aviso-ico">🎡</div><h3>${ruletaCel ? 'El participante ve la ruleta' : 'El participante mira la pantalla'}</h3>
       <p>${ruletaCel ? 'Cuando giras, la ruleta gira también en cada celular y se detiene en el mismo elegido. Si le toca a él (o a su grupo), lo verá en grande.' : 'En el celular solo verá “Mira la pantalla 👀”. Puedes cambiarlo en Propiedades.'}</p>
       <button class="btn btn-primary btn-block" data-editar-web>✏️ Editar en Web</button>` : h.tipo === 'agrupar' ? `<div class="cel-aviso-ico">👥</div><h3>Así se registra el participante</h3>
       <p>Escribe su nombre, un alias opcional y elige un avatar o sube una foto. Cuando formes los grupos, verá “Estás en el Grupo…” con sus compañeros.</p>
@@ -924,6 +935,7 @@ function pintarIzquierda() {
         const ok = DISPONIBLES.includes(t.k);
         return `<button class="tipo-hoja" data-tipo="${t.k}" ${ok ? '' : 'disabled title="Disponible en una próxima fase"'}><span>${t.ico}</span><span>${t.txt}${ok ? '' : '<small>Próximamente</small>'}</span></button>`;
       }).join('')}</div>
+      <button class="tipo-hoja tipo-mas" data-mas title="Sopa de letras, ahorcado, memorama, rompecabezas, trivia… de Mis actividades"><span>➕</span><span>Más: juegos<small>Sopa, ahorcado, memorama…</small></span></button>
       <button class="btn btn-sm btn-block btn-outline" data-importar style="margin-top:8px;">📥 Traer preguntas de mis quizzes</button>
       <h4>Recursos</h4>
       <div class="recursos">${RECURSOS.map(([k, ico, txt]) => `<button class="recurso" data-rec="${k}"><span>${ico}</span>${txt}</button>`).join('')}</div>
@@ -934,6 +946,7 @@ function pintarIzquierda() {
       if (esPregunta(b.dataset.tipo) && esMovil()) { alternarPanelMovil('der'); enfocarEnunciado(); }   // en el celular se abre el panel de la pregunta
     });
     $('[data-importar]', p).onclick = () => { cerrarPanelMovil(); importarDeQuizzes(); };
+    $('[data-mas]', p).onclick = () => { cerrarPanelMovil(); agregarHojaJuego(); };
     $$('[data-rec]', p).forEach(b => b.onclick = () => { recurso = b.dataset.rec; pintarIzquierda(); });
     return;
   }
@@ -1218,7 +1231,7 @@ function pintarPropiedades() {
   if (selId && selId !== selAntes) pestanaDer = 'diseno';
   selAntes = selId;
   if (!interactiva(h.tipo)) return el ? pintarPropsElemento(p, el) : pintarPropsHoja(p);
-  const nombre = esPregunta(h.tipo) ? '❓ Pregunta' : h.tipo === 'agrupar' ? '👥 Agrupar' : '🎡 Ruleta';
+  const nombre = esPregunta(h.tipo) ? '❓ Pregunta' : { agrupar: '👥 Agrupar', ruleta: '🎡 Ruleta', juego: '🎮 Juego' }[h.tipo];
   p.innerHTML = `<div class="der-tabs" role="tablist">
       <button role="tab" data-tab-der="tipo" aria-selected="${pestanaDer === 'tipo'}" class="${pestanaDer === 'tipo' ? 'activo' : ''}">${nombre}</button>
       <button role="tab" data-tab-der="diseno" aria-selected="${pestanaDer === 'diseno'}" class="${pestanaDer === 'diseno' ? 'activo' : ''}">🎨 ${el ? 'Elemento' : 'Diseño'}</button></div>
@@ -1226,11 +1239,12 @@ function pintarPropiedades() {
   $$('[data-tab-der]', p).forEach(b => b.onclick = () => { pestanaDer = b.dataset.tabDer; pintarPropiedades(); });
   const cuerpo = $('[data-der-cuerpo]', p);
   if (pestanaDer === 'diseno') return el ? pintarPropsElemento(cuerpo, el) : pintarPropsHoja(cuerpo, { conTipo: false });
-  const tipo = TIPOS_HOJA.find(t => t.k === h.tipo);
+  const tipo = TIPOS_HOJA.find(t => t.k === h.tipo) || (h.tipo === 'juego' && { ico: '🎮', txt: 'Juego' });
   cuerpo.innerHTML = `<div class="panel-cab"><b>Hoja ${actual + 1} de ${hojas.length}</b><span class="grow"></span><span class="badge">${tipo?.ico || ''} ${esc(tipo?.txt || h.tipo)}</span></div>`;
   if (esPregunta(h.tipo)) seccionPregunta(cuerpo);
   if (h.tipo === 'agrupar') seccionAgrupar(cuerpo);
   if (h.tipo === 'ruleta') seccionRuleta(cuerpo);
+  if (h.tipo === 'juego') seccionJuego(cuerpo);
 }
 function pintarPropsElemento(p, el) {
   const g = geoVer(el);
@@ -1531,6 +1545,71 @@ function seccionRuleta(p) {
 }
 
 // conTipo: false en la pestaña "Diseño" (la configuración de la pregunta está en su propia pestaña)
+// ======================= HOJAS DE JUEGO ("+ Más") =======================
+// Elige el tipo en el catálogo; luego crea un juego nuevo o trae uno de Mis actividades. reemplazar: la hoja a cambiar
+async function agregarHojaJuego(reemplazar = null) {
+  terminarEdicionTexto();
+  const tipo = await elegirActividad({ titulo: '🎲 Agregar una hoja de juego', subtitulo: 'En vivo, cada participante juega en su celular y la pantalla muestra el ranking.', tipos: TIPOS_JUEGO_CATALOGO });
+  if (!tipo) return;
+  const a = ACTIVIDADES[tipo];
+  let mios = [];
+  try { mios = (await rpc('mis_juegos_profesor')).filter(j => j.tipo === tipo); } catch (e) { toast(mensajeError(e), 'error'); }
+  const m = abrirModal(`<h3>${a.ico} ${esc(a.nombre)}</h3>
+    <button class="btn btn-primary btn-block" data-crear>➕ Crear uno nuevo</button>
+    <h4 style="margin:14px 0 6px;">O trae uno de Mis actividades</h4>
+    ${mios.length ? `<div class="imp-lista">${mios.map(j => `<button class="imp-preg" data-j="${j.id}" style="text-align:left; background:#fff;"><span style="font-size:24px;">${a.ico}</span>
+      <span><b>${esc(j.titulo)}</b><small>${j.n} ${UNIDAD[j.tipo] || 'palabras'}${j.tema ? ' · ' + esc(j.tema) : ''} · editado ${new Date(j.updated_at).toLocaleDateString()}</small></span></button>`).join('')}</div>`
+      : `<p class="hint">Todavía no tienes juegos de este tipo.</p>`}`, { ancho: true });
+  const poner = (j) => {
+    m.cerrar();
+    if (reemplazar) {
+      reemplazar.config = configJuego(j, reemplazar.config);
+      const t = reemplazar.diseno.elementos.find(e => e.tipo === 'texto');
+      if (t && !t.vinculo) t.texto = j.titulo;
+      confirmarCambio({ repintar: 'todo' });
+      return toast('Juego cambiado');
+    }
+    hojas.push(hojaNueva('juego', configJuego(j)));
+    actual = hojas.length - 1; selId = null; pestanaDer = 'tipo';
+    confirmarCambio({ repintar: 'todo' });
+    toast(`Hoja de juego agregada: ${j.titulo}`);
+  };
+  $('[data-crear]', m.el).onclick = () => { m.cerrar(); abrirEditor(tipo, null, poner); };
+  $$('[data-j]', m.el).forEach(b => b.onclick = () => poner(mios.find(j => j.id === b.dataset.j)));
+}
+
+function seccionJuego(p) {
+  const h = hoja(), c = h.config, g = c.juego || {};
+  const info = infoJuego(g.tipo);
+  const hayGrupos = hojas.slice(0, actual).some(x => x.tipo === 'agrupar');
+  const s = document.createElement('div');
+  s.innerHTML = `<h4>${info.ico} ${esc(info.nombre)}</h4>
+    <div class="juego-ficha" style="--c:${info.color}"><b>${esc(g.titulo)}</b><small>${g.n || 0} ${UNIDAD[g.tipo] || 'palabras'}${g.tema ? ' · ' + esc(g.tema) : ''}</small></div>
+    ${fila('⏱ Tiempo', `<select class="input" data-seg style="width:auto;">${TIEMPOS_JUEGO.map(([v, t]) => `<option value="${v}" ${Number(g.segundos || 0) === v ? 'selected' : ''}>${t}</option>`).join('')}</select>`)}
+    <p class="hint" style="margin-top:-2px;">El mismo cronómetro para todos. Quien termina antes gana un bono por el tiempo que le sobró.</p>
+    <label class="lbl">Ranking</label>
+    <label class="check" style="display:flex; margin-bottom:4px;"><input type="radio" name="modoj" value="persona" ${c.modo !== 'grupo' ? 'checked' : ''}> 🙋 Por participante</label>
+    <label class="check" style="display:flex; ${hayGrupos ? '' : 'opacity:.55;'}" ${hayGrupos ? '' : 'title="Agrega antes una hoja Agrupar"'}><input type="radio" name="modoj" value="grupo" ${c.modo === 'grupo' ? 'checked' : ''} ${hayGrupos ? '' : 'disabled'}> 👥 Por grupos (promedio de sus integrantes)</label>
+    ${hayGrupos ? '' : '<p class="hint">Para jugar por grupos, agrega antes una hoja <b>Agrupar</b>.</p>'}
+    <div class="stack" style="margin-top:10px;">
+      <button class="btn btn-sm" data-editar-juego>✏️ Editar el juego</button>
+      <button class="btn btn-sm" data-cambiar-juego>🔁 Cambiar por otro juego</button>
+      ${h.diseno.elementos.some(e => e.tipo === 'zona') ? '' : '<button class="btn btn-sm" data-poner-zona>➕ Volver a poner el ranking</button>'}</div>
+    <p class="hint" style="margin-top:10px;">La hoja guarda una copia del juego: si lo cambias en Mis actividades, toca “Editar el juego” aquí para traer los cambios. Pruébala con <b>▶ Presentar → 🎭 Simular → ▶ Empezar juego</b>.</p>`;
+  p.appendChild(s);
+  $('[data-seg]', s).onchange = (e) => { g.segundos = Number(e.target.value) || 0; confirmarCambio({ repintar: 'hoja' }); };
+  $$('input[name=modoj]', s).forEach(r => r.onchange = () => { c.modo = r.value; confirmarCambio(); });
+  $('[data-cambiar-juego]', s).onclick = () => agregarHojaJuego(h);
+  $('[data-editar-juego]', s).onclick = async () => {
+    const { data: j, error } = await supabase.from('juegos').select('*').eq('id', g.id).maybeSingle();
+    if (error) return toast(mensajeError(error), 'error');
+    if (!j) return toast('Ese juego ya no está en Mis actividades. Usa “Cambiar por otro juego”.', 'error');
+    abrirEditor(j.tipo, j, (nuevo) => { h.config = configJuego(nuevo, h.config); confirmarCambio({ repintar: 'todo' }); toast('La hoja se actualizó con los cambios del juego'); });
+  };
+  const pz = $('[data-poner-zona]', s);
+  if (pz) pz.onclick = () => { const z = hojaNueva('juego', c).diseno.elementos.find(e => e.tipo === 'zona'); h.diseno.elementos.push(z); selId = z.id; confirmarCambio(); };
+}
+
 // ======================= TRAER PREGUNTAS DE MIS QUIZZES =======================
 const TIPO_DESDE_QUIZ = { verdadero_falso: 'vf', opcion_unica: 'opcion', opcion_multiple: 'opcion', completar: 'completar', lluvia_ideas: 'lluvia' };
 // Una pregunta de un quiz convertida en hoja del tipo correcto, con su enunciado, opciones y respuesta
@@ -1626,7 +1705,7 @@ function pintarPropsHoja(p, { conTipo = true } = {}) {
   const preg = interactiva(h.tipo);
   const cel = h.config?.celular || 'mirar';
   const els = h.diseno.elementos;
-  const tipo = TIPOS_HOJA.find(t => t.k === h.tipo);
+  const tipo = TIPOS_HOJA.find(t => t.k === h.tipo) || (h.tipo === 'juego' && { ico: '🎮', txt: 'Juego' });
   p.innerHTML = `<div class="panel-cab"><b>Hoja ${actual + 1} de ${hojas.length}</b><span class="grow"></span><span class="badge">${tipo?.ico || ''} ${esc(tipo?.txt || h.tipo)}</span></div>`;
   if (conTipo && esPregunta(h.tipo)) seccionPregunta(p);
   if (conTipo && h.tipo === 'agrupar') seccionAgrupar(p);

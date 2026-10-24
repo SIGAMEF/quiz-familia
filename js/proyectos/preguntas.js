@@ -153,7 +153,8 @@ function textoCorrecta(hoja) {
 // - alEnviar(valor): puede devolver una promesa; si falla, se muestra el error y se conserva lo escrito.
 // - respuestas: en vivo, lo que ya respondió (o su grupo): [{ valor, alias, mia }]. Sin "respuestas" es una vista previa.
 // - cerrado, revelar, modoGrupo, nota
-export function pintarParticipante(cont, hoja, { alEnviar = () => {}, nota = '', respuestas = null, cerrado = false, revelar = false, modoGrupo = false } = {}) {
+// - fija: la respuesta ya enviada no se puede cambiar (proyecto a su ritmo)
+export function pintarParticipante(cont, hoja, { alEnviar = () => {}, nota = '', respuestas = null, cerrado = false, revelar = false, modoGrupo = false, fija = false } = {}) {
   const c = hoja.config || {};
   const tipo = TIPOS_PREGUNTA[hoja.tipo];
   const enVivo = Array.isArray(respuestas);
@@ -175,7 +176,7 @@ export function pintarParticipante(cont, hoja, { alEnviar = () => {}, nota = '',
           : `<div class="part-mal">❌ La respuesta correcta era: <b>${esc(textoCorrecta(hoja))}</b></div>`;
       }
       cuerpo = `<div class="part-hecho">✅<b>¡Respuesta enviada!</b><small>${esc(textoRespuesta(hoja, actual.valor))}</small>${otro}</div>${correccion}
-        ${cerrado ? '<div class="part-cuenta" style="text-align:center;">🔒 Las respuestas están cerradas</div>' : '<button class="part-btn sec" data-otra>Cambiar respuesta</button>'}`;
+        ${fija ? '' : cerrado ? '<div class="part-cuenta" style="text-align:center;">🔒 Las respuestas están cerradas</div>' : '<button class="part-btn sec" data-otra>Cambiar respuesta</button>'}`;
     } else if (cerrado && !(hoja.tipo === 'lluvia' && enviadas.length)) {
       cuerpo = `<div class="part-hecho">🔒<b>Las respuestas están cerradas</b><small>Mira la pantalla.</small></div>`;
       if (revelar && tieneCorrecta(hoja)) cuerpo += `<div class="part-ok">La respuesta correcta era: <b>${esc(textoCorrecta(hoja))}</b></div>`;

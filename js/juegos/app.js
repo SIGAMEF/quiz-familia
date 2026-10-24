@@ -10,7 +10,7 @@ import { JUEGOS, setsPara, buscarSet, conImagenes } from './contenido.js';
 
 const MODULOS = {
   ahorcado: () => import('./ahorcado.js'), sopa: () => import('./sopa.js'), memoria: () => import('./memoria.js'),
-  ordena: () => import('./ordena.js'), quiz: () => import('./quiz.js'), trivia: () => import('./quiz.js'),
+  ordena: () => import('./ordena.js'), quiz: () => import('./quiz.js'), trivia: () => import('./quiz.js'), relampago: () => import('./quiz.js'),
   frase: () => import('./frase.js'), rompecabezas: () => import('./rompecabezas.js'), quizpublico: () => import('./quizlibre.js')
 };
 // Opciones de cada juego
@@ -34,6 +34,7 @@ const OPCIONES = {
   quizpublico: { jugadores: false, campo: 'cantidad', titulo: 'Preguntas', valores: [[5, '5'], [10, '10'], [999, 'Todas']], def: 10,
     reglas: ['Responde cada pregunta y mira si acertaste.', 'Hay preguntas de una o varias respuestas, verdadero o falso y para completar.'] }
 };
+OPCIONES.relampago = OPCIONES.quiz;
 const TIEMPOS = [[0, 'Sin límite'], [60, '1 min'], [120, '2 min'], [180, '3 min'], [300, '5 min'], [600, '10 min']];
 const INFO_QUIZ = { nombre: 'Quiz', ico: '📝', desc: 'Un quiz compartido por un profesor. ¡Demuestra cuánto sabes!' };
 
@@ -205,7 +206,7 @@ function preparar() {
   $$('[data-imp]', cont).forEach(b => b.onclick = async () => {
     try {
       const set = await setCompleto(setId);
-      const tipo = juego === 'quizpublico' || juego === 'trivia' ? 'quiz' : juego;
+      const tipo = ['quizpublico', 'trivia', 'relampago'].includes(juego) ? 'quiz' : juego;
       if (juego === 'sopa' && !set.grilla && !sopaImpresa) sopaImpresa = sopaDe(set, valor, pistas);
       if (juego === 'rompecabezas' && set.id === 'foto') throw new Error('Para imprimir con una foto, primero créalo como juego en tu panel de profesor.');
       const imagen = juego === 'rompecabezas' && !set.imagen_url ? imagenPuzzle(set.id) : null;
@@ -272,7 +273,7 @@ async function crearSalaEnLinea({ juego, setId, setCompletoFn, campo, valor, pis
     if (juega && !alias) { $('[data-err]', cont).textContent = 'Escribe tu nombre.'; return; }
     boton.disabled = true;
     try {
-      const r = await rpc('sala_crear', { p_tipo: juego === 'quiz' && set.remoto ? 'quizpublico' : juego, p_titulo: set.titulo, p_contenido: armar(),
+      const r = await rpc('sala_crear', { p_tipo: juego === 'quiz' && set.remoto ? 'quizpublico' : juego === 'relampago' ? 'quiz' : juego, p_titulo: set.titulo, p_contenido: armar(),
         p_segundos: segundos || null, p_alias: alias, p_avatar: av(), p_juega: juega });
       if (juega) prefs.guardar('jugadores', [{ nombre: alias, avatar: av() }, ...prefs.leer('jugadores', []).slice(1)]);
       if (set.remoto && juego !== 'quiz') rpc('juego_jugado', { p_id: set.id }).catch(() => {});
