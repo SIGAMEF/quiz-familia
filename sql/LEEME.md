@@ -10,11 +10,13 @@ Ejecutar en el **SQL Editor de Supabase**, en este orden.
 | 3 | `03_migrar.sql` | Justo después del 2 | No |
 | 4 | `04_bancos_html.sql` | Opcional, después del 3 | No. Importa las 322 preguntas de `quiz.html` y `lucas.html` |
 | 5 | `05_parche_paneles.sql` | Después del 4 (y cada vez que llegue una versión nueva) | No. Funciones de los paneles; se puede ejecutar varias veces |
-| 6 | `06_permisos.sql` | **Siempre al final** (después del 05 y del 07) | No. Da a la app los permisos sobre las tablas; se puede ejecutar varias veces |
+| 6 | `06_permisos.sql` | **Siempre al final** (después del 05, 07 y 08) | No. Da a la app los permisos sobre las tablas; se puede ejecutar varias veces |
 | 7 | `07_proyectos.sql` | Después del 05 (y cada vez que llegue una versión nueva). Luego, otra vez el 06 | No. Proyectos en grupo (tablas, funciones y la política de Storage para `proyectos/`); se puede ejecutar varias veces |
+| 8 | `08_archivos.sql` | Después del 07 (si vuelves a ejecutar el 07, ejecuta otra vez el 08). Luego, otra vez el 06 | No. "Mis archivos": registro de imágenes y videos, límite de espacio por profesor y políticas de Storage de la carpeta propia. Registra los archivos que ya estaban subidos |
 
-Pruebas opcionales: `pruebas/flujos_proyectos.sql` (después del 07 y del 06). Todo se deshace al final; debe terminar con
-"TODAS LAS PRUEBAS DE PROYECTOS PASARON".
+Pruebas opcionales (después del 07, 08 y 06). Todo se deshace al final:
+- `pruebas/flujos_proyectos.sql` → "TODAS LAS PRUEBAS DE PROYECTOS PASARON".
+- `pruebas/flujos_archivos.sql` → "TODAS LAS PRUEBAS DE ARCHIVOS PASARON".
 
 Antes del paso 2, en Supabase → **Authentication → Sign In / Providers**:
 - *Allow new users to sign up*: **activado**

@@ -7,6 +7,7 @@ import {
 } from './comun.js';
 import { montarEditorQuiz } from './editor-quiz.js';
 import { vistaProyectos } from './proyectos/lista.js';
+import { fmtMB } from './proyectos/archivos.js';
 
 const raiz = $('#raiz');
 let perfil = null;
@@ -199,9 +200,38 @@ async function verProfesor(u) {
       ${(grupos || []).map(g => `<div class="row" style="padding:6px 0; border-bottom:1px solid var(--line);"><b class="grow">${esc(g.nombre)}</b><span class="small muted">${esc(g.nivel || '')}</span><span class="badge gray">${esc(g.codigo_invitacion)}</span></div>`).join('') || '<p class="muted">Sin grupos.</p>'}
       <h3 style="color:var(--ink); margin-top:14px;">📚 Quizzes (${suyos.length})</h3>
       ${suyos.map(q => `<div class="row" style="padding:6px 0; border-bottom:1px solid var(--line);"><b class="grow">${esc(q.titulo)}</b><span class="small muted">${q.preguntas} preg. · ${q.publicaciones} publ.</span>
-        <a class="btn btn-sm" href="#quiz/${q.id}" data-cerrar>Abrir</a></div>`).join('') || '<p class="muted">Sin quizzes.</p>'}`;
+        <a class="btn btn-sm" href="#quiz/${q.id}" data-cerrar>Abrir</a></div>`).join('') || '<p class="muted">Sin quizzes.</p>'}
+      <h3 style="color:var(--ink); margin-top:14px;">📁 Mis archivos (proyectos)</h3><div data-archivos><div class="spinner"></div></div>`;
     $$('[data-cerrar]', m.el).forEach(a => a.addEventListener('click', () => m.cerrar()));
+    limiteArchivos($('[data-archivos]', m.el), u.id);
   } catch (e) { $('[data-c]', m.el).textContent = mensajeError(e); }
+}
+
+// Espacio de "Mis archivos" del profesor y su límite (por defecto 200 MB)
+async function limiteArchivos(c, profesor) {
+  const pintar = (d) => {
+    const lim = d.limite == null ? null : Math.round(d.limite / 1048576);
+    c.innerHTML = `<p style="font-weight:700; margin-bottom:8px;">Usa <b>${fmtMB(d.usado)}</b>${lim == null ? ' (sin límite)' : ` de ${lim} MB`} · ${d.archivos} ${d.archivos === 1 ? 'archivo' : 'archivos'}
+        ${d.personalizado ? '<span class="badge">límite personalizado</span>' : '<span class="badge gray">predeterminado</span>'}</p>
+      <div class="row"><label class="small" style="font-weight:700;">Límite (MB)</label>
+        <input class="input" type="number" min="0" max="100000" data-mb value="${lim ?? ''}" placeholder="sin límite" style="width:120px;">
+        <button class="btn btn-sm btn-primary" data-guardar>Guardar</button>
+        ${d.personalizado ? '<button class="btn btn-sm btn-outline" data-pred>Volver a 200 MB</button>' : ''}</div>`;
+    const cambiar = async (mb) => {
+      try { pintar(await rpc('admin_limite_archivos', { p_profesor: profesor, p_mb: mb })); toast('Límite actualizado'); }
+      catch (e) { toast(mensajeError(e), 'error'); }
+    };
+    $('[data-guardar]', c).onclick = () => {
+      const v = $('[data-mb]', c).value.trim();
+      const mb = Math.round(Number(v));
+      if (v === '' || !(mb >= 0 && mb <= 100000)) return toast('Escribe un límite entre 0 y 100000 MB', 'error');
+      cambiar(mb);
+    };
+    const pred = $('[data-pred]', c);
+    if (pred) pred.onclick = () => cambiar(null);
+  };
+  try { pintar(await rpc('admin_archivos_profesor', { p_profesor: profesor })); }
+  catch (e) { c.innerHTML = `<p class="muted">${esc(mensajeError(e))} (¿ejecutaste sql/08_archivos.sql?)</p>`; }
 }
 
 // ======================= INSTITUCIONES =======================

@@ -5,26 +5,32 @@
 // Se avanza con las flechas, la barra espaciadora, un clic o deslizando el dedo.
 // En un celular en vertical se usa el acomodo para celular.
 // ============================================================
-import { abrirModal, esc, toast, mensajeError, dibujarQR } from '../comun.js';
+import { abrirModal, esc, toast, mensajeError, dibujarQR, copiar } from '../comun.js';
 import { pintarHoja, pintarHojaMovil, repintarElemento } from './lienzo.js';
-import { esPregunta, tieneCorrecta, crearSimulacion } from './preguntas.js';
+import { esPregunta, tieneCorrecta, crearSimulacion, tiempoDe, quedan } from './preguntas.js';
 import { formarLocal, resumenReparto } from './agrupar.js';
-import { candidatosLocal, sortearLocal, restantes, ruletaGirando } from './ruleta.js';
+import { candidatosLocal, sortearLocal, restantes, ruletaGirando, ahoraServidor } from './ruleta.js';
 
 const esCelular = () => innerWidth < innerHeight && innerWidth < 820;
+// el enlace sin "https://" para leerlo en la pantalla
+const enlaceCorto = (u) => String(u || '').replace(/^https?:\/\//, '');
 
 export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
   let i = Math.min(Math.max(0, inicio), hojas.length - 1);
   let sim = null, tSim = null, formato = null, lienzo = null, claveZona = '', arrastrando = false;
   const sorteosLocales = {};   // ruletas sin sesión en vivo: sorteos que no se guardan
+  const inicioLocal = {};      // sin sesión en vivo: cuándo empezó cada pregunta (para su tiempo)
+  let agotada = '';            // la pregunta cuyo tiempo ya terminó (se cierra una sola vez)
   const ov = document.createElement('div');
   ov.className = 'pres' + (vivo ? ' en-vivo' : '');
   ov.innerHTML = `<div class="escenario" data-esc><div class="marco" data-marco></div></div>
+    <div class="pres-reloj" data-reloj hidden></div>
     <div class="pres-ctrl" data-ctrl>
       <button data-acc="ant" title="Anterior (←)" aria-label="Hoja anterior">◀</button>
       <span class="cont" data-cont></span>
       <button data-acc="sig" title="Siguiente (→)" aria-label="Hoja siguiente">▶</button>
-      ${vivo ? `<button class="pres-pin" data-acc="qr" title="Mostrar el QR y el PIN"><small>PIN</small> <b data-pin></b></button><span class="cont" data-gente></span>` : ''}
+      ${vivo ? `<button class="pres-pin" data-acc="qr" title="Mostrar el QR, el PIN y el enlace"><small>PIN</small> <b data-pin></b></button>
+        <button data-acc="enlace" title="Copiar el enlace para entrar desde una computadora o compartirlo por chat">🔗<span class="pres-txt"> Enlace</span></button><span class="cont" data-gente></span>` : ''}
       <span class="pres-herr" data-herr></span>
       ${vivo ? `<button data-acc="pausa" title="Pausar o reanudar"></button><button data-acc="fin" title="Finalizar la sesión">⏹<span class="pres-txt"> Finalizar</span></button>` : ''}
       <button data-acc="pc" title="Pantalla completa (F)" aria-label="Pantalla completa">⛶</button>
@@ -144,6 +150,7 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
   const mostrar = (n) => {
     if (n < 0 || n >= hojas.length) return;
     i = n;
+    inicioLocal[hoja().id] = Date.now();
     pintar();
     if (vivo) intentar(() => vivo.ir(hoja().id));
   };
@@ -238,13 +245,21 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
     const s = vivo.sesion;
     const q = document.createElement('div');
     q.className = 'qr-grande';
-    q.innerHTML = `<div class="caja"><h2 style="margin-bottom:10px;">Únete desde tu celular</h2><div data-qr style="display:inline-block;"></div>
+    q.innerHTML = `<div class="caja"><h2 style="margin-bottom:10px;">Únete desde tu celular o tu computadora</h2><div data-qr style="display:inline-block;"></div>
       <div class="codigo-grande" style="margin-top:10px;">${esc(s.pin.replace(/(\d{3})(\d{3})/, '$1 $2'))}</div>
-      <p class="muted" style="font-weight:700; margin-top:6px;">Escanea el QR o entra a la página e ingresa el PIN</p>
-      <p class="small" style="word-break:break-all; margin-top:6px;">${esc(vivo.url)}</p></div><button class="btn btn-outline">Cerrar</button>`;
+      <p class="muted" style="font-weight:700; margin-top:6px;">Escanea el QR, o abre este enlace en el navegador:</p>
+      <a class="qr-enlace" href="${esc(vivo.url)}" target="_blank" rel="noopener">${esc(enlaceCorto(vivo.url))}</a>
+      <div class="row" style="justify-content:center; gap:8px; margin-top:10px;">
+        <button class="btn btn-sm btn-primary" data-copiar>📋 Copiar enlace</button>
+        ${navigator.share ? '<button class="btn btn-sm btn-outline" data-compartir>📤 Compartir</button>' : ''}</div></div>
+      <button class="btn btn-outline" data-cerrar>Cerrar</button>`;
     ov.appendChild(q);
-    dibujarQR(q.querySelector('[data-qr]'), vivo.url, Math.min(innerWidth, innerHeight) * 0.5);
-    q.onclick = (e) => { if (e.target === q || e.target.tagName === 'BUTTON') q.remove(); };
+    dibujarQR(q.querySelector('[data-qr]'), vivo.url, Math.min(innerWidth, innerHeight) * 0.42);
+    q.onclick = (e) => {
+      if (e.target.closest('[data-copiar]')) return copiar(vivo.url);
+      if (e.target.closest('[data-compartir]')) return navigator.share({ title: 'Únete al proyecto', text: `PIN ${s.pin}`, url: vivo.url }).catch(() => {});
+      if (e.target === q || e.target.closest('[data-cerrar]')) q.remove();
+    };
   }
 
   const ACCIONES = {
@@ -253,6 +268,7 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
     pc: () => pantallaCompleta(),
     salir: () => cerrar(),
     qr: () => verQR(),
+    enlace: () => copiar(vivo.url),
     sim: () => {
       if (sim) { sim = null; clearTimeout(tSim); pintar(); return; }
       sim = crearSimulacion();
@@ -262,7 +278,8 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
     },
     cerrar: () => {
       if (vivo) return intentar(() => vivo.respuestas(!vivo.sesion.respuestas_abiertas));
-      const e = sim?.estado(hoja()); if (e) { e.cerrado = !e.cerrado; pintarZona(); }
+      const e = sim?.estado(hoja());
+      if (e) { e.cerrado = !e.cerrado; if (!e.cerrado) inicioLocal[hoja().id] = Date.now(); pintarZona(); }   // al reabrir, el tiempo empieza de nuevo
     },
     revelar: () => {
       if (vivo) return intentar(() => vivo.respuestas(null, !vivo.sesion.revelar));
@@ -295,6 +312,7 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
 
   // ---------- acciones dentro de la zona (retirar a alguien, mover entre grupos) ----------
   ov.addEventListener('click', async (e) => {
+    if (e.target.closest('[data-copiar-enlace]')) return vivo && copiar(vivo.url);
     if (e.target.closest('[data-ruleta-girar]')) return girar(hoja());
     if (e.target.closest('[data-ruleta-reiniciar]')) return reiniciarRuleta(hoja());
     const x = e.target.closest('[data-expulsar]');
@@ -332,6 +350,28 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
     claveZona = ''; pintarZona();
   });
 
+  // ---------- tiempo por pregunta: cuenta regresiva y cierre automático ----------
+  const reloj = () => {
+    const h = hoja(), el = $('[data-reloj]');
+    if (!tiempoDe(h)) { el.hidden = true; return; }
+    let inicio;
+    if (vivo) inicio = vivo.sesion.hoja_id === h.id ? Date.parse(vivo.sesion.hoja_inicio) : NaN;
+    else inicio = inicioLocal[h.id] ??= Date.now();
+    const r = quedan(h, inicio, vivo ? ahoraServidor() : Date.now());
+    const seg = Math.max(0, Math.ceil(r));
+    el.hidden = false;
+    el.textContent = seg ? `⏱ ${seg}` : '⏱ ¡Tiempo!';
+    el.classList.toggle('poco', seg <= 5);
+    const cerrado = vivo ? !vivo.sesion.respuestas_abiertas : !!sim?.estado(h).cerrado;
+    const clave = h.id + '|' + inicio;
+    if (r <= 0 && !cerrado && agotada !== clave && !isNaN(inicio)) {
+      agotada = clave;
+      if (vivo) intentar(() => vivo.respuestas(false));
+      else if (sim) { sim.estado(h).cerrado = true; pintarZona(); }
+    }
+  };
+  const tReloj = setInterval(reloj, 250);
+
   const pantallaCompleta = () => {
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
     else ov.requestFullscreen?.().catch(() => {});
@@ -339,6 +379,7 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
   const alRedimensionar = () => { if ((esCelular() ? 'movil' : 'web') !== formato) pintar(); };
   function cerrar() {
     clearTimeout(tSim); sim = null;
+    clearInterval(tReloj);
     if (vivo) vivo.detener();
     document.removeEventListener('keydown', tecla);
     removeEventListener('resize', alRedimensionar);
@@ -390,6 +431,7 @@ export function presentar(hojas, { inicio = 0, alSalir, vivo = null } = {}) {
     vivo.alCambiar = (d) => { if (d.sesion.estado === 'finalizada') { toast('La sesión terminó'); cerrar(); return; } pintarZona(); };
   }
   pantallaCompleta();
+  inicioLocal[hoja().id] = Date.now();
   pintar();
   return { cerrar, ir: mostrar, actualizar: pintarZona };
 }

@@ -130,7 +130,7 @@ async function verResultados(p, rpc, alCambiar) {
     }
     const fin = $('[data-finalizar]', cuerpo);
     if (fin) fin.onclick = async () => {
-      try { await rpc('proyecto_finalizar', { p_sesion: s.id }); s.estado = 'finalizada'; toast('Sesión finalizada'); pintar(); alCambiar(); }
+      try { const r = await rpc('proyecto_finalizar', { p_sesion: s.id }); await borrarFotos(r.fotos); s.estado = 'finalizada'; toast('Sesión finalizada'); pintar(); alCambiar(); }
       catch (e) { toast(mensajeError(e), 'error'); }
     };
     $('[data-borrar]', cuerpo).onclick = async () => {

@@ -360,6 +360,38 @@ begin
   if not ok then raise exception 'FALLO: se aceptó una foto de otra ruta'; end if;
 end $$;
 
+-- tiempo por pregunta: pasado el tiempo (más 2 s de margen) ya no se acepta la respuesta
+reset role;
+do $$ begin
+  update public.proyecto_hojas set config = config || '{"tiempo": 5}' where id = pg_temp.id_de('h_l');
+  update public.proyecto_sesiones set hoja_inicio = now() - interval '1 minute' where id = pg_temp.id_de('ses');
+end $$;
+set local role anon;
+do $$
+declare ok boolean := false;
+begin
+  perform pg_temp.anon();
+  begin perform public.proyecto_responder(pg_temp.txt('pin'), pg_temp.txt('tok_1')::uuid, pg_temp.id_de('h_l'), '{"texto":"tarde"}'::jsonb);
+  exception when others then ok := sqlerrm like '%tiempo%'; end;
+  if not ok then raise exception 'FALLO: se aceptó una respuesta fuera de tiempo'; end if;
+end $$;
+reset role;
+set local role authenticated;
+do $$
+declare v jsonb;
+begin
+  perform pg_temp.como('prof1');
+  perform public.proyecto_respuestas(pg_temp.id_de('ses'), false);
+  v := public.proyecto_respuestas(pg_temp.id_de('ses'), true);   -- al reabrir, el tiempo empieza de nuevo
+  if (v->>'hoja_inicio')::timestamptz < now() - interval '5 seconds' then raise exception 'FALLO: reabrir no reinició el tiempo: %', v->>'hoja_inicio'; end if;
+end $$;
+reset role;
+set local role anon;
+do $$ begin
+  perform pg_temp.anon();
+  perform public.proyecto_responder(pg_temp.txt('pin'), pg_temp.txt('tok_1')::uuid, pg_temp.id_de('h_l'), '{"texto":"a tiempo"}'::jsonb);
+end $$;
+
 -- expulsar, registro cerrado, tardíos (entran al grupo más chico), resultados, reiniciar y finalizar
 reset role;
 set local role authenticated;

@@ -58,7 +58,8 @@ export function crearVivo(sesion, { alCambiar = () => {}, alError = () => {} } =
     registro: (abierto, tardios = null) => accion('proyecto_registro', { p_sesion: id(), p_abierto: abierto, p_tardios: tardios }),
     respuestas: (abiertas, revelar = null) => accion('proyecto_respuestas', { p_sesion: id(), p_abiertas: abiertas, p_revelar: revelar }),
     pausar: (si) => accion('proyecto_pausar', { p_sesion: id(), p_pausar: si }),
-    finalizar: () => accion('proyecto_finalizar', { p_sesion: id() }),
+    // al finalizar se borran las fotos de los participantes
+    finalizar: async () => { const r = await accion('proyecto_finalizar', { p_sesion: id() }); await borrarFotos(r?.fotos); return r; },
     expulsar: (p) => accion('proyecto_expulsar', { p_sesion: id(), p_participante: p }),
     formar: (hoja, cantidad, por) => accion('proyecto_formar_grupos', { p_sesion: id(), p_hoja: hoja, p_cantidad: cantidad, p_por: por }),
     confirmar: (hoja, si = true) => accion('proyecto_confirmar_grupos', { p_sesion: id(), p_hoja: hoja, p_confirmar: si }),

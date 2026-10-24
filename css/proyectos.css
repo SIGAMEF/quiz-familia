@@ -430,3 +430,62 @@ button.zr-centro:hover { transform: translate(-50%, -50%) scale(1.07); }
 @keyframes zrPop { from { transform: scale(.4); opacity: 0; } }
 @keyframes zrLatido { to { transform: scale(1.18); } }
 @media (prefers-reduced-motion: reduce) { .zr-gajo.gana path, .zr-gajo.gana circle, .zr-ganador.espera b { animation: none; } }
+
+/* ---------- Mis archivos ---------- */
+.arch-espacio { background: var(--primary-soft); border-radius: 12px; padding: 8px 10px; font-size: 13px; font-weight: 700; }
+.arch-espacio small { display: block; margin-top: 4px; color: var(--muted); }
+.arch-espacio.lleno small { color: var(--red); }
+.arch-barra { height: 8px; border-radius: 6px; background: #fff; overflow: hidden; margin-top: 6px; }
+.arch-barra i { display: block; height: 100%; background: var(--primary); border-radius: 6px; }
+.arch-espacio.lleno .arch-barra i { background: var(--red); }
+.arch-filtro { margin: 8px 0; }
+.arch-filtro button { flex: 1; font-size: 12.5px; padding: 6px 4px; }
+.arch-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.arch { position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; cursor: pointer; background: repeating-conic-gradient(#EEE 0 25%, #FFF 0 50%) 0 0 / 16px 16px; box-shadow: 0 0 0 1px var(--line); }
+.arch:hover { box-shadow: 0 0 0 2px var(--primary); }
+.arch-mini { position: relative; display: block; width: 100%; height: 100%; }
+.arch-mini img, .arch-mini video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.arch-mini i { position: absolute; left: 6px; bottom: 6px; background: rgba(0,0,0,.6); color: #fff; font-style: normal; font-size: 11px; border-radius: 6px; padding: 1px 6px; }
+.arch-acc { position: absolute; top: 4px; right: 4px; display: none; gap: 4px; }
+.arch:hover .arch-acc, .arch:focus-within .arch-acc { display: flex; }
+@media (hover: none) { .arch-acc { display: flex; } }
+.arch-acc button { width: 28px; height: 28px; border: none; border-radius: 8px; background: rgba(255,255,255,.94); box-shadow: 0 1px 4px rgba(0,0,0,.25); cursor: pointer; font-size: 14px; padding: 0; }
+.arch-acc button:hover { background: #fff; transform: scale(1.08); }
+.arch-limpiar { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; max-height: 50vh; overflow: auto; }
+.arch-lim { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 6px; cursor: pointer; font-weight: 700; font-size: 13px; min-width: 0; }
+.arch-lim .arch-mini { width: 54px; height: 54px; flex: 0 0 auto; border-radius: 8px; overflow: hidden; }
+.arch-lim span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arch-lim small { display: block; color: var(--muted); font-weight: 600; }
+
+/* ---------- Panel derecho: pestañas "Pregunta" / "Diseño" ---------- */
+.der-tabs { position: sticky; top: -14px; z-index: 2; display: flex; gap: 4px; background: var(--primary-soft); border-radius: 12px; padding: 4px; margin: -2px 0 10px; box-shadow: 0 4px 8px -6px rgba(60,50,140,.3); }
+.der-tabs button { flex: 1; border: none; background: transparent; border-radius: 9px; padding: 8px 6px; font: 800 13.5px 'Nunito', sans-serif; color: var(--muted); cursor: pointer; }
+.der-tabs button.activo { background: #fff; color: var(--primary-dark); box-shadow: 0 1px 4px rgba(60,50,140,.15); }
+/* opciones: ✓ para la correcta e imagen opcional */
+.op-ok { width: 30px; height: 30px; flex: 0 0 auto; border-radius: 50%; border: 2px solid var(--line); background: #fff; color: #C9C4DD; font-weight: 900; font-size: 15px; cursor: pointer; padding: 0; }
+.op-ok:hover { border-color: var(--green); color: var(--green); }
+.op-ok.si { background: var(--green); border-color: var(--green); color: #fff; }
+.op-img { position: relative; flex: 0 0 auto; }
+.op-img img { height: 30px; width: 30px; object-fit: cover; border-radius: 6px; display: block; }
+.op-img button { position: absolute; top: -6px; right: -6px; width: 17px; height: 17px; border-radius: 50%; border: none; background: var(--red); color: #fff; font-size: 9px; cursor: pointer; padding: 0; line-height: 1; }
+.zb-img { height: calc(5 * var(--u)); width: calc(5 * var(--u)); object-fit: cover; border-radius: calc(.8 * var(--u)); vertical-align: middle; margin-right: calc(1 * var(--u)); }
+.part-op.fila img { width: 14cqw; height: 14cqw; object-fit: cover; border-radius: 2.4cqw; flex: 0 0 auto; background: #fff; }
+/* traer preguntas de mis quizzes */
+.imp-lista { max-height: 46vh; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
+.imp-preg { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; cursor: pointer; }
+.imp-preg input { margin-top: 3px; accent-color: var(--primary); }
+.imp-preg b { display: block; font-size: 14px; }
+.imp-preg small { color: var(--muted); font-weight: 700; }
+/* enlace para entrar desde una computadora */
+.zg-enlace { text-align: center; font-weight: 800; font-size: calc(1.6 * var(--u)); color: var(--primary-dark); max-width: 100%; overflow-wrap: anywhere; }
+.zg-enlace small { display: block; color: var(--muted); font-weight: 700; }
+.zg-enlace button { margin-top: calc(.6 * var(--u)); border: none; background: var(--primary-light); color: var(--primary-dark); font: 800 calc(1.5 * var(--u)) 'Nunito', sans-serif; border-radius: calc(1 * var(--u)); padding: calc(.4 * var(--u)) calc(1.2 * var(--u)); cursor: pointer; }
+.qr-enlace { display: inline-block; margin-top: 4px; font-weight: 800; font-size: 18px; color: var(--primary-dark); word-break: break-all; }
+/* tiempo por pregunta */
+.pres-reloj { position: absolute; top: 14px; right: 16px; z-index: 5; background: rgba(30,25,60,.82); color: #fff; font: 800 30px 'Baloo 2', sans-serif; border-radius: 16px; padding: 4px 16px; min-width: 90px; text-align: center; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+.pres-reloj.poco { background: var(--red); animation: zrLatido .5s ease-in-out infinite alternate; }
+.part-reloj { background: var(--primary-dark); color: #fff; font: 800 15px 'Baloo 2', sans-serif; border-radius: 10px; padding: 1px 9px; }
+.part-reloj.poco { background: var(--red); }
+.zg-acceso:has(.zg-enlace) { gap: calc(.8 * var(--u)); }
+.zg-acceso:has(.zg-enlace) .zg-qr { width: calc(19 * var(--u)); }
+.zg-acceso:has(.zg-enlace) .zg-pin b { font-size: calc(4.6 * var(--u)); }

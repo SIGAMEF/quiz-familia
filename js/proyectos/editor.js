@@ -2,7 +2,7 @@
 // Proyectos en grupo: editor de hojas (pantalla completa)
 // proyectos.html?id=<proyecto>[&volver=admin][&presentar=1]
 // ============================================================
-import { supabase, $, $$, esc, toast, confirmar, abrirModal, mensajeError, exigirRol } from '../comun.js';
+import { supabase, $, $$, esc, toast, confirmar, abrirModal, mensajeError, exigirRol, copiar, TIPOS } from '../comun.js';
 import {
   pintarHoja, pintarHojaMovil, pintarCelular, pintarFondo, repintarElemento, colocar, posMovil, leerVideo, miniaturaVideo, MODOS_FONDO
 } from './lienzo.js';
@@ -10,11 +10,12 @@ import {
   FUENTES, COLORES, DEGRADADOS, cssDegradado, PATRONES, estiloFondo, FORMAS, EMOJIS, PLANTILLAS,
   cargarIconos, nodosIcono, ICONOS_ES, ICONOS_POPULARES, colorValido, urlSegura
 } from './recursos.js';
-import { TIPOS_PREGUNTA, esPregunta, configInicial, huecos, LETRAS, COLORES_OPCION, textoEnunciado } from './preguntas.js';
+import { TIPOS_PREGUNTA, esPregunta, configInicial, huecos, LETRAS, COLORES_OPCION, textoEnunciado, normalizar } from './preguntas.js';
 import { presentar } from './presentar.js';
 import { crearVivo, borrarFotos, enlaceParticipante } from './vivo-profe.js';
 import { configAgruparInicial, resumenReparto } from './agrupar.js';
 import { configRuletaInicial, candidatosLocal, PALETAS, ORIGENES } from './ruleta.js';
+import { guardarArchivo, medidas, pintarMisArchivos } from './archivos.js';
 
 const raiz = $('#raiz');
 const params = new URLSearchParams(location.search);
@@ -31,7 +32,7 @@ const TIPOS_HOJA = [
 const ICO_HOJA = Object.fromEntries(TIPOS_HOJA.map(t => [t.k, t.ico]));
 const DISPONIBLES = TIPOS_HOJA.map(t => t.k);
 const RECURSOS = [
-  ['texto', '🔤', 'Texto'], ['fondo', '🎨', 'Fondo'], ['imagen', '🖼', 'Imagen'], ['iconos', '⭐', 'Iconos'],
+  ['archivos', '📁', 'Mis archivos'], ['texto', '🔤', 'Texto'], ['fondo', '🎨', 'Fondo'], ['imagen', '🖼', 'Imagen'], ['iconos', '⭐', 'Iconos'],
   ['emojis', '😀', 'Emojis'], ['formas', '🔷', 'Formas'], ['video', '🎬', 'Video'], ['plantillas', '🧩', 'Plantillas']
 ];
 const NOMBRE_EL = { texto: 'Texto', imagen: 'Imagen', icono: 'Icono', emoji: 'Emoji', forma: 'Forma', video: 'Video', zona: 'Área de respuestas' };
@@ -201,8 +202,17 @@ function agregarHoja(tipo) {
   terminarEdicionTexto();
   hojas.push(hojaNueva(tipo));
   actual = hojas.length - 1; selId = null;
+  pestanaDer = 'tipo';
   confirmarCambio({ repintar: 'todo' });
   $('[data-tira]').lastElementChild?.previousElementSibling?.scrollIntoView({ inline: 'end', behavior: 'smooth' });
+  if (esPregunta(tipo)) enfocarEnunciado();
+}
+// Cursor en el enunciado (o la frase de "Completar"), con el texto de ejemplo elegido para escribir encima
+function enfocarEnunciado() {
+  const t = $('[data-der] [data-cfg="enunciado"], [data-der] [data-cfg="frase"]');
+  if (!t) return;
+  t.focus({ preventScroll: false });
+  t.select();
 }
 function duplicarHoja(i) {
   const c = clonar(hojas[i]);
@@ -281,36 +291,28 @@ async function comprimir(archivo, maxLado = 1600) {
   if (!b || b.type !== 'image/webp') b = await aBlob('image/jpeg', 0.85);
   return b && b.size < archivo.size ? b : archivo;
 }
-async function subirArchivo(blob, ext, tipo) {
-  const nombre = `proyectos/${perfil.id}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const { error } = await supabase.storage.from('preguntas-imagenes').upload(nombre, blob, { contentType: tipo, upsert: false });
-  if (error) throw error;
-  return supabase.storage.from('preguntas-imagenes').getPublicUrl(nombre).data.publicUrl;
+// Sube a "Mis archivos" (o reutiliza el mismo archivo si ya estaba). Devuelve el archivo registrado.
+async function subirArchivo(original, blob, ext, tipo, extra = {}) {
+  const r = await guardarArchivo({ profesorId: perfil.id, original, blob, tipo, ext, nombre: original.name || (tipo === 'video' ? 'Video' : 'Imagen pegada'), ...extra });
+  if (r.reutilizado) toast(`Ya tenías ${tipo === 'video' ? 'este video' : 'esta imagen'} en Mis archivos: se reutilizó`);
+  return r.archivo;
 }
 const FONDO_IMAGEN = { tipo: 'imagen', modo: 'cubrir', zoom: 100, px: 50, py: 50, opacidad: 1, oscurecer: 0, desenfoque: 0, color: '#2D2A45' };
 // La imagen se agrega como elemento nuevo, como fondo de la hoja o reemplaza la de un elemento
+// Reduce y sube una imagen a Mis archivos (o reutiliza la que ya estaba). Devuelve el archivo registrado.
+async function imagenAArchivo(archivo, maxLado = 1600) {
+  if (!archivo?.type?.startsWith('image/') || archivo.type === 'image/svg+xml') throw new Error('Elige una imagen JPG, PNG, WebP o GIF');
+  if (archivo.size > 15 * 1024 * 1024) throw new Error('La imagen debe pesar menos de 15 MB');
+  const f = await comprimir(archivo, maxLado);
+  const tipo = f.type || 'image/jpeg';
+  const ext = { 'image/webp': 'webp', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif' }[tipo] || 'jpg';
+  const bmp = await createImageBitmap(f).catch(() => null);
+  return subirArchivo(archivo, f, ext, 'imagen', { ancho: bmp?.width ?? null, alto: bmp?.height ?? null });
+}
 async function subirImagen(archivo, { comoFondo = false, reemplazar = null } = {}) {
-  if (!archivo?.type?.startsWith('image/') || archivo.type === 'image/svg+xml') return toast('Elige una imagen JPG, PNG, WebP o GIF', 'error');
-  if (archivo.size > 15 * 1024 * 1024) return toast('La imagen debe pesar menos de 15 MB', 'error');
   estado('guardando', 'Subiendo imagen…');
-  try {
-    const f = await comprimir(archivo);
-    const tipo = f.type || 'image/jpeg';
-    const ext = { 'image/webp': 'webp', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif' }[tipo] || 'jpg';
-    const bmp = await createImageBitmap(f).catch(() => null);
-    const url = await subirArchivo(f, ext, tipo);
-    if (comoFondo) {
-      const previo = hoja().diseno.fondo?.tipo === 'imagen' ? hoja().diseno.fondo : {};
-      hoja().diseno.fondo = { ...FONDO_IMAGEN, ...previo, valor: url, nat: bmp ? [bmp.width, bmp.height] : null };
-      confirmarCambio();
-      if (recurso === 'fondo') pintarIzquierda();
-    } else if (reemplazar) {
-      reemplazar.url = url;
-      confirmarCambio();
-    } else {
-      agregarElemento({ tipo: 'imagen', url, ajuste: 'cover', radio: 0, ...tamProporcional(bmp ? bmp.width / bmp.height : 4 / 3, 40) });
-    }
-  } catch (e) { toast('No se pudo subir la imagen: ' + mensajeError(e), 'error'); }
+  try { ponerImagen(await imagenAArchivo(archivo), { comoFondo, reemplazar }); }
+  catch (e) { toast('No se pudo subir la imagen: ' + mensajeError(e), 'error'); }
   finally { if (!sucio && !guardando) estado('ok', 'Guardado ✓'); }
 }
 async function subirVideo(archivo) {
@@ -318,10 +320,32 @@ async function subirVideo(archivo) {
   if (archivo.size > MAX_VIDEO_MB * 1024 * 1024) return toast(`El video debe pesar menos de ${MAX_VIDEO_MB} MB. Para videos más grandes usa un enlace de YouTube.`, 'error');
   estado('guardando', 'Subiendo video…');
   try {
-    const url = await subirArchivo(archivo, archivo.type === 'video/webm' ? 'webm' : 'mp4', archivo.type);
-    agregarElemento({ tipo: 'video', fuente: 'mp4', url, ...tamProporcional(16 / 9, 60) });
+    const a = await subirArchivo(archivo, archivo, archivo.type === 'video/webm' ? 'webm' : 'mp4', 'video');
+    ponerArchivo(a);
   } catch (e) { toast('No se pudo subir el video: ' + mensajeError(e), 'error'); }
   finally { if (!sucio && !guardando) estado('ok', 'Guardado ✓'); }
+}
+
+// Una imagen de Mis archivos (o recién subida) como elemento nuevo, como fondo o en lugar de la de un elemento
+async function ponerImagen(a, { comoFondo = false, reemplazar = null } = {}) {
+  const m = await medidas(a);
+  if (comoFondo) {
+    const previo = hoja().diseno.fondo?.tipo === 'imagen' ? hoja().diseno.fondo : {};
+    hoja().diseno.fondo = { ...FONDO_IMAGEN, ...previo, valor: a.url, nat: m.ancho ? [m.ancho, m.alto] : null };
+    confirmarCambio();
+    if (recurso === 'fondo') pintarIzquierda();
+  } else if (reemplazar) {
+    reemplazar.url = a.url;
+    confirmarCambio();
+  } else {
+    agregarElemento({ tipo: 'imagen', url: a.url, ajuste: 'cover', radio: 0, ...tamProporcional(m.ancho ? m.ancho / m.alto : 4 / 3, 40) });
+  }
+}
+// Insertar un archivo de Mis archivos en la hoja
+async function ponerArchivo(a) {
+  if (a.tipo !== 'video') return ponerImagen(a);
+  const m = await medidas(a);
+  agregarElemento({ tipo: 'video', fuente: 'mp4', url: a.url, ...tamProporcional(m.ancho ? m.ancho / m.alto : 16 / 9, 60) });
 }
 
 // ---------- Fondo de imagen ↔ imagen normal ----------
@@ -418,9 +442,11 @@ function pintarBanner() {
   if (!sesionActiva) return;
   const s = sesionActiva;
   b.innerHTML = `<span>📡 <b>Tienes una sesión en curso</b> (hoja ${s.hoja_indice} de ${s.total_hojas}, ${s.participantes} ${s.participantes === 1 ? 'participante' : 'participantes'} · PIN ${esc(s.pin)}${s.estado === 'pausada' ? ' · en pausa' : ''})</span>
-    <span class="row" style="gap:6px;"><button class="btn btn-sm btn-primary" data-continuar>Continuar</button><button class="btn btn-sm btn-outline" data-reiniciar>Reiniciar</button>
+    <span class="row" style="gap:6px;"><button class="btn btn-sm btn-primary" data-continuar>Continuar</button>
+    <button class="btn btn-sm btn-outline" data-copiar-enlace title="Copiar el enlace para entrar desde una computadora o compartirlo por chat">🔗 Copiar enlace</button><button class="btn btn-sm btn-outline" data-reiniciar>Reiniciar</button>
     <button class="btn btn-sm btn-ghost" data-finalizar title="Cerrar la sesión: el PIN deja de funcionar">Finalizar</button></span>`;
   $('[data-continuar]', b).onclick = iniciarVivo;
+  $('[data-copiar-enlace]', b).onclick = () => copiar(enlaceParticipante(s.pin));
   $('[data-reiniciar]', b).onclick = async () => {
     if (!await confirmar('Se borrarán los participantes, sus respuestas y los grupos de esta sesión, y habrá un PIN nuevo. El diseño del proyecto no cambia.', { titulo: '¿Reiniciar la sesión?', boton: 'Reiniciar' })) return;
     try {
@@ -432,7 +458,7 @@ function pintarBanner() {
   };
   $('[data-finalizar]', b).onclick = async () => {
     if (!await confirmar('El PIN dejará de funcionar. Los resultados quedan guardados en “Resultados” del proyecto.', { titulo: '¿Finalizar la sesión?', boton: 'Finalizar', peligro: false })) return;
-    try { await rpc('proyecto_finalizar', { p_sesion: s.id }); toast('Sesión finalizada'); } catch (e) { toast(mensajeError(e), 'error'); }
+    try { const r = await rpc('proyecto_finalizar', { p_sesion: s.id }); await borrarFotos(r.fotos); toast('Sesión finalizada'); } catch (e) { toast(mensajeError(e), 'error'); }
     revisarSesion();
   };
 }
@@ -769,11 +795,18 @@ function conectarSoltarArchivos() {
   const escn = $('[data-escenario]');
   let n = 0;
   const marca = (on) => $('[data-escenario] .marco, [data-escenario] .cel-marco')?.classList.toggle('soltar', on);
-  escn.addEventListener('dragenter', (e) => { if (e.dataTransfer?.types?.includes('Files')) { n++; marca(true); e.preventDefault(); } });
-  escn.addEventListener('dragover', (e) => { if (e.dataTransfer?.types?.includes('Files')) e.preventDefault(); });
+  const sirve = (e) => e.dataTransfer?.types?.includes('Files') || e.dataTransfer?.types?.includes('text/x-archivo');
+  escn.addEventListener('dragenter', (e) => { if (sirve(e)) { n++; marca(true); e.preventDefault(); } });
+  escn.addEventListener('dragover', (e) => { if (sirve(e)) e.preventDefault(); });
   escn.addEventListener('dragleave', () => { if (--n <= 0) { n = 0; marca(false); } });
   escn.addEventListener('drop', (e) => {
     n = 0; marca(false);
+    const deMisArchivos = e.dataTransfer?.getData('text/x-archivo');
+    if (deMisArchivos) {
+      e.preventDefault();
+      try { ponerArchivo(JSON.parse(deMisArchivos)); } catch { /* no era un archivo */ }
+      return;
+    }
     const f = e.dataTransfer?.files?.[0];
     if (!f) return;
     e.preventDefault();
@@ -891,10 +924,16 @@ function pintarIzquierda() {
         const ok = DISPONIBLES.includes(t.k);
         return `<button class="tipo-hoja" data-tipo="${t.k}" ${ok ? '' : 'disabled title="Disponible en una próxima fase"'}><span>${t.ico}</span><span>${t.txt}${ok ? '' : '<small>Próximamente</small>'}</span></button>`;
       }).join('')}</div>
+      <button class="btn btn-sm btn-block btn-outline" data-importar style="margin-top:8px;">📥 Traer preguntas de mis quizzes</button>
       <h4>Recursos</h4>
       <div class="recursos">${RECURSOS.map(([k, ico, txt]) => `<button class="recurso" data-rec="${k}"><span>${ico}</span>${txt}</button>`).join('')}</div>
       <p class="hint" style="margin-top:14px;">También puedes <b>pegar</b> (Ctrl+V) o <b>arrastrar</b> una imagen sobre la hoja.</p>`;
-    $$('[data-tipo]', p).forEach(b => b.onclick = () => { agregarHoja(b.dataset.tipo); cerrarPanelMovil(); });
+    $$('[data-tipo]', p).forEach(b => b.onclick = () => {
+      cerrarPanelMovil();
+      agregarHoja(b.dataset.tipo);
+      if (esPregunta(b.dataset.tipo) && esMovil()) { alternarPanelMovil('der'); enfocarEnunciado(); }   // en el celular se abre el panel de la pregunta
+    });
+    $('[data-importar]', p).onclick = () => { cerrarPanelMovil(); importarDeQuizzes(); };
     $$('[data-rec]', p).forEach(b => b.onclick = () => { recurso = b.dataset.rec; pintarIzquierda(); });
     return;
   }
@@ -905,6 +944,18 @@ function pintarIzquierda() {
 }
 
 const PANELES = {
+  archivos(c) {
+    pintarMisArchivos(c, {
+      alInsertar: (a) => { ponerArchivo(a); cerrarPanelMovil(); },
+      alFondo: (a) => { ponerImagen(a, { comoFondo: true }); cerrarPanelMovil(); },
+      // para saber dónde se usa un archivo, primero se guarda lo que esté pendiente
+      antesDeUsos: async () => {
+        if (sucio || guardando) await guardar();
+        for (let k = 0; k < 40 && (sucio || guardando); k++) await new Promise(r => setTimeout(r, 150));
+      }
+    });
+  },
+
   texto(c) {
     c.innerHTML = `<div class="stack">
       <button class="btn btn-block" data-n="titulo" style="font-size:20px;">Agregar título</button>
@@ -959,7 +1010,9 @@ const PANELES = {
       <div class="zona-pegar" tabindex="0" data-pegar style="margin-top:10px; padding:22px 12px;">📋 Haz clic aquí y pega una imagen (Ctrl+V)<br><small>o arrástrala sobre la hoja</small></div>
       <h4>Desde un enlace</h4>
       <div class="row"><input class="input grow" data-url placeholder="https://…/imagen.jpg"><button class="btn btn-sm" data-usar>Usar</button></div>
-      <p class="hint">Las imágenes se reducen a 1600 px antes de subirlas para que carguen rápido en los celulares.</p>`;
+      <p class="hint">Las imágenes se reducen a 1600 px antes de subirlas para que carguen rápido en los celulares.
+        Todo lo que subes queda en <a href="#" data-ir-archivos>📁 Mis archivos</a> para volver a usarlo.</p>`;
+    $('[data-ir-archivos]', c).onclick = (e) => { e.preventDefault(); recurso = 'archivos'; pintarIzquierda(); };
     $('[data-arch]', c).onchange = (e) => { if (e.target.files[0]) subirImagen(e.target.files[0]); e.target.value = ''; };
     $('[data-pegar]', c).onpaste = (e) => {
       const it = Array.from(e.clipboardData.items).find(i => i.type.startsWith('image/'));
@@ -1152,11 +1205,34 @@ function seccionFondoImagen(p) {
   $('[data-quitar-fondo]', s).onclick = quitarFondo;
 }
 
+// En las hojas de pregunta, Agrupar y Ruleta el panel derecho tiene dos pestañas fijas:
+// "Pregunta" (o Agrupar/Ruleta) y "Diseño/Elemento". Elegir un elemento en la hoja pasa a "Elemento";
+// cambiar de pestaña no quita la selección.
+let pestanaDer = 'tipo', selAntes = null, hojaAntes = null;
 function pintarPropiedades() {
   const p = $('[data-der]');
   if (!p) return;
+  const h = hoja();
   const el = editableAqui() ? elSel() : null;
-  if (!el) return pintarPropsHoja(p);
+  if (h.id !== hojaAntes) { pestanaDer = 'tipo'; hojaAntes = h.id; selAntes = null; }
+  if (selId && selId !== selAntes) pestanaDer = 'diseno';
+  selAntes = selId;
+  if (!interactiva(h.tipo)) return el ? pintarPropsElemento(p, el) : pintarPropsHoja(p);
+  const nombre = esPregunta(h.tipo) ? '❓ Pregunta' : h.tipo === 'agrupar' ? '👥 Agrupar' : '🎡 Ruleta';
+  p.innerHTML = `<div class="der-tabs" role="tablist">
+      <button role="tab" data-tab-der="tipo" aria-selected="${pestanaDer === 'tipo'}" class="${pestanaDer === 'tipo' ? 'activo' : ''}">${nombre}</button>
+      <button role="tab" data-tab-der="diseno" aria-selected="${pestanaDer === 'diseno'}" class="${pestanaDer === 'diseno' ? 'activo' : ''}">🎨 ${el ? 'Elemento' : 'Diseño'}</button></div>
+    <div data-der-cuerpo></div>`;
+  $$('[data-tab-der]', p).forEach(b => b.onclick = () => { pestanaDer = b.dataset.tabDer; pintarPropiedades(); });
+  const cuerpo = $('[data-der-cuerpo]', p);
+  if (pestanaDer === 'diseno') return el ? pintarPropsElemento(cuerpo, el) : pintarPropsHoja(cuerpo, { conTipo: false });
+  const tipo = TIPOS_HOJA.find(t => t.k === h.tipo);
+  cuerpo.innerHTML = `<div class="panel-cab"><b>Hoja ${actual + 1} de ${hojas.length}</b><span class="grow"></span><span class="badge">${tipo?.ico || ''} ${esc(tipo?.txt || h.tipo)}</span></div>`;
+  if (esPregunta(h.tipo)) seccionPregunta(cuerpo);
+  if (h.tipo === 'agrupar') seccionAgrupar(cuerpo);
+  if (h.tipo === 'ruleta') seccionRuleta(cuerpo);
+}
+function pintarPropsElemento(p, el) {
   const g = geoVer(el);
   let esp = '';
   if (el.tipo === 'texto') {
@@ -1279,6 +1355,8 @@ function seccionPregunta(p) {
   } else {
     cuerpo = `<label class="lbl" style="margin-top:0;">Enunciado</label><textarea class="input" data-cfg="enunciado" style="min-height:64px;">${esc(c.enunciado || '')}</textarea>`;
   }
+  cuerpo += fila('⏱ Tiempo', `<select class="input" data-tiempo style="width:auto;">${[0, 10, 15, 20, 30, 45, 60, 90, 120, 180, 300].map(t =>
+    `<option value="${t}" ${Number(c.tiempo || 0) === t ? 'selected' : ''}>${t ? (t < 60 ? t + ' segundos' : t / 60 + (t === 60 ? ' minuto' : ' minutos')) : 'Sin límite'}</option>`).join('')}</select>`);
   if (h.tipo === 'pregunta') cuerpo += fila('Máx. letras', `<input class="input" type="number" min="10" max="500" data-cfg-num="limite" value="${c.limite ?? 140}" style="width:90px;">`);
   if (h.tipo === 'lluvia') cuerpo += fila('Ideas por persona', `<input class="input" type="number" min="1" max="10" data-cfg-num="max" value="${c.max ?? 3}" style="width:80px;">`);
   if (h.tipo === 'vf') {
@@ -1287,11 +1365,13 @@ function seccionPregunta(p) {
   }
   if (h.tipo === 'opcion') {
     const ops = c.opciones || (c.opciones = []);
-    cuerpo += `<label class="lbl">Opciones <span style="text-transform:none;">(marca la correcta o deja todas sin marcar)</span></label>
-      <div class="ops-ed">${ops.map((o, i) => `<div class="op-fila ${(c.correctas || []).includes(o.id) ? 'correcta' : ''}"><span class="zb-letra mini" style="background:${COLORES_OPCION[i % 6]}">${LETRAS[i]}</span>
+    cuerpo += `<label class="lbl">Opciones (2 a 6) <span style="text-transform:none;">· pulsa ✓ en la correcta (o en ninguna, si es de opinión)</span></label>
+      <div class="ops-ed">${ops.map((o, i) => { const ok = (c.correctas || []).includes(o.id); return `<div class="op-fila ${ok ? 'correcta' : ''}"><span class="zb-letra mini" style="background:${COLORES_OPCION[i % 6]}">${LETRAS[i]}</span>
         <input type="text" data-op-txt="${i}" value="${esc(o.texto)}" maxlength="80" aria-label="Opción ${LETRAS[i]}">
-        <input type="checkbox" data-op-ok="${i}" ${(c.correctas || []).includes(o.id) ? 'checked' : ''} title="Correcta">
-        <button class="btn btn-sm btn-ghost btn-icon" data-op-del="${i}" ${ops.length <= 2 ? 'disabled' : ''} aria-label="Quitar opción">✕</button></div>`).join('')}</div>
+        ${o.imagen ? `<span class="op-img"><img src="${esc(o.imagen)}" alt=""><button data-op-img-del="${i}" title="Quitar la imagen" aria-label="Quitar la imagen de la opción ${LETRAS[i]}">✕</button></span>`
+          : `<label class="btn btn-sm btn-ghost btn-icon" title="Agregar imagen (opcional)" style="cursor:pointer;">🖼<input type="file" accept="image/*" hidden data-op-img="${i}"></label>`}
+        <button class="op-ok ${ok ? 'si' : ''}" data-op-ok="${i}" aria-pressed="${ok}" title="${ok ? 'Es la correcta (pulsa para quitar)' : 'Marcar como correcta'}">✓</button>
+        <button class="btn btn-sm btn-ghost btn-icon" data-op-del="${i}" ${ops.length <= 2 ? 'disabled' : ''} title="Quitar opción" aria-label="Quitar opción">🗑</button></div>`; }).join('')}</div>
       ${ops.length < 6 ? '<button class="btn btn-sm" data-op-mas>➕ Agregar opción</button>' : ''}`;
   }
   const hayGrupos = hojas.slice(0, actual).some(x => x.tipo === 'agrupar');
@@ -1325,12 +1405,25 @@ function seccionPregunta(p) {
     inp.oninput = () => { c.opciones[+inp.dataset.opTxt].texto = inp.value; repintarZona(); };
     inp.onchange = () => confirmarCambio();
   });
-  $$('[data-op-ok]', s).forEach(ch => ch.onchange = () => {
-    const id = c.opciones[+ch.dataset.opOk].id;
+  $$('[data-op-ok]', s).forEach(b => b.onclick = () => {
+    const id = c.opciones[+b.dataset.opOk].id;
+    const era = (c.correctas || []).includes(id);
     c.correctas = (c.correctas || []).filter(x => x !== id);
-    if (ch.checked) c.correctas.push(id);
+    if (!era) c.correctas.push(id);
     confirmarCambio();
   });
+  $$('[data-op-img]', s).forEach(inp => inp.onchange = async () => {
+    const f = inp.files[0], o = c.opciones[+inp.dataset.opImg];
+    inp.value = '';
+    if (!f || !o) return;
+    estado('guardando', 'Subiendo imagen…');
+    try { o.imagen = (await imagenAArchivo(f, 800)).url; confirmarCambio(); }
+    catch (e) { toast('No se pudo subir la imagen: ' + mensajeError(e), 'error'); }
+    finally { if (!sucio && !guardando) estado('ok', 'Guardado ✓'); }
+  });
+  $$('[data-op-img-del]', s).forEach(b => b.onclick = () => { delete c.opciones[+b.dataset.opImgDel].imagen; confirmarCambio(); });   // sigue en Mis archivos
+  const tiempo = $('[data-tiempo]', s);
+  if (tiempo) tiempo.onchange = () => { c.tiempo = Number(tiempo.value) || 0; confirmarCambio({ repintar: 'nada' }); };
   $$('[data-op-del]', s).forEach(b => b.onclick = () => {
     const [o] = c.opciones.splice(+b.dataset.opDel, 1);
     c.correctas = (c.correctas || []).filter(x => x !== o.id);
@@ -1437,16 +1530,107 @@ function seccionRuleta(p) {
   };
 }
 
-function pintarPropsHoja(p) {
+// conTipo: false en la pestaña "Diseño" (la configuración de la pregunta está en su propia pestaña)
+// ======================= TRAER PREGUNTAS DE MIS QUIZZES =======================
+const TIPO_DESDE_QUIZ = { verdadero_falso: 'vf', opcion_unica: 'opcion', opcion_multiple: 'opcion', completar: 'completar', lluvia_ideas: 'lluvia' };
+// Una pregunta de un quiz convertida en hoja del tipo correcto, con su enunciado, opciones y respuesta
+function hojaDesdePregunta(p) {
+  const tipo = TIPO_DESDE_QUIZ[p.tipo] || 'pregunta';
+  const h = hojaNueva(tipo), c = h.config;
+  const enun = String(p.enunciado || '').trim().slice(0, 500);
+  if (tipo === 'completar') {
+    c.frase = /_{3,}/.test(enun) ? enun : `${enun} ___`;
+    c.aceptadas = Array.from({ length: Math.max(1, huecos(c.frase)) }, (_, i) =>
+      String(p.respuestas_texto?.[i] || '').split('|').map(x => x.trim()).filter(Boolean));
+  } else c.enunciado = enun;
+  if (tipo === 'vf') {
+    const ok = (p.opciones || []).find(o => o.es_correcta);
+    c.correcta = ok ? normalizar(ok.texto).startsWith('v') : null;
+  }
+  if (tipo === 'opcion') {
+    const ops = (p.opciones || []).filter(o => o.texto || o.imagen_url).slice(0, 6)
+      .map(o => ({ id: uid(), texto: String(o.texto || '').slice(0, 80), imagen: o.imagen_url || undefined, ok: !!o.es_correcta }));
+    while (ops.length < 2) ops.push({ id: uid(), texto: `Opción ${LETRAS[ops.length]}`, ok: false });
+    c.opciones = ops.map(({ ok, ...o }) => (o.imagen ? o : { id: o.id, texto: o.texto }));
+    c.correctas = ops.filter(o => o.ok).map(o => o.id);
+  }
+  // la imagen de la pregunta va a la izquierda y el área de respuestas se angosta
+  if (/^https:\/\//.test(p.imagen_url || '')) {
+    const z = h.diseno.elementos.find(e => e.tipo === 'zona');
+    if (z) Object.assign(z, { x: 40, w: 54 });
+    h.diseno.elementos.push({ id: uid(), tipo: 'imagen', url: p.imagen_url, ajuste: 'contain', radio: 4, x: 6, y: 28, w: 31, h: 66, rot: 0 });
+  }
+  return h;
+}
+
+async function importarDeQuizzes() {
+  terminarEdicionTexto();
+  const m = abrirModal(`<h3>📥 Traer preguntas de mis quizzes</h3><div data-c><div class="center" style="padding:20px;"><div class="spinner"></div></div></div>`, { ancho: true });
+  const c = $('[data-c]', m.el);
+  let quizzes;
+  try { quizzes = (await rpc('mis_quizzes')).filter(q => q.n_preguntas > 0); }
+  catch (e) { c.innerHTML = `<p class="err">${esc(mensajeError(e))}</p>`; return; }
+  if (!quizzes.length) {
+    c.innerHTML = '<div class="empty"><span class="big">📚</span>Todavía no tienes quizzes con preguntas.</div>';
+    return;
+  }
+  c.innerHTML = `<label class="lbl" style="margin-top:0;">Quiz</label>
+    <select class="input" data-quiz><option value="">Elige un quiz…</option>${quizzes.map(q => `<option value="${q.id}">${esc(q.titulo)} (${q.n_preguntas} ${q.n_preguntas === 1 ? 'pregunta' : 'preguntas'})</option>`).join('')}</select>
+    <div data-lista style="margin-top:12px;"></div>
+    <p class="hint" style="margin-top:8px;">Cada pregunta se convierte en una hoja del mismo tipo, con su enunciado, opciones y respuesta correcta. Se agregan después de la hoja actual.</p>
+    <div class="modal-pie"><button class="btn btn-outline" data-no>Cancelar</button><button class="btn btn-primary" data-si disabled>Agregar</button></div>`;
+  let preguntas = [];
+  const lista = $('[data-lista]', c), si = $('[data-si]', c);
+  const elegidas = () => preguntas.filter(p => $(`[data-p="${p.id}"]`, lista)?.checked);
+  const contar = () => {
+    const n = elegidas().length;
+    si.disabled = !n;
+    si.textContent = n ? `Agregar ${n} ${n === 1 ? 'hoja' : 'hojas'}` : 'Agregar';
+    const t = $('[data-todas]', lista);
+    if (t) t.checked = n === preguntas.length;
+  };
+  $('[data-quiz]', c).onchange = async (e) => {
+    preguntas = [];
+    contar();
+    if (!e.target.value) { lista.innerHTML = ''; return; }
+    lista.innerHTML = '<div class="center" style="padding:14px;"><div class="spinner"></div></div>';
+    try { preguntas = await rpc('preguntas_de_quiz', { p_quiz: e.target.value }); }
+    catch (x) { lista.innerHTML = `<p class="err">${esc(mensajeError(x))}</p>`; return; }
+    lista.innerHTML = `<label class="check" style="display:flex; margin-bottom:8px;"><input type="checkbox" data-todas checked> <b>Elegir todas (${preguntas.length})</b></label>
+      <div class="imp-lista">${preguntas.map((p, i) => {
+        const t = TIPOS[p.tipo] || { ico: '❓', nombre: p.tipo };
+        const destino = TIPOS_PREGUNTA[TIPO_DESDE_QUIZ[p.tipo] || 'pregunta'];
+        return `<label class="imp-preg"><input type="checkbox" data-p="${p.id}" checked>
+          <span><b>${i + 1}. ${esc(String(p.enunciado || '').slice(0, 140)) || '<i>(sin enunciado)</i>'}</b>
+          <small>${t.ico} ${esc(t.nombre)} → hoja ${destino.ico} ${esc(destino.nombre)}${p.imagen_url ? ' · 🖼 con imagen' : ''}</small></span></label>`;
+      }).join('')}</div>`;
+    $$('[data-p]', lista).forEach(x => x.onchange = contar);
+    $('[data-todas]', lista).onchange = (ev) => { $$('[data-p]', lista).forEach(x => { x.checked = ev.target.checked; }); contar(); };
+    contar();
+  };
+  $('[data-no]', c).onclick = () => m.cerrar();
+  si.onclick = () => {
+    const nuevas = elegidas().map(hojaDesdePregunta);
+    if (!nuevas.length) return;
+    if (hojas.length + nuevas.length > 100) return toast(`Un proyecto puede tener hasta 100 hojas (quedan ${100 - hojas.length}).`, 'error');
+    hojas.splice(actual + 1, 0, ...nuevas);
+    actual += 1; selId = null; pestanaDer = 'tipo';
+    m.cerrar();
+    confirmarCambio({ repintar: 'todo' });
+    toast(`Se agregaron ${nuevas.length} ${nuevas.length === 1 ? 'hoja' : 'hojas'} de preguntas`);
+  };
+}
+
+function pintarPropsHoja(p, { conTipo = true } = {}) {
   const h = hoja();
   const preg = interactiva(h.tipo);
   const cel = h.config?.celular || 'mirar';
   const els = h.diseno.elementos;
   const tipo = TIPOS_HOJA.find(t => t.k === h.tipo);
   p.innerHTML = `<div class="panel-cab"><b>Hoja ${actual + 1} de ${hojas.length}</b><span class="grow"></span><span class="badge">${tipo?.ico || ''} ${esc(tipo?.txt || h.tipo)}</span></div>`;
-  if (esPregunta(h.tipo)) seccionPregunta(p);
-  if (h.tipo === 'agrupar') seccionAgrupar(p);
-  if (h.tipo === 'ruleta') seccionRuleta(p);
+  if (conTipo && esPregunta(h.tipo)) seccionPregunta(p);
+  if (conTipo && h.tipo === 'agrupar') seccionAgrupar(p);
+  if (conTipo && h.tipo === 'ruleta') seccionRuleta(p);
   if (h.diseno.fondo?.tipo === 'imagen') seccionFondoImagen(p);
   p.insertAdjacentHTML('beforeend', `
     ${h.diseno.fondo?.tipo === 'imagen' ? '' : `<h4>Fondo</h4>

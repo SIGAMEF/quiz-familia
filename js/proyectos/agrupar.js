@@ -63,6 +63,8 @@ export function pintarZonaAgrupar(d, hoja, res) {
     html = `<div class="zg-registro">
       <div class="zg-acceso"><div class="zg-qr" data-qr>${res?.url ? '' : '<span>QR</span>'}</div>
         <div class="zg-pin"><small>PIN</small><b>${res?.pin ? esc(res.pin.replace(/(\d{3})(\d{3})/, '$1 $2')) : '000 000'}</b></div>
+        ${res?.url ? `<div class="zg-enlace"><small>o entra desde una computadora:</small><span>${esc(res.url.replace(/^https?:\/\//, ''))}</span>
+          ${res.profe ? '<button data-copiar-enlace title="Copiar el enlace">📋 Copiar</button>' : ''}</div>` : ''}
         ${res?.registro_abierto === false ? '<div class="zg-cerrado">🔒 Registro cerrado</div>' : ''}</div>
       <div class="zg-gente"><div class="zg-cuenta">Registrados: <b>${parts.length}</b></div><div class="zg-burbujas">${burbujas}</div></div></div>`;
   }

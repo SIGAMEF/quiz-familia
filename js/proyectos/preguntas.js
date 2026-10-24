@@ -24,7 +24,7 @@ export const COLORES_OPCION = ['#7C6FF0', '#FF9F43', '#2FAE6C', '#E14D72', '#38B
 export const LETRAS = 'ABCDEF';
 
 export function configInicial(tipo) {
-  const base = { modo: 'persona' };
+  const base = { modo: 'persona', tiempo: 0 };   // tiempo: segundos para responder (0 = sin límite)
   if (tipo === 'pregunta') return { ...base, enunciado: '¿Qué aprendiste hoy?', limite: 140 };
   if (tipo === 'vf') return { ...base, enunciado: 'El Sol es una estrella.', correcta: true };
   if (tipo === 'opcion') {
@@ -34,6 +34,14 @@ export function configInicial(tipo) {
   if (tipo === 'completar') return { ...base, frase: 'El agua hierve a ___ grados.', aceptadas: [['100', 'cien']] };
   if (tipo === 'lluvia') return { ...base, enunciado: '¿Con qué palabra describes a tu familia?', max: 3 };
   return {};
+}
+
+// Tiempo por pregunta: segundos que quedan (null si no tiene límite). inicio y ahora en ms.
+export const tiempoDe = (hoja) => esPregunta(hoja?.tipo) ? Math.max(0, Math.round(Number(hoja.config?.tiempo) || 0)) : 0;
+export function quedan(hoja, inicio, ahora = Date.now()) {
+  const t = tiempoDe(hoja);
+  if (!t) return null;
+  return isNaN(inicio) ? t : t - (ahora - inicio) / 1000;
 }
 
 // Texto que muestra el elemento "enunciado" de la hoja
@@ -75,14 +83,14 @@ export function pintarZona(d, hoja, res) {
   if (hoja.tipo === 'vf' || hoja.tipo === 'opcion') {
     const ops = hoja.tipo === 'vf'
       ? [{ id: true, texto: 'Verdadero', letra: '✔', color: '#2FAE6C' }, { id: false, texto: 'Falso', letra: '✘', color: '#E14D72' }]
-      : (c.opciones || []).map((o, i) => ({ id: o.id, texto: o.texto, letra: LETRAS[i], color: COLORES_OPCION[i % 6] }));
+      : (c.opciones || []).map((o, i) => ({ id: o.id, texto: o.texto, imagen: o.imagen, letra: LETRAS[i], color: COLORES_OPCION[i % 6] }));
     const votos = (id) => resp.filter(r => (hoja.tipo === 'vf' ? r.valor?.valor : r.valor?.opcion) === id).length;
     const total = resp.length || 1;
     const ok = (id) => hoja.tipo === 'vf' ? c.correcta === id : (c.correctas || []).includes(id);
     html = `<div class="zb">${ops.map(o => {
       const v = votos(o.id), p = Math.round(v * 100 / total);
       return `<div class="zb-fila ${revelar ? (ok(o.id) ? 'ok' : 'apagada') : ''}"><span class="zb-letra" style="background:${o.color}">${esc(o.letra)}</span>
-        <span class="zb-txt">${esc(o.texto)}${revelar && ok(o.id) ? ' ✅' : ''}</span>
+        <span class="zb-txt">${urlImagen(o.imagen) ? `<img class="zb-img" src="${esc(o.imagen)}" alt="">` : ''}${esc(o.texto)}${revelar && ok(o.id) ? ' ✅' : ''}</span>
         <span class="zb-barra"><i style="width:${resp.length ? p : 0}%; background:${o.color}"></i></span><b class="zb-n">${v}</b></div>`;
     }).join('')}</div>`;
   } else if (hoja.tipo === 'pregunta') {
@@ -121,6 +129,7 @@ export function pintarZona(d, hoja, res) {
   d.innerHTML = `<div class="zona">${html}${pie}</div>`;
 }
 const vacio = (ico, txt) => `<div class="zona-vacia"><span>${ico}</span>${esc(txt)}</div>`;
+const urlImagen = (u) => typeof u === 'string' && /^https:\/\/[^\s"'()<>\\]+$/.test(u);
 
 // ======================= FORMULARIO DEL PARTICIPANTE (celular) =======================
 // Texto corto de una respuesta (para "¡Respuesta enviada!" y la corrección)
@@ -174,7 +183,7 @@ export function pintarParticipante(cont, hoja, { alEnviar = () => {}, nota = '',
       cuerpo = `<div class="part-ops dos"><button class="part-op" data-v="1" style="--c:#2FAE6C">✔<span>Verdadero</span></button>
         <button class="part-op" data-v="0" style="--c:#E14D72">✘<span>Falso</span></button></div>`;
     } else if (hoja.tipo === 'opcion') {
-      cuerpo = `<div class="part-ops">${(c.opciones || []).map((o, i) => `<button class="part-op fila" data-op="${esc(o.id)}" style="--c:${COLORES_OPCION[i % 6]}"><i>${LETRAS[i]}</i><span>${esc(o.texto)}</span></button>`).join('')}</div>`;
+      cuerpo = `<div class="part-ops">${(c.opciones || []).map((o, i) => `<button class="part-op fila" data-op="${esc(o.id)}" style="--c:${COLORES_OPCION[i % 6]}"><i>${LETRAS[i]}</i>${urlImagen(o.imagen) ? `<img src="${esc(o.imagen)}" alt="">` : ''}<span>${esc(o.texto)}</span></button>`).join('')}</div>`;
     } else if (hoja.tipo === 'pregunta') {
       const lim = Math.max(10, Math.min(500, Number(c.limite) || 140));
       cuerpo = `<textarea class="part-campo" data-t maxlength="${lim}" placeholder="Escribe tu respuesta"></textarea>

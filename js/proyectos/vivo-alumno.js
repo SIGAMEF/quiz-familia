@@ -6,14 +6,15 @@
 import { supabase, esc, mensajeError } from '../comun.js';
 import { pintarCelular, pintarFondo } from './lienzo.js';
 import { pintarMiGrupo } from './agrupar.js';
-import { esPregunta } from './preguntas.js';
-import { ajustarReloj } from './ruleta.js';
+import { esPregunta, quedan } from './preguntas.js';
+import { ajustarReloj, ahoraServidor } from './ruleta.js';
 
 const raiz = document.getElementById('raiz');
 const params = new URLSearchParams(location.search);
 let pin = (params.get('pin') || '').replace(/\D/g, '');
 let yo = null;          // { token, participante_id, foto_clave, sesion_id }
 let hoja = null, version = null, clave = '', tSondeo = null;
+let ultimo = null, agotadoVisto = false;   // último estado y si ya se dibujó "se acabó el tiempo"
 
 async function rpc(nombre, args) {
   const { data, error } = await supabase.rpc(nombre, args);
@@ -120,9 +121,15 @@ async function sondear() {
   tSondeo = setTimeout(sondear, 1500);
 }
 
+// Segundos que quedan para responder la pregunta actual (null si no tiene tiempo)
+const restante = (e) => hoja && e?.sesion?.hoja_id === hoja.id ? quedan(hoja, Date.parse(e.sesion.hoja_inicio), ahoraServidor()) : null;
+
 function pintar(e) {
+  ultimo = e;
+  const agotado = (restante(e) ?? 1) <= 0;
+  agotadoVisto = agotado;
   // solo se vuelve a dibujar si algo cambió (así no se borra lo que el participante está escribiendo)
-  const k = JSON.stringify([version, e.estado, e.sesion, e.yo, e.respuestas, e.ruleta, hoja?.id]);
+  const k = JSON.stringify([version, e.estado, e.sesion, e.yo, e.respuestas, e.ruleta, hoja?.id, agotado]);
   if (k === clave) return;
   const mismaHoja = clave && JSON.parse(clave)[0] === version;
   const escribiendo = mismaHoja && document.activeElement?.matches?.('.part-campo, .part-hueco') && document.activeElement.value;
@@ -132,7 +139,7 @@ function pintar(e) {
   const g = e.yo.grupo;
   raiz.innerHTML = `<div class="part-barra"><span class="part-yo">${e.yo.foto_url ? `<img src="${esc(e.yo.foto_url)}" alt="">` : esc(e.yo.avatar || '🙂')}</span>
       <b>${esc(e.yo.alias)}</b>${g ? `<span class="part-grupo" style="--c:${esc(g.color)}">${esc(g.emoji || '')} ${esc(g.nombre)}</span>` : ''}
-      <span class="grow"></span><small>${esc(e.proyecto)}</small></div>
+      <span class="grow"></span><span class="part-reloj" data-reloj hidden></span><small>${esc(e.proyecto)}</small></div>
     <div class="part-pantalla" data-cel></div>
     ${e.estado === 'pausada' ? '<div class="part-pausa"><div>⏸</div><b>Sesión en pausa</b><small>Espera al profesor</small></div>' : ''}`;
   const cont = raiz.querySelector('[data-cel]');
@@ -156,7 +163,7 @@ function pintar(e) {
       return;
     }
     pintarCelular(cont, hoja, e.proyecto, {
-      vivo: { respuestas: e.respuestas, cerrado: !e.sesion.abiertas, revelar: e.sesion.revelar, modoGrupo: porGrupo },
+      vivo: { respuestas: e.respuestas, cerrado: !e.sesion.abiertas || agotado, revelar: e.sesion.revelar, modoGrupo: porGrupo },
       alEnviar: async (valor) => {
         if (e.estado === 'pausada') throw new Error('La sesión está en pausa. Espera al profesor.');
         await rpc('proyecto_responder', { p_pin: pin, p_token: yo.token, p_hoja: hoja.id, p_valor: valor });
@@ -173,6 +180,20 @@ function pintar(e) {
   }
   pintarCelular(cont, hoja, e.proyecto);
 }
+
+// cuenta regresiva del tiempo por pregunta; al llegar a 0 se cierra el formulario
+setInterval(() => {
+  const el = document.querySelector('[data-reloj]');
+  const r = restante(ultimo);
+  if (!el) return;
+  el.hidden = r == null;
+  if (r == null) return;
+  const seg = Math.max(0, Math.ceil(r));
+  el.textContent = seg ? `⏱ ${seg}` : '⏱ ¡Tiempo!';
+  el.classList.toggle('poco', seg <= 5);
+  if (r <= 0 && !agotadoVisto && document.activeElement?.matches?.('.part-campo, .part-hueco')) document.activeElement.blur();
+  if (r <= 0 && !agotadoVisto) pintar(ultimo);
+}, 250);
 
 // al volver a la pestaña, actualizar enseguida
 document.addEventListener('visibilitychange', () => { if (!document.hidden && yo) sondear(); });

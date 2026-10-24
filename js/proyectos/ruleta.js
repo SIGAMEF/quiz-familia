@@ -68,6 +68,8 @@ export function ajustarReloj(ahoraServidor) {
   const t = Date.parse(ahoraServidor);
   if (!isNaN(t)) desfase = t - Date.now();
 }
+// hora del servidor en ms (también la usa el tiempo por pregunta)
+export const ahoraServidor = () => Date.now() + desfase;
 
 // ---------- sonido (clics del puntero y fanfarria al final) ----------
 let audio = null;

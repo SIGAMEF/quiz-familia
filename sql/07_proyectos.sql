@@ -208,6 +208,8 @@ create table if not exists public.proyecto_sesiones (
   finalizada_en       timestamptz
 );
 create unique index if not exists proyecto_sesiones_pin_activo on public.proyecto_sesiones (pin) where estado <> 'finalizada';
+-- cuándo empezó la hoja actual (o se volvieron a abrir las respuestas): para el tiempo por pregunta
+alter table public.proyecto_sesiones add column if not exists hoja_inicio timestamptz not null default now();
 create index if not exists proyecto_sesiones_proyecto_idx on public.proyecto_sesiones (proyecto_id);
 
 create table if not exists public.sesion_grupos (
@@ -311,7 +313,7 @@ language sql stable security definer set search_path = public as $$
     'total_hojas', (select count(*) from proyecto_hojas where proyecto_id = s.proyecto_id),
     'participantes', (select count(*) from sesion_participantes where sesion_id = s.id and not expulsado),
     'registro_abierto', s.registro_abierto, 'tardios', s.tardios,
-    'respuestas_abiertas', s.respuestas_abiertas, 'revelar', s.revelar,
+    'respuestas_abiertas', s.respuestas_abiertas, 'revelar', s.revelar, 'hoja_inicio', s.hoja_inicio,
     'created_at', s.created_at, 'updated_at', s.updated_at, 'finalizada_en', s.finalizada_en);
 $$;
 
@@ -369,7 +371,7 @@ begin
   v := _sesion_profe(p_sesion);
   if v.estado = 'finalizada' then raise exception 'La sesión ya terminó.'; end if;
   if not exists (select 1 from proyecto_hojas where id = p_hoja and proyecto_id = v.proyecto_id) then raise exception 'Esa hoja no es de este proyecto.'; end if;
-  update proyecto_sesiones set hoja_id = p_hoja, respuestas_abiertas = true, revelar = false, updated_at = now()
+  update proyecto_sesiones set hoja_id = p_hoja, respuestas_abiertas = true, revelar = false, hoja_inicio = now(), updated_at = now()
   where id = p_sesion returning * into v;
   return _sesion_resumen(v);
 end $$;
@@ -391,7 +393,9 @@ language plpgsql security definer set search_path = public as $$
 declare v proyecto_sesiones%rowtype;
 begin
   v := _sesion_profe(p_sesion);
-  update proyecto_sesiones set respuestas_abiertas = coalesce(p_abiertas, respuestas_abiertas), revelar = coalesce(p_revelar, revelar), updated_at = now()
+  -- al volver a abrir las respuestas, el tiempo de la pregunta empieza de nuevo
+  update proyecto_sesiones set respuestas_abiertas = coalesce(p_abiertas, respuestas_abiertas), revelar = coalesce(p_revelar, revelar),
+         hoja_inicio = case when p_abiertas and not respuestas_abiertas then now() else hoja_inicio end, updated_at = now()
   where id = p_sesion returning * into v;
   return _sesion_resumen(v);
 end $$;
@@ -407,15 +411,19 @@ begin
   return _sesion_resumen(v);
 end $$;
 
--- Finalizar: el PIN deja de funcionar; los resultados quedan guardados
+-- Finalizar: el PIN deja de funcionar; los resultados quedan guardados.
+-- Las fotos de los participantes se quitan (vuelven a su avatar) y se devuelven sus rutas para borrarlas de Storage.
 create or replace function public.proyecto_finalizar(p_sesion uuid) returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare v proyecto_sesiones%rowtype;
+declare v proyecto_sesiones%rowtype; v_fotos jsonb;
 begin
   v := _sesion_profe(p_sesion);
+  select coalesce(jsonb_agg(_ruta_foto(foto_url)) filter (where _ruta_foto(foto_url) is not null), '[]') into v_fotos
+  from sesion_participantes where sesion_id = p_sesion;
+  update sesion_participantes set foto_url = null where sesion_id = p_sesion and foto_url is not null;
   update proyecto_sesiones set estado = 'finalizada', finalizada_en = coalesce(finalizada_en, now()), updated_at = now()
   where id = p_sesion returning * into v;
-  return _sesion_resumen(v);
+  return _sesion_resumen(v) || jsonb_build_object('fotos', v_fotos);
 end $$;
 
 -- Reiniciar: borra participantes, respuestas, grupos y sorteos de las ruletas; PIN nuevo; vuelve a la primera hoja.
@@ -433,7 +441,7 @@ begin
   delete from sesion_participantes where sesion_id = p_sesion;
   delete from sesion_grupos where sesion_id = p_sesion;
   update proyecto_sesiones set pin = _nuevo_pin(), estado = 'activa', registro_abierto = true, tardios = false,
-         respuestas_abiertas = true, revelar = false, updated_at = now(),
+         respuestas_abiertas = true, revelar = false, hoja_inicio = now(), updated_at = now(),
          hoja_id = (select id from proyecto_hojas where proyecto_id = v.proyecto_id order by orden, created_at limit 1)
   where id = p_sesion returning * into v;
   return jsonb_build_object('sesion', _sesion_resumen(v), 'fotos', v_fotos);
@@ -681,7 +689,7 @@ begin
   return jsonb_build_object(
     'estado', v.estado, 'proyecto', (select nombre from proyectos where id = v.proyecto_id), 'pin', v.pin, 'ahora', now(),
     'ruleta', case when h.tipo = 'ruleta' then _ruleta_estado(v.id, h) end,
-    'sesion', jsonb_build_object('hoja_id', v.hoja_id, 'abiertas', v.respuestas_abiertas, 'revelar', v_rev,
+    'sesion', jsonb_build_object('hoja_id', v.hoja_id, 'abiertas', v.respuestas_abiertas, 'revelar', v_rev, 'hoja_inicio', v.hoja_inicio,
                                  'registro_abierto', v.registro_abierto),
     'version', v_version,
     'hoja', case when h.id is null or v_version = p_version then null
@@ -706,6 +714,11 @@ begin
   if not v.respuestas_abiertas then raise exception 'Las respuestas están cerradas.'; end if;
   select * into h from proyecto_hojas where id = p_hoja;
   if not found or h.tipo not in ('pregunta','vf','opcion','completar','lluvia') then raise exception 'Esta hoja no tiene pregunta.'; end if;
+  -- tiempo por pregunta (con 2 s de margen por la demora de la red)
+  if coalesce((h.config->>'tiempo')::int, 0) > 0
+     and now() > v.hoja_inicio + make_interval(secs => (h.config->>'tiempo')::int + 2) then
+    raise exception 'Se acabó el tiempo para responder.';
+  end if;
   if jsonb_typeof(p_valor) is distinct from 'object' or pg_column_size(p_valor) > 4000 then raise exception 'Respuesta no válida.'; end if;
 
   -- validación según el tipo
