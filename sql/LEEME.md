@@ -10,11 +10,12 @@ Ejecutar en el **SQL Editor de Supabase**, en este orden.
 | 3 | `03_migrar.sql` | Justo después del 2 | No |
 | 4 | `04_bancos_html.sql` | Opcional, después del 3 | No. Importa las 322 preguntas de `quiz.html` y `lucas.html` |
 | 5 | `05_parche_paneles.sql` | Después del 4 (y cada vez que llegue una versión nueva) | No. Funciones de los paneles; se puede ejecutar varias veces |
-| 6 | `06_permisos.sql` | **Siempre al final** (después del 05, 07, 08, 09 y 10) | No. Da a la app los permisos sobre las tablas; se puede ejecutar varias veces |
+| 6 | `06_permisos.sql` | **Siempre al final** (después del 05, 07, 08, 09, 10 y 11) | No. Da a la app los permisos sobre las tablas; se puede ejecutar varias veces |
 | 7 | `07_proyectos.sql` | Después del 05 (y cada vez que llegue una versión nueva). Luego, otra vez el 06 | No. Proyectos en grupo (tablas, funciones y la política de Storage para `proyectos/`); se puede ejecutar varias veces |
 | 8 | `08_archivos.sql` | Después del 07 (si vuelves a ejecutar el 07, ejecuta otra vez el 08). Luego, otra vez el 06 | No. "Mis archivos": registro de imágenes y videos, límite de espacio por profesor y políticas de Storage de la carpeta propia. Registra los archivos que ya estaban subidos |
 | 9 | `09_actividades.sql` | Después del 08 (y después del 05, si lo vuelves a ejecutar). Luego, otra vez el 06 | No. Mis actividades: Trivia y Quiz relámpago como juegos, visibilidad (privado, grupos, público, destacado), fila de destacados de la portada y biblioteca con proyectos |
 | 10 | `10_consumo.sql` | Después del 09. Luego, otra vez el 06 | No. Visor de consumo de Supabase en el panel (solo el admin): tamaño de la base, Storage, usuarios activos del mes y sesiones en vivo abiertas; se puede ejecutar varias veces |
+| 11 | `11_salas_turnos.sql` | Después del 05 (y cada vez que llegue una versión nueva). Luego, otra vez el 06 | No. Salas en línea **por turnos**: una sola partida para todos, cada jugador mueve en su turno desde su dispositivo (tabla de jugadas y funciones `sala_turnos`, `sala_jugar`, `sala_fin_turnos`); se puede ejecutar varias veces |
 
 Pruebas opcionales (después del 07, 08, 09 y 06). Todo se deshace al final:
 - `pruebas/flujos_proyectos.sql` → "TODAS LAS PRUEBAS DE PROYECTOS PASARON".

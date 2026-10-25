@@ -1,14 +1,16 @@
 // ============================================================
 // Rompecabezas: toca una pieza y luego otra para cambiarlas de lugar.
+// En una sala por turnos: si tu cambio deja piezas en su sitio (+1 por pieza) sigues; si no, pasa el turno.
+// Quien coloca la última pieza gana 5 más.
 // ============================================================
-import { $, $$, esc, barajar, sonar, fmtTiempo, pantallaFinal, mezclador } from './util.js';
+import { $, $$, esc, barajar, sonar, fmtTiempo, pantallaFinal, mezclador, hudJugadores, turnos } from './util.js';
 import { imagenPuzzle, fotoCuadrada } from './imagenes.js';
 
 let fotoGuardada = null;   // la foto elegida se mantiene mientras la página esté abierta
 
 export function iniciar(cont, ctx) {
   if (ctx.set.id === 'foto' && !fotoGuardada) return elegirFoto(cont, ctx);
-  jugar(cont, ctx, ctx.set.imagen_url || (ctx.set.id === 'foto' ? fotoGuardada : imagenPuzzle(ctx.set.id)));
+  return jugar(cont, ctx, ctx.set.imagen_url || (ctx.set.id === 'foto' ? fotoGuardada : imagenPuzzle(ctx.set.id)));
 }
 
 function elegirFoto(cont, ctx) {
@@ -26,7 +28,11 @@ function elegirFoto(cont, ctx) {
   };
 }
 
-function jugar(cont, { set, jugadores, opciones, alMenu, alRepetir }, imagen) {
+function jugar(cont, { set, jugadores, opciones, alMenu, alRepetir, red = null }, imagen) {
+  const T = turnos(red);
+  const N = jugadores.length;
+  let turno = 0;
+  jugadores.forEach(j => { j.puntos = 0; });
   const mezclar = mezclador(opciones.semilla);
   const n = Number(opciones.piezas) || 3;
   const total = n * n;
@@ -36,14 +42,16 @@ function jugar(cont, { set, jugadores, opciones, alMenu, alRepetir }, imagen) {
   const t0 = Date.now();
   const jug = jugadores[0]; jug.puntos = 0;
 
-  cont.innerHTML = `
+  cont.innerHTML = `${red ? '<div data-hud></div>' : ''}
     <div class="sopa-top"><span class="pill">🧩 ${esc(set.titulo)}</span><span class="pill" data-reloj>⏱ 0:00</span><span class="pill" data-movs>Movimientos: 0</span></div>
     <div class="puzzle" data-tablero style="--n:${n}" role="grid" aria-label="Rompecabezas de ${n} por ${n}"></div>
     <div class="final-botones"><button class="b3 morado chico" data-ver aria-pressed="false">👁 Ver la imagen</button>
       ${set.id === 'foto' ? '<button class="b3 rosa chico" data-otra>📷 Otra foto</button>' : ''}</div>
     <p class="ayuda-juego">Toca una pieza y luego otra para cambiarlas de lugar. Las piezas bien puestas se marcan en verde.</p>`;
   const tablero = $('[data-tablero]', cont);
-  const reloj = setInterval(() => { const el = $('[data-reloj]', cont); if (!el) return clearInterval(reloj); el.textContent = `⏱ ${fmtTiempo((Date.now() - t0) / 1000)}`; }, 500);
+  const hud = () => { const h = $('[data-hud]', cont); if (h) h.innerHTML = hudJugadores(jugadores, turno, (j) => `⭐ ${j.puntos}`); };
+  hud();
+  const reloj = setInterval(() => { const el = $('[data-reloj]', cont); if (!el || !tablero.isConnected) return clearInterval(reloj); el.textContent = `⏱ ${fmtTiempo((Date.now() - t0) / 1000)}`; }, 500);
 
   const pintar = () => {
     tablero.innerHTML = orden.map((p, i) => {
@@ -53,23 +61,42 @@ function jugar(cont, { set, jugadores, opciones, alMenu, alRepetir }, imagen) {
     }).join('');
     $$('[data-i]', tablero).forEach(b => b.onclick = () => tocar(Number(b.dataset.i)));
   };
+  // elegir la primera pieza es solo de esta pantalla; el cambio de lugar es la jugada que ven todos
   const tocar = (i) => {
+    if (T.pendiente() || (red && !red.puedo(turno))) return;
     if (elegida === null) { elegida = i; sonar.clic(); return pintar(); }
     if (elegida === i) { elegida = null; return pintar(); }
-    [orden[elegida], orden[i]] = [orden[i], orden[elegida]];
-    const acierto = orden[i] === i || orden[elegida] === elegida;
+    const a = elegida; elegida = null;
+    T.hacer(() => turno, { t: 'cambiar', a, b: i }, aplicar);
+  };
+  function cambiar(a, b) {
+    if (![a, b].every(x => Number.isInteger(x) && x >= 0 && x < total) || a === b || orden.every((p, k) => p === k)) return;
+    const antes = [a, b].filter(x => orden[x] === x).length;
+    [orden[a], orden[b]] = [orden[b], orden[a]];
+    const bien = [a, b].filter(x => orden[x] === x).length - antes;
     elegida = null; movs++;
     $('[data-movs]', cont).textContent = `Movimientos: ${movs}`;
-    acierto ? sonar.bien() : sonar.clic();
+    bien > 0 ? sonar.bien() : sonar.clic();
+    const listo = orden.every((p, k) => p === k);
+    if (red) {
+      if (bien > 0) jugadores[turno].puntos += bien;
+      if (listo) jugadores[turno].puntos += 5;
+      else if (bien <= 0 && N > 1) turno = (turno + 1) % N;
+      hud();
+    }
     pintar();
-    if (orden.every((p, k) => p === k)) {
+    if (listo) {
       clearInterval(reloj);
       const seg = (Date.now() - t0) / 1000;
-      jug.puntos = Math.max(10, Math.round(total * 40 - movs * 5 - seg));
+      if (!red) jug.puntos = Math.max(10, Math.round(total * 40 - movs * 5 - seg));
       tablero.classList.add('completo');
-      setTimeout(() => pantallaFinal(cont, { jugadores, titulo: '¡Rompecabezas armado!', detalle: `${movs} movimientos en ${fmtTiempo(seg)}.`, alRepetir, alMenu }), 900);
+      T.despues(900, () => pantallaFinal(cont, { jugadores, titulo: '¡Rompecabezas armado!', detalle: `${movs} movimientos en ${fmtTiempo(seg)}.`, alRepetir, alMenu }));
     }
-  };
+  }
+  function aplicar(x) {
+    if (x.t === 'cambiar') cambiar(x.a, x.b);
+    else if (x.t === 'pasar') { elegida = null; turno = (turno + 1) % N; hud(); pintar(); }
+  }
   $('[data-ver]', cont).onclick = (e) => {
     const ver = tablero.classList.toggle('mostrar');
     e.currentTarget.setAttribute('aria-pressed', String(ver));
@@ -78,4 +105,5 @@ function jugar(cont, { set, jugadores, opciones, alMenu, alRepetir }, imagen) {
   const otra = $('[data-otra]', cont);
   if (otra) otra.onclick = () => { clearInterval(reloj); fotoGuardada = null; elegirFoto(cont, { set, jugadores, opciones, alMenu, alRepetir }); };
   pintar();
+  return { aplicar: (x) => T.recibir(x, aplicar), turno: () => turno };
 }

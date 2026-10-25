@@ -39,10 +39,12 @@ export const prefs = { leer, guardar };
 // ---------- Sonidos sencillos (sin archivos) ----------
 let ctx = null;
 let mudo = leer('mudo', false);
+let callado = false;   // mientras una sala repite jugadas ya hechas (no suenan de nuevo)
 export function sonidoActivo() { return !mudo; }
 export function alternarSonido() { mudo = !mudo; guardar('mudo', mudo); return !mudo; }
+export function silenciar(si) { callado = !!si; }
 function tono(f, dur = 0.12, tipo = 'sine', cuando = 0, vol = 0.18) {
-  if (mudo) return;
+  if (mudo || callado) return;
   try {
     ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
     const o = ctx.createOscillator(), g = ctx.createGain();
@@ -60,7 +62,7 @@ export const sonar = {
   pierde: () => [392, 330, 262].forEach((f, i) => tono(f, 0.22, 'sine', i * 0.16))
 };
 export function confeti() {
-  if (!window.confetti || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (callado || !window.confetti || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   [0.2, 0.5, 0.8].forEach((x, i) => setTimeout(() => window.confetti({ particleCount: 70, spread: 75, origin: { x, y: 0.55 } }), i * 200));
 }
 
@@ -137,6 +139,7 @@ export function paisaje(noche = false) {
 // ---------- Jugadores ----------
 export const AVATARES = ['🧒', '👧', '👦', '👩', '🧑', '🦊', '🐼', '🐸', '🦁', '🐯', '🐨', '🦄'];
 export const COLORES = ['j1', 'j2'];
+export const COLORES_SALA = ['j1', 'j2', 'j3', 'j4', 'j5', 'j6'];
 
 // Pantalla para elegir 1 o 2 jugadores con nombre y avatar. Devuelve una promesa con la lista.
 export function formJugadores(cont, { permitirDos = true, etiqueta2 = '2 jugadores' } = {}) {
@@ -173,6 +176,7 @@ export function hudJugadores(jugadores, turno, extra = (j) => `${j.puntos}`) {
   const tarjeta = (j, i) => `<div class="hud-j ${j.color} ${i === turno && jugadores.length > 1 ? 'activo' : ''}">
       <span class="hud-av">${j.avatar}</span><span class="hud-txt"><b>${esc(j.nombre)}</b><span>${extra(j)}</span></span></div>`;
   if (jugadores.length === 1) return `<div class="hud">${tarjeta(jugadores[0], 0)}</div>`;
+  if (jugadores.length > 2) return `<div class="hud hud-varios">${jugadores.map(tarjeta).join('')}</div>`;   // sala por turnos
   return `<div class="hud">${tarjeta(jugadores[0], 0)}
     <div class="hud-turno" aria-live="polite"><span>Turno de</span><b>${esc(jugadores[turno].nombre)}</b></div>
     ${tarjeta(jugadores[1], 1)}</div>`;
@@ -184,7 +188,8 @@ export function alFinalizarPartida(fn) { alFinal = fn; }
 
 // Pantalla final común
 export function pantallaFinal(cont, { jugadores, titulo = '¡Fin del juego!', detalle = '', alRepetir, alMenu }) {
-  try { if (alFinal) alFinal({ jugadores, detalle: String(detalle).replace(/<[^>]+>/g, '') }); } catch { /* el juego sigue aunque falle el registro */ }
+  // si alFinal devuelve true, se encarga él de la pantalla final (sala por turnos: podio de la sala)
+  try { if (alFinal && alFinal({ jugadores, detalle: String(detalle).replace(/<[^>]+>/g, '') }) === true) return; } catch { /* el juego sigue aunque falle el registro */ }
   const orden = [...jugadores].sort((a, b) => b.puntos - a.puntos);
   const empate = jugadores.length > 1 && orden[0].puntos === orden[1].puntos;
   cont.innerHTML = `<div class="final">
@@ -203,6 +208,34 @@ export function pantallaFinal(cont, { jugadores, titulo = '¡Fin del juego!', de
   $('[data-otra]', cont).focus();
 }
 
+// ---------- Partida por turnos en una sala en línea ----------
+// red (lo da sala.js): { yo, puedo(i), enviar(accion), vigente() }. Sin red, el juego es local y todo sigue igual.
+// Las jugadas se aplican igual en todas las pantallas; las pausas de animación (tapar cartas, pasar a la
+// siguiente palabra…) se adelantan si llega otra jugada antes de que terminen, para que nadie se desfase.
+export function turnos(red) {
+  let pend = null;
+  const adelantar = () => { if (!pend) return; clearTimeout(pend.t); const f = pend.fn; pend = null; f(); };
+  return {
+    red,
+    despues(ms, fn) {
+      adelantar();
+      const vale = () => !red || !red.vigente || red.vigente();   // la partida de la sala terminó o se volvió a armar
+      pend = { fn: () => { if (vale()) fn(); }, t: setTimeout(() => { pend = null; if (vale()) fn(); }, ms) };
+    },
+    adelantar,
+    pendiente: () => !!pend,
+    // una acción de quien toca la pantalla: solo vale si es su turno; se aplica aquí y se envía a los demás
+    hacer(turno, accion, aplicar) {
+      if (pend && !red) return;          // jugando en un solo dispositivo se espera la animación, como siempre
+      adelantar();
+      if (red && !red.puedo(turno())) return;
+      aplicar(accion);
+      if (red) red.enviar(accion);
+    },
+    // una jugada que llega de otro dispositivo
+    recibir(accion, aplicar) { adelantar(); aplicar(accion); }
+  };
+}
 // ---------- La horca del ahorcado con el cangurito colgado de la soga ----------
 export function horca({ energia = 1, estado = 'normal' } = {}) {
   const k = canguro({ energia, estado }).replace(/^<svg[^>]*>|<\/svg>$/g, '');

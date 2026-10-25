@@ -1,8 +1,12 @@
 // ============================================================
-// Salas en línea: el anfitrión comparte un PIN, todos juegan lo mismo a la vez,
-// con el mismo cronómetro, ranking en vivo y podio al final.
+// Salas en línea: el anfitrión comparte un PIN y todos entran desde su dispositivo.
+// Dos modos:
+//  · turnos  — una sola partida: todos ven el mismo tablero y, cuando te toca, solo tú puedes mover.
+//              Cada jugada se guarda en el servidor y las demás pantallas la repiten igual.
+//  · carrera — cada uno juega su propia partida a la vez, con ranking en vivo.
+// Mismo cronómetro y podio al final en los dos.
 // ============================================================
-import { $, $$, esc, figura, sonar, confeti, relojBarra, alFinalizarPartida, prefs, selectorEmoji } from './util.js';
+import { $, $$, esc, figura, sonar, confeti, relojBarra, alFinalizarPartida, prefs, selectorEmoji, silenciar, COLORES_SALA } from './util.js';
 import { sopaDe } from './sopa.js';
 import { enPausa } from '../reposo.js';
 
@@ -16,12 +20,12 @@ const guardarSesion = (sala, datos) => { try { sessionStorage.setItem('sala_' + 
 const leerSesion = (sala) => { try { return JSON.parse(sessionStorage.getItem('sala_' + sala) || 'null'); } catch { return null; } };
 
 // Lo que juegan todos: el mismo tema, el mismo orden (semilla) y, en la sopa, la misma grilla
-export function contenidoSala({ juego, set, campo, valor, pistas }) {
+export function contenidoSala({ juego, set, campo, valor, pistas, modo = 'turnos' }) {
   if (juego === 'rompecabezas' && set.id === 'foto') throw new Error('Para jugar en línea con una foto, el profesor debe crear el rompecabezas en su panel.');
   const tipo = juego === 'quiz' && set.remoto ? 'quizpublico' : juego === 'relampago' ? 'quiz' : juego;   // el relámpago usa el módulo del Quiz
   const opciones = { [campo]: valor, pistas, semilla: Math.floor(Math.random() * 2 ** 31) };
   if (juego === 'sopa') { const s = sopaDe(set, valor, pistas); opciones.sopa = { grilla: s.grilla, ubicaciones: s.ubicaciones }; }
-  return { juego: tipo, set, opciones };
+  return { juego: tipo, set, opciones, modo };
 }
 
 /**
@@ -30,44 +34,74 @@ export function contenidoSala({ juego, set, campo, valor, pistas }) {
  */
 export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }) {
   const { rpc, cont, barra } = ctx;
-  const S = { fase: '', ronda: 0, offset: 0, est: null, jug: null, reloj: null, enviado: -1, terminado: false, modulo: null, timer: null };
+  const S = { fase: '', ronda: 0, offset: 0, est: null, jug: null, reloj: null, enviado: -1, terminado: false, modulo: null, timer: null,
+    // por turnos
+    sinTurnos: false, n: 0, ctrl: null, jugs: [], orden: [], cola: Promise.resolve(), desfase: false, vigia: null, turnoPintado: null, canal: null,
+    ocupado: false, otraVez: false, epoca: 0 };
   const esHost = !!host_token;
   if (yo) guardarSesion(sala_id, { yo, host_token, codigo });
 
   const ahoraServidor = () => Date.now() + S.offset;
   const aLocal = (iso) => Date.parse(iso) - S.offset;
+  const porTurnos = () => (S.est?.modo || S.est?.contenido?.modo) === 'turnos';
+  const firma = () => ({ p_jugador: yo?.id || null, p_token: yo?.token || null, p_host: host_token });
 
+  // sala_turnos (paso 11 del SQL) trae además el modo y las jugadas nuevas; si no está instalado, sala_estado
+  async function leerEstado(desde = S.n) {
+    if (!S.sinTurnos) {
+      try { return await rpc('sala_turnos', { p_sala: sala_id, p_desde: desde }); }
+      catch (e) { if (!/sala_turnos|PGRST202|schema cache/i.test(`${e.message} ${e.code}`)) throw e; S.sinTurnos = true; }
+    }
+    return rpc('sala_estado', { p_sala: sala_id });
+  }
   async function sondear() {
     if (enPausa()) return;   // en pausa por inactividad (el intervalo sigue y consulta al reanudar)
+    if (S.ocupado) { S.otraVez = true; return; }
+    S.ocupado = true;
+    try { await revisar(); } finally { S.ocupado = false; }
+    if (S.otraVez) { S.otraVez = false; sondear(); }
+  }
+  async function revisar() {
     let est;
-    try { est = await rpc('sala_estado', { p_sala: sala_id }); } catch (e) { return; }
+    try { est = await leerEstado(); } catch (e) { return; }
+    const jugadas = est.jugadas || [];
     S.est = est; S.offset = Date.parse(est.ahora) - Date.now();
     if (est.estado === 'esperando') {
       if (S.fase !== 'lobby' || est.ronda !== S.ronda) { S.ronda = est.ronda; return lobby(); }
       return pintarJugadores();
     }
     if (est.estado === 'en_curso') {
-      if (S.fase === 'lobby' || S.fase === 'podio' || !S.fase) return yo ? cuentaAtras() : tablero();
-      if (S.fase === 'jugando') return actualizarEnJuego();
+      if (S.fase === 'lobby' || S.fase === 'podio' || !S.fase) return yo || porTurnos() ? cuentaAtras() : tablero();
+      if (S.fase === 'jugando') return porTurnos() ? recibirJugadas(jugadas) : actualizarEnJuego();
       if (S.fase === 'esperando' || S.fase === 'tablero') return pintarRanking();
       return;
     }
     if (est.estado === 'finalizado' && S.fase !== 'podio') {
+      if (porTurnos()) { if (S.fase === 'jugando') recibirJugadas(jugadas); if (S.fase !== 'podio') podio(); return; }
       if (S.fase === 'jugando' && !S.terminado) await terminarYo('Se acabó el tiempo');
       return podio();
     }
   }
   const iniciarSondeo = () => { clearInterval(S.timer); S.timer = setInterval(sondear, 1500); sondear(); };
-  const pararTodo = () => { clearInterval(S.timer); if (S.reloj) S.reloj.ocultar(); alFinalizarPartida(null); };
+  const pararTurnos = () => { clearInterval(S.vigia); S.vigia = null; S.ctrl = null; S.epoca++; cont.classList.remove('no-es-mi-turno'); };
+  const pararTodo = () => {
+    clearInterval(S.timer); pararTurnos(); if (S.reloj) S.reloj.ocultar(); alFinalizarPartida(null);
+    if (S.canal) { S.canal.cerrar(); S.canal = null; }
+  };
+  // aviso instantáneo entre pantallas (Realtime); si no hay, igual se consulta cada 1,5 s
+  if (ctx.canal) ctx.canal('sala-' + sala_id, () => sondear()).then(c => { S.canal = c; }).catch(() => {});
 
   // ---------- Sala de espera ----------
   function lobby() {
     S.fase = 'lobby'; S.terminado = false; S.enviado = -1; if (S.reloj) { S.reloj.ocultar(); S.reloj = null; }
+    pararTurnos();
     const est = S.est, enlace = `${location.origin}${location.pathname}?sala=${est.codigo}`;
     cont.classList.add('jugando');
     cont.innerHTML = `<div class="tabla-juego center">
         <div class="rotulo-tabla">${esc(est.titulo)}</div>
         <p class="ordena-pista" style="margin-top:10px;">${esHost ? 'Comparte el PIN, el QR o el enlace. Cuando estén todos, toca “Iniciar para todos”.' : '¡Ya estás en la sala! Espera a que el anfitrión inicie.'}</p>
+        ${est.modo === 'turnos' ? '<p class="sala-modo">🎲 Por turnos: una sola partida para todos. Cuando te toque, mueves desde tu dispositivo.</p>'
+          : est.modo === 'carrera' ? '<p class="sala-modo">🏁 Todos a la vez: cada uno juega su propia partida.</p>' : ''}
         <p class="small" style="font-weight:800; margin-top:6px;">PIN de la sala</p>
         <div class="sala-pin">${esc(est.codigo)}</div>
         ${esHost ? `<div class="sala-qr"><div data-qr></div></div>
@@ -87,7 +121,11 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
       $('[data-iniciar]', cont).onclick = async (e) => {
     const boton = e.currentTarget;
         boton.disabled = true;
-        try { S.est = await rpc('sala_iniciar', { p_sala: sala_id, p_host: host_token }); S.offset = Date.parse(S.est.ahora) - Date.now(); yo ? cuentaAtras() : tablero(); }
+        try {
+          const modo = S.est.modo;
+          S.est = { ...await rpc('sala_iniciar', { p_sala: sala_id, p_host: host_token }), modo }; S.offset = Date.parse(S.est.ahora) - Date.now();
+          yo || porTurnos() ? cuentaAtras() : tablero();
+        }
         catch (er) { alert(er.message); boton.disabled = false; }
       };
       $('[data-cerrar]', cont).onclick = async () => { await rpc('sala_terminar', { p_sala: sala_id, p_host: host_token }).catch(() => {}); pararTodo(); location.href = ctx.volverA; };
@@ -113,7 +151,7 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
     const paso = () => {
       if (S.fase !== 'cuenta') return;
       const s = Math.ceil((inicio - Date.now()) / 1000);
-      if (s <= 0) return jugar();
+      if (s <= 0) return porTurnos() ? jugarTurnos() : jugar();
       if (s !== ultimo) {
         ultimo = s; sonar.clic();
         cont.innerHTML = `<div class="cuenta-atras">${s}</div><p class="lema" style="text-align:center;">¡Prepárate! ${esc(S.est.titulo)}</p>`;
@@ -171,6 +209,123 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
     sondear();
   }
 
+  // ---------- Una sola partida por turnos ----------
+  // Todas las pantallas cargan el mismo juego y repiten las mismas jugadas en el mismo orden.
+  // cada vez que se arma la partida hay una "época" nueva: lo pendiente de una partida anterior ya no pinta nada
+  function nuevaRed() {
+    const epoca = ++S.epoca;
+    const vigente = () => S.fase === 'jugando' && S.epoca === epoca;
+    return {
+      yo: yo?.id || null, vigente,
+      puedo: (i) => !!yo && vigente() && !S.desfase && S.jugs[i]?.id === yo.id,
+      enviar: (accion) => { if (vigente()) enviarJugada(accion); }
+    };
+  }
+  let red = nuevaRed();
+  const puntajes = () => Object.fromEntries(S.jugs.map(j => [j.id, Math.round(Number(j.puntos) || 0)]));
+  // las jugadas salen de a una, en orden; cada una lleva su número para que nadie se adelante a otro
+  function enviarJugada(accion) {
+    const n = ++S.n, p = puntajes();
+    S.cola = S.cola.then(async () => {
+      if (S.desfase) return;
+      try { await rpc('sala_jugar', { p_sala: sala_id, p_n: n, p_accion: accion, p_puntajes: p, ...firma() }); if (S.canal) S.canal.avisar(); }
+      catch (e) {
+        if (/tiempo|no está en curso/i.test(e.message || '')) return sondear();
+        resincronizar();   // otro jugó antes (o se cortó la conexión): se vuelve a armar la partida desde el servidor
+      }
+    });
+  }
+  function resincronizar() {
+    if (S.desfase) return;
+    S.desfase = true;
+    S.cola.finally(async () => { try { await sincronizar(); } finally { S.desfase = false; } });
+  }
+  function recibirJugadas(jugadas) {
+    if (!S.ctrl || S.desfase) return;
+    for (const j of jugadas) {
+      if (j.n <= S.n) continue;                        // ya está (por ejemplo, una jugada mía)
+      if (j.n !== S.n + 1) return resincronizar();     // falta alguna
+      S.n = j.n;
+      try { S.ctrl.aplicar(j.accion); } catch (e) { console.error(e); }
+      if (S.fase !== 'jugando') return;
+    }
+    pintarTurno();
+  }
+  async function jugarTurnos() {
+    S.fase = 'jugando'; S.terminado = false;
+    if (S.sinTurnos) {
+      cont.innerHTML = `<div class="tabla-juego center"><div style="font-size:50px;">🛠</div><h2>Falta activar el modo por turnos</h2>
+        <p class="ordena-pista">Quien administra la app debe ejecutar <b>sql/11_salas_turnos.sql</b> y luego <b>sql/06_permisos.sql</b> en Supabase.</p></div>`;
+      return;
+    }
+    const c = S.est.contenido;
+    S.modulo = await (CARGADORES[c.juego] || CARGADORES.ahorcado)();
+    alFinalizarPartida(() => { finTurnos(); return true; });
+    if (S.reloj) S.reloj.ocultar();
+    if (S.est.fin) S.reloj = relojBarra(barra, aLocal(S.est.fin), { total: S.est.segundos, alAcabar: () => sondear() });
+    else { barra.hidden = false; S.reloj = relojBarra(barra, Date.now() + 864e5, {}); $('[data-rt]', barra).parentElement.innerHTML = '⏱ Sin límite'; }
+    window.scrollTo(0, 0);
+    await sincronizar();
+    clearInterval(S.vigia); S.vigia = setInterval(pintarTurno, 300);
+  }
+  // Arma la partida desde cero y repite todas las jugadas guardadas (al empezar, al volver a entrar o si hubo un desfase)
+  async function sincronizar() {
+    let est;
+    try { est = await leerEstado(0); } catch { setTimeout(() => { if (S.fase === 'jugando') resincronizar(); }, 2000); return; }
+    S.est = est;
+    if (S.fase !== 'jugando' || (est.estado !== 'en_curso' && est.estado !== 'finalizado')) return;
+    const c = est.contenido;
+    S.orden = est.orden || [];
+    S.jugs = S.orden.map((id, i) => {
+      const j = est.jugadores.find(x => x.id === id) || {};
+      return { id, nombre: j.alias || 'Jugador', avatar: /^(https?:|data:)/.test(j.avatar || '') ? '🙂' : (j.avatar || '🙂'), color: COLORES_SALA[i % COLORES_SALA.length], puntos: 0 };
+    });
+    if (!S.jugs.length) return;
+    S.n = 0; S.turnoPintado = null;
+    red = nuevaRed();
+    silenciar(true);
+    try {
+      S.ctrl = await S.modulo.iniciar(cont, { set: c.set, jugadores: S.jugs, opciones: c.opciones, alMenu: () => {}, alRepetir: () => {}, red });
+      for (const j of est.jugadas || []) {
+        if (j.n !== S.n + 1) break;
+        S.n = j.n;
+        try { S.ctrl.aplicar(j.accion); } catch (e) { console.error(e); }
+        if (S.fase !== 'jugando') break;
+      }
+    } finally { silenciar(false); }
+    if (est.estado === 'finalizado' && S.fase === 'jugando') return podio();
+    pintarTurno();
+  }
+  // Barra de arriba: de quién es el turno (y, para el anfitrión, pasar el turno o terminar)
+  function pintarTurno() {
+    if (S.fase !== 'jugando' || !S.ctrl || !S.reloj) return;
+    const i = S.ctrl.turno(), j = S.jugs[i];
+    if (!j) return;
+    const mio = red.puedo(i);
+    cont.classList.toggle('no-es-mi-turno', !mio);
+    const clave = `${i}|${mio}`;
+    if (clave === S.turnoPintado) return;
+    const antes = S.turnoPintado;
+    S.turnoPintado = clave;
+    S.reloj.extra(`<span class="pill pill-turno ${mio ? 'mio' : ''}" aria-live="polite">${mio ? '🎯 ¡Es tu turno!' : `🎯 Turno de <b>${esc(j.avatar)} ${esc(j.nombre)}</b>`}</span>
+      ${esHost ? '<button class="b3 azul chico" data-pasar title="Si alguien no está, salta su turno">⏭ Pasar</button><button class="b3 morado chico" data-fin-todos>Terminar</button>' : ''}`);
+    const bp = $('[data-pasar]', barra);
+    if (bp) bp.onclick = () => {
+      if (!S.ctrl || S.desfase) return;
+      const accion = { t: 'pasar' };
+      S.ctrl.aplicar(accion); enviarJugada(accion); pintarTurno();
+    };
+    const bf = $('[data-fin-todos]', barra); if (bf) bf.onclick = terminarTodos;
+    if (mio && antes) { sonar.bien(); try { navigator.vibrate?.(120); } catch { /* sin vibración */ } }
+  }
+  function finTurnos() {
+    if (S.fase !== 'jugando') return;
+    const p = puntajes();
+    S.est.jugadores = S.est.jugadores.map(j => ({ ...j, puntaje: p[j.id] ?? j.puntaje })).sort((a, b) => Number(b.puntaje) - Number(a.puntaje));
+    if (yo || esHost) rpc('sala_fin_turnos', { p_sala: sala_id, p_puntajes: p, ...firma() }).then(() => S.canal?.avisar()).catch(() => {});
+    podio();
+  }
+
   // ---------- Tablero del anfitrión que no juega ----------
   function tablero() {
     S.fase = 'tablero';
@@ -191,8 +346,9 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
   // ---------- Podio ----------
   function podio() {
     S.fase = 'podio'; if (S.reloj) { S.reloj.ocultar(); S.reloj = null; }
-    alFinalizarPartida(null);
-    const js = S.est.jugadores;
+    alFinalizarPartida(null); pararTurnos();
+    // por turnos, el podio es de los que jugaron la partida (los que llegaron tarde solo miraron)
+    const js = porTurnos() && S.orden.length ? S.est.jugadores.filter(j => S.orden.includes(j.id)) : S.est.jugadores;
     const lugar = (j, n) => j ? `<div class="p${n}"><div class="cara-p">${avatarDe(j.avatar)}</div><b>${esc(j.alias)}</b><div class="bloque">${n}°<br>${Number(j.puntaje)}</div></div>` : '<div></div>';
     cont.innerHTML = `<div class="final"><div class="trofeo">🏆</div><h2 class="rotulo-tabla">¡Fin de la partida!</h2>
       <div class="podio-sala">${lugar(js[1], 2)}${lugar(js[0], 1)}${lugar(js[2], 3)}</div>

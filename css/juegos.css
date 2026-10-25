@@ -307,3 +307,26 @@ button.palabra-ficha:disabled { visibility: hidden; }
 .avatar-grid-juego button { font-size: 26px; height: 50px; border-radius: 14px; border: 2px solid #EBD3A8; background: #fff; cursor: pointer; }
 .avatar-grid-juego button[aria-pressed="true"] { border-color: var(--azul); background: #DCEBFF; box-shadow: 0 3px 0 var(--azul); }
 body.con-reloj [data-reloj] { display: none; }   /* con cronómetro arriba, no se muestra el tiempo transcurrido */
+
+/* ---------- Sala por turnos: una sola partida para todos ---------- */
+.sala-modo { text-align: center; font-weight: 800; background: #fff; border-radius: 14px; padding: 6px 12px; margin: 8px auto 0; max-width: 520px; }
+.hud-varios { flex-wrap: wrap; justify-content: center; }
+.hud-varios .hud-j { flex: 1 1 140px; max-width: 220px; }
+.hud-varios .hud-j.j2 { flex-direction: row; text-align: left; padding: 6px 10px 6px 6px; }
+.hud-varios .hud-j.j2 .hud-txt span { justify-content: flex-start; }
+.hud-j.j3 { background: linear-gradient(180deg, #5AD475, var(--verde)); }
+.hud-j.j4 { background: linear-gradient(180deg, #A47BF2, var(--morado)); }
+.hud-j.j5 { background: linear-gradient(180deg, #FFA94D, #F28C0F); }
+.hud-j.j6 { background: linear-gradient(180deg, #3FD0D9, #14A3B8); }
+.carta.hecha.j3 .frente { border-color: var(--verde); background: #EAF8EE; }
+.carta.hecha.j4 .frente { border-color: var(--morado); background: #F1EAFE; }
+.carta.hecha.j5 .frente { border-color: #F28C0F; background: #FFF1E0; }
+.carta.hecha.j6 .frente { border-color: #14A3B8; background: #E3F7F9; }
+@media (max-width: 480px) { .hud-varios .hud-j { flex-basis: 120px; } }
+.pill-turno { max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pill-turno.mio { background: var(--sol); color: #5A3A00; animation: latido 1s ease-in-out infinite; }
+/* cuando no es tu turno ves el tablero, pero no puedes tocarlo */
+.zona-juego.no-es-mi-turno > * { pointer-events: none; }
+.zona-juego.no-es-mi-turno [data-ver] { pointer-events: auto; }
+.zona-juego.no-es-mi-turno :is(.teclado, .memoria, .ordena-fichas, .frase-fichas, .quiz-ops, .sopa, .puzzle, .final-botones, [data-zona]) { opacity: .8; }
+@media (prefers-reduced-motion: reduce) { .pill-turno.mio { animation: none; } }

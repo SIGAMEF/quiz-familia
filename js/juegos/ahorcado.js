@@ -3,14 +3,17 @@
 // Letra correcta: +1 punto por cada vez que aparece y sigue el mismo jugador.
 // Letra incorrecta: el cangurito pierde energía y pasa el turno.
 // Quien completa la palabra gana +2. Cada jugador tiene 3 pistas (revelan una letra).
+// En una sala por turnos juegan todos en la misma partida, cada uno desde su dispositivo.
 // ============================================================
-import { $, $$, esc, barajar, base, sonar, confeti, canguro, horca, hudJugadores, pantallaFinal, figura, mezclador } from './util.js';
+import { $, $$, esc, barajar, base, sonar, confeti, canguro, horca, hudJugadores, pantallaFinal, figura, mezclador, turnos } from './util.js';
 
 const VIDAS = 6;
 let teclaActiva = null;   // un solo oyente del teclado físico aunque se juegue varias veces
 const TECLAS = ['ABCDEFGHI', 'JKLMNÑOPQ', 'RSTUVWXYZ'];
 
-export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir }) {
+export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red = null }) {
+  const T = turnos(red);
+  const N = jugadores.length;
   const mezclar = mezclador(opciones.semilla);
   const total = Number(opciones.cantidad) || 6;
   const palabras = mezclar(set.palabras).slice(0, Math.min(total, set.palabras.length));
@@ -49,9 +52,20 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir }) {
         return `<button class="tecla ${usada ? (ok ? 'bien' : 'mal') : ''}" data-l="${l}" ${usada || S.terminada ? 'disabled' : ''} aria-label="Letra ${l}">${l}</button>`;
       }).join('')}</div>`).join('')}</div>
       <div data-cartel></div>`;
-    $$('[data-l]', cont).forEach(b => b.onclick = () => jugar(b.dataset.l));
-    $('[data-pista]', cont).onclick = pista;
+    $$('[data-l]', cont).forEach(b => b.onclick = () => accion({ t: 'l', l: b.dataset.l }));
+    $('[data-pista]', cont).onclick = () => {
+      if (!jugadores[S.turno].pistas || S.terminada) return;
+      accion({ t: 'pista', l: base(barajar(faltan())[0]) });   // la letra se elige aquí y viaja con la jugada
+    };
   }
+  // Jugadas: letra, pista, siguiente palabra y "pasar" (el anfitrión salta el turno de alguien que no está)
+  function aplicar(a) {
+    if (a.t === 'l') jugar(a.l);
+    else if (a.t === 'pista') pista(a.l);
+    else if (a.t === 'sig') siguiente();
+    else if (a.t === 'pasar') { if (S.terminada) siguiente(); else { S.turno = (S.turno + 1) % N; pintar(); } }
+  }
+  const accion = (a) => T.hacer(() => S.turno, a, aplicar);
 
   function jugar(l) {
     if (S.terminada || S.usadas.has(l)) return;
@@ -62,17 +76,16 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir }) {
     else { S.errores++; sonar.mal(); }
     if (!faltan().length) return fin(true);
     if (S.errores >= VIDAS) return fin(false);
-    if (!veces && jugadores.length > 1) S.turno = 1 - S.turno;
+    if (!veces && N > 1) S.turno = (S.turno + 1) % N;
     pintar();
     if (veces) cont.querySelector('.palabra')?.classList.add('brillo');
   }
 
-  function pista() {
+  function pista(l) {
     const j = jugadores[S.turno];
-    if (!j.pistas || S.terminada) return;
+    if (!j.pistas || S.terminada || !l || S.usadas.has(l)) return;
     j.pistas--;
     S.ayudaTexto = true;
-    const l = base(barajar(faltan())[0]);
     S.usadas.add(l);
     sonar.clic();
     if (!faltan().length) return fin(true, true);
@@ -91,15 +104,18 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir }) {
       <div class="rotulo-tabla">${gano ? '¡Correcto!' : '¡Oh no!'}</div>
       <p>${gano ? (porPista ? 'La pista completó la palabra.' : `${esc(j.nombre)} completó la palabra: +2`) : 'El cangurito se cansó…'}</p>
       <div class="palabra-final">${esc(actual().palabra)}</div>
-      <button class="b3 ${gano ? 'verde' : 'azul'}" data-sig>${ultima ? 'Ver resultados' : gano ? 'Siguiente palabra' : 'Nueva palabra'}</button></div></div>`;
+      ${!red || red.puedo(S.turno) ? `<button class="b3 ${gano ? 'verde' : 'azul'}" data-sig>${ultima ? 'Ver resultados' : gano ? 'Siguiente palabra' : 'Nueva palabra'}</button>`
+        : `<p class="ordena-pista">Esperando a que ${esc(j.nombre)} continúe…</p>`}</div></div>`;
     if (gano) { sonar.gana(); confeti(); } else sonar.pierde();
-    const b = $('[data-sig]', cartel); b.focus();
-    b.onclick = () => {
-      if (ultima) return pantallaFinal(cont, { jugadores, detalle: `${palabras.length} palabras de “${esc(set.titulo)}”`, alRepetir, alMenu });
-      S.idx++; S.usadas = new Set(); S.errores = 0; S.terminada = false; S.ayudaTexto = false;
-      if (jugadores.length > 1) S.turno = S.idx % 2;   // cada palabra la empieza un jugador distinto
-      pintar();
-    };
+    const b = $('[data-sig]', cartel);
+    if (b) { b.focus(); b.onclick = () => accion({ t: 'sig' }); }
+  }
+  function siguiente() {
+    if (!S.terminada) return;
+    if (S.idx === palabras.length - 1) return pantallaFinal(cont, { jugadores, detalle: `${palabras.length} palabras de “${esc(set.titulo)}”`, alRepetir, alMenu });
+    S.idx++; S.usadas = new Set(); S.errores = 0; S.terminada = false; S.ayudaTexto = false;
+    if (N > 1) S.turno = S.idx % N;   // cada palabra la empieza un jugador distinto
+    pintar();
   }
 
   // Teclado físico
@@ -107,9 +123,10 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir }) {
   const tecla = (e) => {
     if (!cont.querySelector('.teclado') || e.ctrlKey || e.metaKey || e.altKey || e.target.matches('input, textarea')) return;
     const l = e.key.toUpperCase();
-    if (/^[A-ZÑ]$/.test(l)) jugar(l);
+    if (/^[A-ZÑ]$/.test(l) && !S.usadas.has(l) && !S.terminada) accion({ t: 'l', l });
   };
   teclaActiva = tecla;
   document.addEventListener('keydown', tecla);
   pintar();
+  return { aplicar: (a) => T.recibir(a, aplicar), turno: () => S.turno };
 }

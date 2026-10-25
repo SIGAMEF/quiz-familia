@@ -1,7 +1,8 @@
 // ============================================================
 // Sopa de letras: arrastra (o toca la primera y la última letra) para marcar una palabra.
+// En una sala por turnos: cada palabra encontrada vale 10 y sigues; si fallas, pasa el turno.
 // ============================================================
-import { $, $$, esc, barajar, sinTildes, sonar, fmtTiempo, pantallaFinal, figura } from './util.js';
+import { $, $$, esc, barajar, sinTildes, sonar, fmtTiempo, pantallaFinal, figura, hudJugadores, turnos } from './util.js';
 
 const NIVELES = {
   facil:   { lado: 10, n: 6,  dirs: ['horizontal', 'vertical'] },
@@ -71,7 +72,11 @@ function itemLista(p, modo) {
   return `<li data-p="${p.clave}" class="li-fig">${figura(p.imagen)}<span class="li-fig-txt"><b class="oculta">${'_ '.repeat(p.clave.length).trim()}</b>${modo === 'imagenes_desc' && p.pista ? `<span>${esc(p.pista)}</span>` : ''}</span></li>`;
 }
 
-export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir }) {
+export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red = null }) {
+  const T = turnos(red);
+  const N = jugadores.length;
+  let turno = 0;
+  jugadores.forEach(j => { j.puntos = 0; });
   const modo = opciones.pistas || set.pistas || 'palabras';      // palabras | imagenes | imagenes_desc
   const { grilla: g, ubicaciones: puestas } = opciones.sopa || sopaDe(set, opciones.nivel || 'facil', modo);
   const lado = g[0].length;
@@ -80,7 +85,7 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir }) {
   let reloj = null, inicio = null, fin = null, arrastrando = false;
   const jug = jugadores[0];
 
-  cont.innerHTML = `
+  cont.innerHTML = `${red ? '<div data-hud></div>' : ''}
     <div class="sopa-top"><span class="pill">🔎 ${esc(set.titulo)}</span><span class="pill" data-reloj>⏱ 0:00</span><span class="pill" data-cuenta>0 / ${puestas.length}</span></div>
     <div class="sopa-wrap">
       <div class="sopa" data-grid style="--lado:${lado}" role="grid" aria-label="Sopa de letras">
@@ -90,7 +95,9 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir }) {
     </div>
     <p class="ayuda-juego">Arrastra el dedo desde la primera hasta la última letra. También puedes tocar la primera y luego la última.</p>`;
   const grid = $('[data-grid]', cont);
-  reloj = setInterval(() => { const el = $('[data-reloj]', cont); if (!el) return clearInterval(reloj); el.textContent = `⏱ ${fmtTiempo((Date.now() - t0) / 1000)}`; }, 500);
+  const hud = () => { const h = $('[data-hud]', cont); if (h) h.innerHTML = hudJugadores(jugadores, turno, (j) => `⭐ ${j.puntos}`); };
+  hud();
+  reloj = setInterval(() => { const el = $('[data-reloj]', cont); if (!el || !grid.isConnected) return clearInterval(reloj); el.textContent = `⏱ ${fmtTiempo((Date.now() - t0) / 1000)}`; }, 500);
 
   const celda = (rc) => grid.querySelector(`[data-rc="${rc}"]`);
   const linea = (a, b) => {
@@ -109,28 +116,40 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir }) {
     const p = puestas.find(x => !halladas.has(x.clave) && (x.clave === txt || x.clave === [...txt].reverse().join('')) && x.celdas.length === celdas.length);
     if (!p) return false;
     const color = halladas.size % 6;
+    if (red) jugadores[turno].puntos += 10;
     halladas.set(p.clave, color);
     celdas.forEach(rc => { const el = celda(rc); el.classList.add('hallada', `c${color}`); });
     const li = $(`[data-p="${p.clave}"]`, cont); li.classList.add('hecha', `c${color}`);
     const oculta = $('.oculta', li); if (oculta) { oculta.textContent = p.palabra; oculta.classList.remove('oculta'); }
     $('[data-cuenta]', cont).textContent = `${halladas.size} / ${puestas.length}`;
-    sonar.bien();
+    sonar.bien(); hud();
     if (halladas.size === puestas.length) {
       clearInterval(reloj);
       const seg = (Date.now() - t0) / 1000;
-      jug.puntos = Math.max(10, Math.round(puestas.length * 100 - seg * 2));
-      setTimeout(() => pantallaFinal(cont, { jugadores, titulo: '¡Sopa resuelta!', detalle: `Encontraste ${puestas.length} palabras en ${fmtTiempo(seg)}.`, alRepetir, alMenu }), 700);
+      if (!red) jug.puntos = Math.max(10, Math.round(puestas.length * 100 - seg * 2));
+      T.despues(700, () => pantallaFinal(cont, { jugadores, titulo: '¡Sopa resuelta!', detalle: `${red ? 'Encontraron' : 'Encontraste'} ${puestas.length} palabras en ${fmtTiempo(seg)}.`, alRepetir, alMenu }));
     }
     return true;
   }
+  // Jugadas: una línea marcada (encontrada o no) y "pasar"
+  function aplicar(a) {
+    if (a.t === 'linea') {
+      if (comprobar(a.celdas)) return;
+      sonar.mal();
+      if (N > 1) { turno = (turno + 1) % N; hud(); }
+    } else if (a.t === 'pasar') { turno = (turno + 1) % N; hud(); }
+  }
+  const intentar = (celdas) => {
+    if (!celdas || celdas.length < 2) return;
+    T.hacer(() => turno, { t: 'linea', celdas }, aplicar);
+  };
 
   grid.addEventListener('pointerdown', (e) => {
     const rc = deEvento(e); if (!rc) return;
     e.preventDefault();
     if (inicio && !arrastrando && rc !== inicio) {          // segundo toque del modo tocar-tocar
       const l = linea(inicio, rc);
-      if (!comprobar(l) && l) sonar.mal();
-      inicio = null; marcar(null); return;
+      inicio = null; marcar(null); intentar(l); return;
     }
     inicio = rc; fin = rc; arrastrando = true; marcar([rc]);
   });
@@ -144,11 +163,12 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir }) {
     arrastrando = false;
     if (fin === inicio) return;                              // fue un toque: espera la última letra
     const l = linea(inicio, fin);
-    if (!comprobar(l)) sonar.mal();
     inicio = null; marcar(null);
+    if (l) intentar(l); else sonar.mal();
   };
   grid.addEventListener('pointerup', soltar);
   grid.addEventListener('pointercancel', () => { arrastrando = false; inicio = null; marcar(null); });
+  return { aplicar: (a) => T.recibir(a, aplicar), turno: () => turno };
 }
 
 // ---------- Solución dibujada: cada palabra encerrada en un óvalo de su color ----------

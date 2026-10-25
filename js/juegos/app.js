@@ -58,6 +58,16 @@ async function rpc(nombre, args) {
   if (error) throw error;
   return data;
 }
+// Aviso instantáneo entre los dispositivos de una sala (Supabase Realtime, sin tocar la base)
+async function canal(nombre, alAviso) {
+  if (!api) api = await import('../comun.js');
+  const ch = api.supabase.channel(nombre, { config: { broadcast: { self: false } } })
+    .on('broadcast', { event: 'aviso' }, () => alAviso()).subscribe();
+  return {
+    avisar: () => { try { ch.send({ type: 'broadcast', event: 'aviso', payload: {} }).catch(() => {}); } catch { /* sin tiempo real */ } },
+    cerrar: () => { try { api.supabase.removeChannel(ch); } catch { /* ya cerrado */ } }
+  };
+}
 const aSet = (j) => ({ ...j.datos, id: j.id, remoto: true, tipo: j.tipo, titulo: j.titulo, tema: j.tema, categoria: j.tema || '', autor: j.autor, ico: JUEGOS[j.tipo]?.ico || '🎲', publicacion_id: j.publicacion_id, segundos: j.segundos || null });
 
 let juego = MODULOS[params.get('j')] && params.get('j') !== 'quizpublico' ? params.get('j') : 'ahorcado';
@@ -80,7 +90,7 @@ function encabezado() {
 async function arrancar() {
   if (PIN_SALA) {
     $('#nombreJuego').textContent = '🌐 Sala en línea';
-    return unirseSala({ rpc, cont, barra, volverA: INICIO }, PIN_SALA);
+    return unirseSala({ rpc, canal, cont, barra, volverA: INICIO }, PIN_SALA);
   }
   if (!REMOTO) return preparar();
   cont.innerHTML = '<div class="tabla-juego center" style="padding:40px;">Cargando el juego…</div>';
@@ -164,7 +174,7 @@ function preparar() {
         <button class="b3 amarillo grande" data-jugar>▶ Jugar aquí</button>
         ${!ID_PUB && !PREVIA ? '<button class="b3 azul grande" data-enlinea>🌐 Jugar en línea con otros</button>' : ''}
       </div>
-      ${!ID_PUB && !PREVIA ? '<p class="hint" style="text-align:center;">En línea: compartes un PIN, cada uno juega desde su celular y tú inicias para todos.</p>' : ''}
+      ${!ID_PUB && !PREVIA ? '<p class="hint" style="text-align:center;">En línea: compartes un PIN y cada uno entra desde su celular. Juegan una sola partida por turnos, o todos a la vez.</p>' : ''}
       ${PREVIA ? '' : `<div class="final-botones imprimir-botones">${puedeImprimir(juego === 'quizpublico' ? 'quiz' : juego) ? `<button class="b3 azul chico" data-imp="0">🖨 Imprimir ficha</button>${juego === 'quizpublico' ? '' : '<button class="b3 morado chico" data-imp="1">🖨 Imprimir solución</button>'}` : ''}</div>`}
       <details class="reglas"><summary>Cómo se juega</summary><ul>${op.reglas.map(r => `<li>${esc(r)}</li>`).join('')}</ul></details>
     </div>`;
@@ -253,11 +263,17 @@ function preparar() {
 // ---------- Crear una sala en línea ----------
 async function crearSalaEnLinea({ juego, setId, setCompletoFn, campo, valor, pistas, segundos }) {
   const set = await setCompletoFn(setId);
-  const armar = () => contenidoSala({ juego, set, campo, valor, pistas });
+  let modo = prefs.leer('modo_sala', 'turnos') === 'carrera' ? 'carrera' : 'turnos';
+  const armar = () => contenidoSala({ juego, set, campo, valor, pistas, modo });
   armar();   // valida (por ejemplo, la foto propia no se puede compartir)
   const g = prefs.leer('jugadores', [{ nombre: '', avatar: '🧒' }])[0];
+  const MODOS = [['turnos', '🎲 Por turnos', 'Una sola partida para todos. Cuando te toca, mueves tú desde tu celular; los demás miran el mismo tablero.'],
+                 ['carrera', '🏁 Todos a la vez', 'Cada uno juega su propia partida al mismo tiempo y gana quien haga más puntos.']];
   cont.innerHTML = `<div class="tabla-juego">
       <div class="center"><div class="rotulo-tabla">🌐 Jugar en línea</div><p class="lema">${esc(set.titulo)} · ${segundos ? `⏱ ${Math.round(segundos / 60 * 10) / 10} min para todos` : 'sin límite de tiempo'}</p></div>
+      <h2>¿Cómo juegan?</h2>
+      <div class="segmento" role="group" aria-label="Modo de juego">${MODOS.map(([v, t]) => `<button type="button" data-modo="${v}" aria-pressed="${v === modo}">${t}</button>`).join('')}</div>
+      <p class="hint" data-modo-txt>${MODOS.find(m => m[0] === modo)[2]}</p>
       <label class="check" style="margin-top:10px;"><input type="checkbox" data-juego checked> Yo también juego</label>
       <div data-mis-datos><label class="lbl" for="aliasHost">Tu nombre</label><input class="input" id="aliasHost" maxlength="30" value="${esc(g.nombre && g.nombre !== 'Jugador 1' ? g.nombre : '')}" placeholder="Ej: Mamá">
         <label class="lbl">Tu avatar</label><div data-av></div></div>
@@ -265,6 +281,11 @@ async function crearSalaEnLinea({ juego, setId, setCompletoFn, campo, valor, pis
       <button class="b3 amarillo grande" data-crear>Crear sala y mostrar el PIN</button>
       <button class="b3 morado chico" data-atras style="margin-top:10px;">← Volver</button></div>`;
   const av = selectorEmoji($('[data-av]', cont), g.avatar);
+  $$('[data-modo]', cont).forEach(b => b.onclick = () => {
+    modo = b.dataset.modo; prefs.guardar('modo_sala', modo);
+    $$('[data-modo]', cont).forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    $('[data-modo-txt]', cont).textContent = MODOS.find(m => m[0] === modo)[2];
+  });
   $('[data-juego]', cont).onchange = (e) => { $('[data-mis-datos]', cont).hidden = !e.target.checked; };
   $('[data-atras]', cont).onclick = () => preparar();
   $('[data-crear]', cont).onclick = async (e) => {
@@ -279,7 +300,7 @@ async function crearSalaEnLinea({ juego, setId, setCompletoFn, campo, valor, pis
       if (set.remoto && juego !== 'quiz') rpc('juego_jugado', { p_id: set.id }).catch(() => {});
       history.replaceState(null, '', `?sala=${r.codigo}`);
       $('#nombreJuego').textContent = '🌐 Sala en línea';
-      abrirSala({ rpc, cont, barra, volverA: INICIO, nuevaRonda: armar },
+      abrirSala({ rpc, canal, cont, barra, volverA: INICIO, nuevaRonda: armar },
         { sala_id: r.sala_id, codigo: r.codigo, host_token: r.host_token, yo: juega ? { id: r.jugador_id, token: r.token } : null });
     } catch (er) { $('[data-err]', cont).textContent = er.message || String(er); boton.disabled = false; }
   };
