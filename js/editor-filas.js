@@ -2,7 +2,7 @@
 // Lista editable de elementos de un juego: cada fila con imagen (foto o emoji), texto y pista
 // ============================================================
 import { $, $$, esc, abrirModal, cargando, mensajeError, subirImagen, toast } from './comun.js';
-import { figura, lado } from './juegos/util.js?v=202610242316';
+import { figura, lado } from './juegos/util.js?v=202610242346';
 
 const ETIQ = {
   palabras: { texto: 'Palabra', pista: 'Pista o descripción (opcional)' },

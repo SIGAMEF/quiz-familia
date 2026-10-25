@@ -6,14 +6,14 @@
 //  · carrera — cada uno juega su propia partida a la vez, con ranking en vivo.
 // Mismo cronómetro y podio al final en los dos.
 // ============================================================
-import { $, $$, esc, figura, sonar, confeti, relojBarra, alFinalizarPartida, prefs, selectorEmoji, silenciar, COLORES_SALA, pararRelojTurno, fondo, decir, olvidarTurno } from './util.js?v=202610242316';
-import { sopaDe } from './sopa.js?v=202610242316';
+import { $, $$, esc, figura, sonar, confeti, relojBarra, alFinalizarPartida, prefs, selectorEmoji, silenciar, COLORES_SALA, pararRelojTurno, fondo, decir, olvidarTurno, ordenarPorPuntos, fmtTiempo } from './util.js?v=202610242346';
+import { sopaDe } from './sopa.js?v=202610242346';
 import { enPausa } from '../reposo.js';
 
 const CARGADORES = {
-  ahorcado: () => import('./ahorcado.js?v=202610242316'), sopa: () => import('./sopa.js?v=202610242316'), memoria: () => import('./memoria.js?v=202610242316'),
-  ordena: () => import('./ordena.js?v=202610242316'), quiz: () => import('./quiz.js?v=202610242316'), trivia: () => import('./quiz.js?v=202610242316'), relampago: () => import('./quiz.js?v=202610242316'),
-  frase: () => import('./frase.js?v=202610242316'), rompecabezas: () => import('./rompecabezas.js?v=202610242316'), quizpublico: () => import('./quizlibre.js?v=202610242316')
+  ahorcado: () => import('./ahorcado.js?v=202610242346'), sopa: () => import('./sopa.js?v=202610242346'), memoria: () => import('./memoria.js?v=202610242346'),
+  ordena: () => import('./ordena.js?v=202610242346'), quiz: () => import('./quiz.js?v=202610242346'), trivia: () => import('./quiz.js?v=202610242346'), relampago: () => import('./quiz.js?v=202610242346'),
+  frase: () => import('./frase.js?v=202610242346'), rompecabezas: () => import('./rompecabezas.js?v=202610242346'), quizpublico: () => import('./quizlibre.js?v=202610242346')
 };
 const avatarDe = (a) => /^(https?:|data:)/.test(a || '') ? `<img src="${esc(a)}" alt="">` : esc(a || '🙂');
 const guardarSesion = (sala, datos) => { try { sessionStorage.setItem('sala_' + sala, JSON.stringify(datos)); } catch { /* sin almacenamiento */ } };
@@ -79,7 +79,12 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
       return;
     }
     if (est.estado === 'finalizado' && S.fase !== 'podio') {
-      if (porTurnos()) { if (S.fase === 'jugando') recibirJugadas(jugadas); if (S.fase !== 'podio') podio(); return; }
+      if (porTurnos()) {
+        if (S.fase === 'jugando') recibirJugadas(jugadas);
+        if (S.desfase) return;          // se está rearmando la partida: al terminar, sincronizar() muestra el podio con todo aplicado
+        if (S.fase !== 'podio') podio();
+        return;
+      }
       if (S.fase === 'jugando' && !S.terminado) await terminarYo('Se acabó el tiempo');
       return podio();
     }
@@ -204,10 +209,10 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
   async function terminarYo(detalle, porTiempo = false) {
     if (S.terminado) return;
     S.terminado = true;
-    const bono = S.reloj && S.est.fin && !porTiempo ? Math.round(S.reloj.restante()) : 0;
-    S.jug.puntos += bono;
+    const bono = 0;   // el puntaje es de 1 en 1; con los mismos puntos queda primero quien terminó antes
+    const tardo = S.est.inicio ? ` · ⏱ ${fmtTiempo((Date.now() - aLocal(S.est.inicio)) / 1000)}` : '';
     await rpc('sala_progreso', { p_jugador: yo.id, p_token: yo.token, p_puntaje: S.jug.puntos, p_progreso: 0, p_terminado: true,
-      p_detalle: `${detalle || ''}${bono ? ` · bono de tiempo +${bono}` : ''}`.replace(/^ · /, '') }).catch(() => {});
+      p_detalle: `${detalle || ''}${tardo}`.replace(/^ · /, '') }).catch(() => {});
     if (porTiempo) {
       cont.innerHTML = `<div class="final"><div class="trofeo">⏰</div><h2 class="rotulo-tabla">¡Se acabó el tiempo!</h2><p class="final-sub">Hiciste ${S.jug.puntos} puntos</p></div>`;
     }
@@ -241,10 +246,11 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
   const puntajes = () => Object.fromEntries(S.jugs.map(j => [j.id, Math.round(Number(j.puntos) || 0)]));
   // las jugadas salen de a una, en orden; cada una lleva su número para que nadie se adelante a otro
   function enviarJugada(accion) {
-    const n = ++S.n, p = puntajes();
+    const n = ++S.n;
     S.enVuelo++;
     S.cola = S.cola.then(async () => {
       if (S.desfase) return;
+      const p = puntajes();   // se leen al enviar: la jugada ya está aplicada
       try { await conLimite(rpc('sala_jugar', { p_sala: sala_id, p_n: n, p_accion: accion, p_puntajes: p, ...firma() })); if (S.canal) S.canal.avisar(); }
       catch (e) {
         if (/se acabó el tiempo|no está en curso/i.test(e.message || '')) return sondear();
@@ -368,7 +374,8 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
     if (S.fase !== 'jugando') return;
     const p = puntajes();
     S.est.jugadores = S.est.jugadores.map(j => ({ ...j, puntaje: p[j.id] ?? j.puntaje })).sort((a, b) => Number(b.puntaje) - Number(a.puntaje));
-    if (yo || esHost) rpc('sala_fin_turnos', { p_sala: sala_id, p_puntajes: p, ...firma() }).then(() => S.canal?.avisar()).catch(() => {});
+    // después de las jugadas que falten por enviar (la última puede ser la que terminó la partida)
+    if (yo || esHost) S.cola.then(() => rpc('sala_fin_turnos', { p_sala: sala_id, p_puntajes: p, ...firma() })).then(() => S.canal?.avisar()).catch(() => {});
     podio();
   }
 
@@ -393,12 +400,17 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
   function podio() {
     S.fase = 'podio'; if (S.reloj) { S.reloj.ocultar(); S.reloj = null; }
     alFinalizarPartida(null); pararTurnos();
-    // por turnos, el podio es de los que jugaron la partida (los que llegaron tarde solo miraron)
-    const js = porTurnos() && S.orden.length ? S.est.jugadores.filter(j => S.orden.includes(j.id)) : S.est.jugadores;
-    const lugar = (j, n) => j ? `<div class="p${n}"><div class="cara-p">${avatarDe(j.avatar)}</div><b>${esc(j.alias)}</b><div class="bloque">${n}°<br>${Number(j.puntaje)}</div></div>` : '<div></div>';
+    // por turnos, el podio es de los que jugaron la partida (los que llegaron tarde solo miraron);
+    // con los mismos puntos gana quien tardó menos en sus turnos (el tiempo es igual en todas las pantallas)
+    let js = S.est.jugadores;
+    if (porTurnos() && S.orden.length) {
+      js = ordenarPorPuntos(js.filter(j => S.orden.includes(j.id)).map(j => ({ ...j, tiempo: S.jugs.find(x => x.id === j.id)?.tiempo || 0 })), (j) => Number(j.puntaje) || 0);
+    }
+    const tiempo = (j) => j.tiempo ? `<small class="final-tiempo">⏱ ${fmtTiempo(j.tiempo / 1000)}</small>` : '';
+    const lugar = (j, n) => j ? `<div class="p${n}"><div class="cara-p">${avatarDe(j.avatar)}</div><b>${esc(j.alias)}</b><div class="bloque">${n}°<br>${Number(j.puntaje)}${tiempo(j)}</div></div>` : '<div></div>';
     cont.innerHTML = `<div class="final"><div class="trofeo">🏆</div><h2 class="rotulo-tabla">¡Fin de la partida!</h2>
       <div class="podio-sala">${lugar(js[1], 2)}${lugar(js[0], 1)}${lugar(js[2], 3)}</div>
-      <ul class="ranking">${js.map((j, i) => `<li class="${yo && j.id === yo.id ? 'yo' : ''}"><span class="pos">${i + 1}</span>${esc(j.alias)}${j.detalle ? ` <small class="muted">· ${esc(j.detalle)}</small>` : ''}<span class="pts">${Number(j.puntaje)}</span></li>`).join('')}</ul>
+      <ul class="ranking">${js.map((j, i) => `<li class="${yo && j.id === yo.id ? 'yo' : ''}"><span class="pos">${i + 1}</span>${esc(j.alias)}${j.detalle ? ` <small class="muted">· ${esc(j.detalle)}</small>` : ''}<span class="pts">${Number(j.puntaje)}${tiempo(j)}</span></li>`).join('')}</ul>
       <div class="final-botones">${esHost ? '<button class="b3 amarillo" data-otra>🔄 Otra ronda</button><button class="b3 azul" data-cerrar>Cerrar sala</button>'
         : '<p class="ordena-pista">Si el anfitrión inicia otra ronda, entrarás automáticamente.</p><button class="b3 azul" data-salir>Volver a los juegos</button>'}</div></div>`;
     sonar.gana(); confeti();

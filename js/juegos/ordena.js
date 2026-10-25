@@ -2,7 +2,7 @@
 // Ordena la palabra: toca las letras en orden. Más puntos si no usas ayuda.
 // En una sala por turnos, cada palabra la arma un jugador distinto.
 // ============================================================
-import { $, $$, esc, barajar, base, sonar, confeti, pantallaFinal, figura, mezclador, hudJugadores, turnos, decir } from './util.js?v=202610242316';
+import { $, $$, esc, barajar, base, sonar, confeti, pantallaFinal, figura, mezclador, hudJugadores, turnos, decir } from './util.js?v=202610242346';
 
 export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red = null }) {
   const T = turnos(red);
@@ -47,7 +47,7 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
     puestas.push(f); sonar.clic();
     if (puestas.length < letras.length) return pintar();
     const ok = puestas.map(x => base(x.l)).join('') === letras.map(base).join('');
-    if (ok) { jugadores[turno()].puntos += Math.max(2, 10 - ayudas * 3); aciertos++; sonar.bien(); decir('¡Correcto!'); }
+    if (ok) { jugadores[turno()].puntos += 1; aciertos++; sonar.bien(); decir('¡Correcto!'); }
     else sonar.mal();
     pintar();
     $('.ordena-resp', cont).classList.add(ok ? 'correcta' : 'incorrecta');
@@ -73,6 +73,7 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
     ronda();
   }
   ronda();
+  T.cronometro(jugadores, turno);
   T.reloj(opciones.seg_turno, turno, () => T.hacer(turno, { t: 'tiempo' }, aplicar));
   return { aplicar: (a) => T.recibir(a, aplicar), turno };
 }

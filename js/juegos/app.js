@@ -1,39 +1,39 @@
 // ============================================================
 // juegos.html?j=<juego>&s=<set>  — prepara y lanza un juego libre
 // ============================================================
-import { $, $$, esc, paisaje, formJugadores, sonar, alternarSonido, sonidoActivo, prefs, alFinalizarPartida, relojBarra, pantallaFinal, selectorEmoji, pararRelojTurno, fondo } from './util.js?v=202610242316';
-import { contenidoSala, abrirSala, unirseSala } from './sala.js?v=202610242316';
-import { imprimir, puedeImprimir } from './imprimir.js?v=202610242316';
-import { sopaDe } from './sopa.js?v=202610242316';
-import { imagenPuzzle } from './imagenes.js?v=202610242316';
-import { JUEGOS, setsPara, buscarSet, conImagenes } from './contenido.js?v=202610242316';
+import { $, $$, esc, paisaje, formJugadores, sonar, alternarSonido, sonidoActivo, prefs, alFinalizarPartida, relojBarra, pantallaFinal, selectorEmoji, pararRelojTurno, fondo } from './util.js?v=202610242346';
+import { contenidoSala, abrirSala, unirseSala } from './sala.js?v=202610242346';
+import { imprimir, puedeImprimir } from './imprimir.js?v=202610242346';
+import { sopaDe } from './sopa.js?v=202610242346';
+import { imagenPuzzle } from './imagenes.js?v=202610242346';
+import { JUEGOS, setsPara, buscarSet, conImagenes } from './contenido.js?v=202610242346';
 
 const MODULOS = {
-  ahorcado: () => import('./ahorcado.js?v=202610242316'), sopa: () => import('./sopa.js?v=202610242316'), memoria: () => import('./memoria.js?v=202610242316'),
-  ordena: () => import('./ordena.js?v=202610242316'), quiz: () => import('./quiz.js?v=202610242316'), trivia: () => import('./quiz.js?v=202610242316'), relampago: () => import('./quiz.js?v=202610242316'),
-  frase: () => import('./frase.js?v=202610242316'), rompecabezas: () => import('./rompecabezas.js?v=202610242316'), quizpublico: () => import('./quizlibre.js?v=202610242316')
+  ahorcado: () => import('./ahorcado.js?v=202610242346'), sopa: () => import('./sopa.js?v=202610242346'), memoria: () => import('./memoria.js?v=202610242346'),
+  ordena: () => import('./ordena.js?v=202610242346'), quiz: () => import('./quiz.js?v=202610242346'), trivia: () => import('./quiz.js?v=202610242346'), relampago: () => import('./quiz.js?v=202610242346'),
+  frase: () => import('./frase.js?v=202610242346'), rompecabezas: () => import('./rompecabezas.js?v=202610242346'), quizpublico: () => import('./quizlibre.js?v=202610242346')
 };
 // Opciones de cada juego
 const OPCIONES = {
   ahorcado: { jugadores: true, campo: 'cantidad', titulo: 'Palabras', valores: [[4, '4'], [6, '6'], [10, '10']], def: 6,
-    reglas: ['Se turnan para elegir letras.', 'Letra correcta: un punto por cada vez que aparece, y sigues tú.', 'Letra incorrecta: el cangurito pierde energía y pasa el turno.', 'Quien completa la palabra gana 2 puntos más.', 'Cada jugador tiene 3 pistas: cada una destapa una letra.',
+    reglas: ['Se turnan para elegir letras.', 'Letra correcta: sigues tú.', 'Letra incorrecta: el cangurito pierde energía y pasa el turno.', 'Quien completa la palabra gana 1 punto.', 'Cada jugador tiene 3 pistas: cada una destapa una letra.',
       'Fácil: el teclado marca las letras que ya salieron. Difícil: no se marcan, y repetir una letra cuenta como error.', 'Con tiempo por turno: si se acaba, le toca al siguiente.'] },
   sopa: { jugadores: false, campo: 'nivel', titulo: 'Dificultad', valores: [['facil', '🟢 Fácil'], ['medio', '🟡 Medio'], ['dificil', '🔴 Difícil']], def: 'facil',
-    reglas: ['Busca las palabras de la lista dentro de la sopa.', 'Fácil: horizontal y vertical. Medio: también en diagonal. Difícil: en todas las direcciones, incluso al revés.', 'Mientras más rápido termines, más puntos.'] },
+    reglas: ['Busca las palabras de la lista dentro de la sopa.', 'Fácil: horizontal y vertical. Medio: también en diagonal. Difícil: en todas las direcciones, incluso al revés.', 'Cada palabra encontrada vale 1 punto.'] },
   memoria: { jugadores: true, campo: 'parejas', titulo: 'Parejas', valores: [[6, '6'], [8, '8'], [10, '10']], def: 6,
     reglas: ['Voltea dos cartas. Si forman pareja, son tuyas y vuelves a jugar.', 'Si no, se tapan otra vez y pasa el turno.', 'Gana quien junte más parejas.'] },
   ordena: { jugadores: false, campo: 'cantidad', titulo: 'Palabras', valores: [[5, '5'], [8, '8'], [12, '12']], def: 8,
-    reglas: ['Toca las letras en el orden correcto para armar la palabra.', 'Lee la pista si no sabes cuál es.', '“Una letra” te ayuda, pero da menos puntos.'] },
+    reglas: ['Toca las letras en el orden correcto para armar la palabra.', 'Lee la pista si no sabes cuál es.', 'Cada palabra bien armada vale 1 punto.', '“Una letra” te ayuda si no sabes cuál es.'] },
   quiz: { jugadores: false, campo: 'cantidad', titulo: 'Preguntas', valores: [[5, '5'], [10, '10']], def: 10,
-    reglas: ['Tienes 15 segundos por pregunta (puedes cambiarlo en “Tiempo por pregunta”). Faltando 5 segundos suena un aviso.', 'Respuesta correcta: 500 puntos más un bono por rapidez.'] },
+    reglas: ['Tienes 15 segundos por pregunta (puedes cambiarlo en “Tiempo por pregunta”). Faltando 5 segundos suena un aviso.', 'Cada respuesta correcta vale 1 punto.'] },
   trivia: { jugadores: false, campo: 'cantidad', titulo: 'Preguntas', valores: [[5, '5'], [10, '10']], def: 10,
-    reglas: ['Tienes 15 segundos por pregunta (puedes cambiarlo en “Tiempo por pregunta”). Faltando 5 segundos suena un aviso.', 'Respuesta correcta: 500 puntos más un bono por rapidez.'] },
+    reglas: ['Tienes 15 segundos por pregunta (puedes cambiarlo en “Tiempo por pregunta”). Faltando 5 segundos suena un aviso.', 'Cada respuesta correcta vale 1 punto.'] },
   frase: { jugadores: false, campo: 'cantidad', titulo: 'Frases', valores: [[4, '4'], [6, '6'], [8, '8']], def: 6,
-    reglas: ['Toca las palabras en el orden correcto para formar la frase.', 'La pista te dice de qué trata (o la cita, en los versículos).', '“Una palabra” te ayuda, pero da menos puntos.'] },
+    reglas: ['Toca las palabras en el orden correcto para formar la frase.', 'La pista te dice de qué trata (o la cita, en los versículos).', 'Cada frase bien armada vale 1 punto.', '“Una palabra” te ayuda si no sabes cómo sigue.'] },
   rompecabezas: { jugadores: false, campo: 'piezas', titulo: 'Piezas', valores: [[3, '3 × 3'], [4, '4 × 4'], [5, '5 × 5']], def: 3,
-    reglas: ['Toca una pieza y luego otra para cambiarlas de lugar.', 'Las piezas que ya están en su sitio se marcan en verde.', 'Con “Una foto de la familia” puedes armar tu propia foto.'] },
+    reglas: ['Toca una pieza y luego otra para cambiarlas de lugar.', 'Las piezas que ya están en su sitio se marcan en verde. Cada pieza que pones en su sitio vale 1 punto.', 'Con “Una foto de la familia” puedes armar tu propia foto.'] },
   quizpublico: { jugadores: false, campo: 'cantidad', titulo: 'Preguntas', valores: [[5, '5'], [10, '10'], [999, 'Todas']], def: 10,
-    reglas: ['Responde cada pregunta y mira si acertaste.', 'Hay preguntas de una o varias respuestas, verdadero o falso y para completar.'] }
+    reglas: ['Responde cada pregunta y mira si acertaste.', 'Hay preguntas de una o varias respuestas, verdadero o falso y para completar.', 'Cada respuesta correcta vale 1 punto.'] }
 };
 OPCIONES.relampago = OPCIONES.quiz;
 const TIEMPOS = [[0, 'Sin límite'], [60, '1 min'], [120, '2 min'], [180, '3 min'], [300, '5 min'], [600, '10 min']];

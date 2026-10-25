@@ -4,18 +4,18 @@
 // - en vivo: el profesor inicia la partida, todos juegan a la vez en su celular con el mismo cronómetro
 //   y la pantalla muestra el ranking en vivo (por participante o, si hay grupos, por grupo)
 // ============================================================
-import { JUEGOS } from '../juegos/contenido.js?v=202610242316';
-import { contenidoSala } from '../juegos/sala.js?v=202610242316';
-import { relojBarra, alFinalizarPartida } from '../juegos/util.js?v=202610242316';
+import { JUEGOS } from '../juegos/contenido.js?v=202610242346';
+import { contenidoSala } from '../juegos/sala.js?v=202610242346';
+import { relojBarra, alFinalizarPartida } from '../juegos/util.js?v=202610242346';
 import { ahoraServidor } from './ruleta.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const esUrl = (u) => typeof u === 'string' && /^https:\/\/[^\s"'()<>\\]+$/.test(u);
 const cara = (x) => esUrl(x?.foto_url) ? `<img src="${esc(x.foto_url)}" alt="">` : esc(x?.avatar || x?.emoji || '🙂');
 export const CARGAR = {
-  ahorcado: () => import('../juegos/ahorcado.js?v=202610242316'), sopa: () => import('../juegos/sopa.js?v=202610242316'), memoria: () => import('../juegos/memoria.js?v=202610242316'),
-  ordena: () => import('../juegos/ordena.js?v=202610242316'), quiz: () => import('../juegos/quiz.js?v=202610242316'), trivia: () => import('../juegos/quiz.js?v=202610242316'),
-  relampago: () => import('../juegos/quiz.js?v=202610242316'), frase: () => import('../juegos/frase.js?v=202610242316'), rompecabezas: () => import('../juegos/rompecabezas.js?v=202610242316')
+  ahorcado: () => import('../juegos/ahorcado.js?v=202610242346'), sopa: () => import('../juegos/sopa.js?v=202610242346'), memoria: () => import('../juegos/memoria.js?v=202610242346'),
+  ordena: () => import('../juegos/ordena.js?v=202610242346'), quiz: () => import('../juegos/quiz.js?v=202610242346'), trivia: () => import('../juegos/quiz.js?v=202610242346'),
+  relampago: () => import('../juegos/quiz.js?v=202610242346'), frase: () => import('../juegos/frase.js?v=202610242346'), rompecabezas: () => import('../juegos/rompecabezas.js?v=202610242346')
 };
 export const UNIDAD = { memoria: 'parejas', frase: 'frases', rompecabezas: 'piezas', trivia: 'preguntas', relampago: 'preguntas' };
 // (la Trivia de los profesores es de cualquier tema, no solo bíblica)
@@ -84,7 +84,7 @@ export function pintarZonaJuego(d, hoja, res) {
   const info = infoJuego(g.tipo);
   const ahora = () => res?.servidor ? ahoraServidor() : Date.now();
   const f = fase(hoja, res, ahora());
-  const muestra = !res ? [['Ana', '🦊', 820], ['Luis', '🐼', 640], ['Sofía', '🐸', 510]].map(([alias, avatar, puntos]) => ({ alias, avatar, puntos })) : null;
+  const muestra = !res ? [['Ana', '🦊', 8], ['Luis', '🐼', 6], ['Sofía', '🐸', 5]].map(([alias, avatar, puntos]) => ({ alias, avatar, puntos })) : null;
   const filas = muestra || ranking(res);
   const max = Math.max(1, ...filas.map(x => x.puntos));
   const porGrupo = !!res?.modoGrupo && (res.grupos || []).length > 0;
@@ -197,9 +197,7 @@ export function juegoCelular(cont, hoja, e, { enviar }) {
     if (S.terminado) return;
     S.terminado = true;
     clearInterval(S.prog);
-    // bono por terminar antes de tiempo (como en las salas)
-    const bono = seg && !porTiempo && S.reloj ? Math.round(S.reloj.restante()) : 0;
-    S.jug.puntos += bono;
+    const bono = 0;   // el puntaje es de 1 en 1: sin bono por terminar antes
     alFinalizarPartida(null);
     if (S.reloj) { S.reloj.ocultar(); S.reloj = null; }
     await enviar({ puntos: S.jug.puntos, terminado: true, detalle: `${detalle || ''}${bono ? ` · bono de tiempo +${bono}` : ''}`.replace(/^ · /, '') }).catch(() => {});

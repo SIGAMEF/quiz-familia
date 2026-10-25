@@ -1,7 +1,7 @@
 // ============================================================
 // Memoria: voltea dos cartas; si forman pareja, sumas un punto y vuelves a jugar.
 // ============================================================
-import { $, $$, esc, barajar, sonar, hudJugadores, pantallaFinal, lado, figura, ladoTexto, mezclador, turnos, decir } from './util.js?v=202610242316';
+import { $, $$, esc, barajar, sonar, hudJugadores, pantallaFinal, lado, figura, ladoTexto, mezclador, turnos, decir } from './util.js?v=202610242346';
 
 export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red = null }) {
   const T = turnos(red);
@@ -57,6 +57,7 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
     if (hechas.has(c.par) || abiertas.includes(c)) return;
     T.hacer(() => turno, { t: 'c', id: c.id }, aplicar);
   });
+  T.cronometro(jugadores, () => turno);
   T.reloj(opciones.seg_turno, () => turno, () => T.hacer(() => turno, { t: 'tiempo' }, aplicar));
   return { aplicar: (a) => T.recibir(a, aplicar), turno: () => turno };
 }

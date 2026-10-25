@@ -345,3 +345,7 @@ body.con-reloj [data-reloj] { display: none; }   /* con cronómetro arriba, no s
 .reloj-turno.urgente .rt-barra > div { background: #fff; }
 .ahor-aviso { margin-top: 6px; font-weight: 800; color: var(--rosa-osc); animation: pop .25s ease-out; }
 @media (prefers-reduced-motion: reduce) { .reloj-turno.urgente { animation: none; } }
+
+/* ---------- Tiempo de cada jugador (desempate) ---------- */
+.final-tiempo { display: block; font-size: 13px; font-weight: 700; opacity: .85; font-family: var(--display); line-height: 1.1; }
+.ranking .pts .final-tiempo { text-align: right; color: #8a7a68; }

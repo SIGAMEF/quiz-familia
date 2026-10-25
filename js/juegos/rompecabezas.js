@@ -1,10 +1,9 @@
 // ============================================================
 // Rompecabezas: toca una pieza y luego otra para cambiarlas de lugar.
-// En una sala por turnos: si tu cambio deja piezas en su sitio (+1 por pieza) sigues; si no, pasa el turno.
-// Quien coloca la última pieza gana 5 más.
+// Cada pieza que dejas en su sitio vale 1 punto. En una sala por turnos, si tu cambio deja piezas en su sitio sigues; si no, pasa el turno.
 // ============================================================
-import { $, $$, esc, barajar, sonar, fmtTiempo, pantallaFinal, mezclador, hudJugadores, turnos } from './util.js?v=202610242316';
-import { imagenPuzzle, fotoCuadrada } from './imagenes.js?v=202610242316';
+import { $, $$, esc, barajar, sonar, fmtTiempo, pantallaFinal, mezclador, hudJugadores, turnos } from './util.js?v=202610242346';
+import { imagenPuzzle, fotoCuadrada } from './imagenes.js?v=202610242346';
 
 let fotoGuardada = null;   // la foto elegida se mantiene mientras la página esté abierta
 
@@ -78,17 +77,15 @@ function jugar(cont, { set, jugadores, opciones, alMenu, alRepetir, red = null }
     $('[data-movs]', cont).textContent = `Movimientos: ${movs}`;
     bien > 0 ? sonar.bien() : sonar.clic();
     const listo = orden.every((p, k) => p === k);
+    if (bien > 0) jugadores[turno].puntos += bien;
     if (red) {
-      if (bien > 0) jugadores[turno].puntos += bien;
-      if (listo) jugadores[turno].puntos += 5;
-      else if (bien <= 0 && N > 1) turno = (turno + 1) % N;
+      if (!listo && bien <= 0 && N > 1) turno = (turno + 1) % N;
       hud();
     }
     pintar();
     if (listo) {
       clearInterval(reloj);
       const seg = (Date.now() - t0) / 1000;
-      if (!red) jug.puntos = Math.max(10, Math.round(total * 40 - movs * 5 - seg));
       tablero.classList.add('completo');
       T.despues(900, () => pantallaFinal(cont, { jugadores, titulo: '¡Rompecabezas armado!', detalle: `${movs} movimientos en ${fmtTiempo(seg)}.`, alRepetir, alMenu }));
     }
@@ -105,6 +102,7 @@ function jugar(cont, { set, jugadores, opciones, alMenu, alRepetir, red = null }
   const otra = $('[data-otra]', cont);
   if (otra) otra.onclick = () => { clearInterval(reloj); fotoGuardada = null; elegirFoto(cont, { set, jugadores, opciones, alMenu, alRepetir }); };
   pintar();
+  T.cronometro(jugadores, () => turno);
   T.reloj(opciones.seg_turno, () => turno, () => { elegida = null; T.hacer(() => turno, { t: 'tiempo' }, aplicar); });
   return { aplicar: (x) => T.recibir(x, aplicar), turno: () => turno };
 }

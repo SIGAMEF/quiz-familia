@@ -6,9 +6,9 @@ import {
   supabase, $, $$, esc, htmlMenuMas, toast, abrirModal, confirmar, cargando, mensajeError, fmtFecha,
   subirImagen, urlBase, copiar, mostrarQRGrande, avatarHtml
 } from './comun.js';
-import { JUEGOS } from './juegos/contenido.js?v=202610242316';
-import { generarSopa, claveSopa, capsulasSVG, colorSol } from './juegos/sopa.js?v=202610242316';
-import { imprimir } from './juegos/imprimir.js?v=202610242316';
+import { JUEGOS } from './juegos/contenido.js?v=202610242346';
+import { generarSopa, claveSopa, capsulasSVG, colorSol } from './juegos/sopa.js?v=202610242346';
+import { imprimir } from './juegos/imprimir.js?v=202610242346';
 import { montarFilas } from './editor-filas.js';
 
 export const TIPOS_JUEGO = ['sopa', 'ahorcado', 'memoria', 'ordena', 'frase', 'rompecabezas', 'trivia', 'relampago'];

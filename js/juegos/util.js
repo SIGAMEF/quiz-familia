@@ -244,21 +244,27 @@ export function hudJugadores(jugadores, turno, extra = (j) => `${j.puntos}`) {
 let alFinal = null;
 export function alFinalizarPartida(fn) { alFinal = fn; }
 
+// Orden del ranking: más puntos primero; con los mismos puntos, quien tardó menos
+export const ordenarPorPuntos = (js, pts = (j) => Number(j.puntos) || 0) =>
+  [...js].sort((a, b) => pts(b) - pts(a) || (a.tiempo || 0) - (b.tiempo || 0));
+
 // Pantalla final común
 export function pantallaFinal(cont, { jugadores, titulo = '¡Fin del juego!', detalle = '', alRepetir, alMenu }) {
   // si alFinal devuelve true, se encarga él de la pantalla final (sala por turnos: podio de la sala)
   try { if (alFinal && alFinal({ jugadores, detalle: String(detalle).replace(/<[^>]+>/g, '') }) === true) return; } catch { /* el juego sigue aunque falle el registro */ }
-  const orden = [...jugadores].sort((a, b) => b.puntos - a.puntos);
-  const empate = jugadores.length > 1 && orden[0].puntos === orden[1].puntos;
+  const orden = ordenarPorPuntos(jugadores);
+  const mismosPuntos = jugadores.length > 1 && orden[0].puntos === orden[1].puntos;
+  const empate = mismosPuntos && Math.round((orden[0].tiempo || 0) / 1000) === Math.round((orden[1].tiempo || 0) / 1000);
+  const t = (j) => j.tiempo ? `<small class="final-tiempo">⏱ ${fmtTiempo(j.tiempo / 1000)}</small>` : '';
   fondo.parar(); olvidarTurno();
   decir(jugadores.length > 1 ? (empate ? '¡Empate!' : `¡Ganó ${orden[0].nombre}!`) : '¡Muy bien, terminaste!', { cortar: true });
   cont.innerHTML = `<div class="final">
     <div class="trofeo" aria-hidden="true">🏆</div>
     <h2 class="rotulo-tabla">${esc(titulo)}</h2>
-    ${jugadores.length > 1 ? `<p class="final-sub">${empate ? '¡Empate!' : 'Ganador'}</p>
-      ${empate ? '' : `<div class="ganador ${orden[0].color}"><span>${orden[0].avatar}</span><b>${esc(orden[0].nombre)}</b><strong>${orden[0].puntos}</strong><span class="corona" aria-hidden="true">👑</span></div>`}
-      <div class="final-puntos">${jugadores.map(j => `<div class="${j.color}"><span>${j.avatar}</span><b>${esc(j.nombre)}</b><strong>${j.puntos}</strong></div>`).join('')}</div>`
-    : `<div class="ganador ${jugadores[0].color}"><span>${jugadores[0].avatar}</span><b>${esc(jugadores[0].nombre)}</b><strong>${jugadores[0].puntos}</strong></div>`}
+    ${jugadores.length > 1 ? `<p class="final-sub">${empate ? '¡Empate!' : mismosPuntos ? 'Ganador (mismos puntos: ganó por tiempo)' : 'Ganador'}</p>
+      ${empate ? '' : `<div class="ganador ${orden[0].color}"><span>${orden[0].avatar}</span><b>${esc(orden[0].nombre)}</b><strong>${orden[0].puntos}</strong>${t(orden[0])}<span class="corona" aria-hidden="true">👑</span></div>`}
+      <div class="final-puntos">${jugadores.map(j => `<div class="${j.color}"><span>${j.avatar}</span><b>${esc(j.nombre)}</b><strong>${j.puntos}</strong>${t(j)}</div>`).join('')}</div>`
+    : `<div class="ganador ${jugadores[0].color}"><span>${jugadores[0].avatar}</span><b>${esc(jugadores[0].nombre)}</b><strong>${jugadores[0].puntos}</strong>${t(jugadores[0])}</div>`}
     ${detalle ? `<p class="final-detalle">${detalle}</p>` : ''}
     <div class="final-botones"><button class="b3 azul" data-menu>Volver a los juegos</button><button class="b3 amarillo" data-otra>Jugar de nuevo</button></div>
   </div>`;
@@ -273,7 +279,15 @@ export function pantallaFinal(cont, { jugadores, titulo = '¡Fin del juego!', de
 // Las jugadas se aplican igual en todas las pantallas; las pausas de animación (tapar cartas, pasar a la
 // siguiente palabra…) se adelantan si llega otra jugada antes de que terminen, para que nadie se desfase.
 export function turnos(red) {
-  let pend = null, reloj = null;
+  let pend = null, reloj = null, crono = null, ultimaJugada = Date.now();
+  // Tiempo de cada jugador (para desempatar): cada jugada suma lo que tardó quien la hizo.
+  // Lo mide quien juega y viaja con la jugada (dt), así todas las pantallas de una sala suman lo mismo.
+  const contar = (accion) => {
+    if (!crono) return;
+    const j = crono.jugadores[crono.turno()];
+    if (j) j.tiempo = (j.tiempo || 0) + Math.max(0, Math.min(Number(accion.dt) || 0, 3600000));
+    ultimaJugada = Date.now();
+  };
   const vale = () => !red || !red.vigente || red.vigente();   // la partida de la sala terminó o se volvió a armar
   const adelantar = () => { if (!pend) return; clearTimeout(pend.t); const f = pend.fn; pend = null; f(); };
   const T = {
@@ -290,12 +304,16 @@ export function turnos(red) {
       if (pend && !red) return;          // jugando en un solo dispositivo se espera la animación, como siempre
       adelantar();
       if (red && !red.puedo(turno())) return;
+      if (crono) accion = { ...accion, dt: Date.now() - ultimaJugada };
+      contar(accion);
+      if (red) red.enviar(accion);   // antes de aplicarla: si esta jugada termina la partida, igual tiene que llegar a los demás
       aplicar(accion);
-      if (red) red.enviar(accion);
       reloj?.reiniciar();
     },
     // una jugada que llega de otro dispositivo
-    recibir(accion, aplicar) { adelantar(); aplicar(accion); reloj?.reiniciar(); },
+    recibir(accion, aplicar) { adelantar(); contar(accion); aplicar(accion); reloj?.reiniciar(); },
+    // empieza a contar el tiempo de cada jugador (jugador.tiempo, en milisegundos)
+    cronometro(jugadores, turno) { crono = { jugadores, turno }; jugadores.forEach(j => { j.tiempo = 0; }); ultimaJugada = Date.now(); },
     // Tiempo por turno: cada jugada vuelve a dar el tiempo completo; al acabarse, alAcabar() (le toca al siguiente).
     // En una sala solo lo dispara la pantalla de quien tiene el turno.
     reloj(seg, turno, alAcabar) {

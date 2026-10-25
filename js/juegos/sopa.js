@@ -1,8 +1,8 @@
 // ============================================================
 // Sopa de letras: arrastra (o toca la primera y la última letra) para marcar una palabra.
-// En una sala por turnos: cada palabra encontrada vale 10 y sigues; si fallas, pasa el turno.
+// Cada palabra encontrada vale 1 punto. En una sala por turnos, si la encuentras sigues; si fallas, pasa el turno.
 // ============================================================
-import { $, $$, esc, barajar, sinTildes, sonar, fmtTiempo, pantallaFinal, figura, hudJugadores, turnos, decir } from './util.js?v=202610242316';
+import { $, $$, esc, barajar, sinTildes, sonar, fmtTiempo, pantallaFinal, figura, hudJugadores, turnos, decir } from './util.js?v=202610242346';
 
 const NIVELES = {
   facil:   { lado: 10, n: 6,  dirs: ['horizontal', 'vertical'] },
@@ -83,7 +83,6 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
   const halladas = new Map();     // clave -> nº de color
   const t0 = Date.now();
   let reloj = null, inicio = null, fin = null, arrastrando = false;
-  const jug = jugadores[0];
 
   cont.innerHTML = `${red ? '<div data-hud></div>' : ''}
     <div class="sopa-top"><span class="pill">🔎 ${esc(set.titulo)}</span><span class="pill" data-reloj>⏱ 0:00</span><span class="pill" data-cuenta>0 / ${puestas.length}</span></div>
@@ -116,17 +115,16 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
     const p = puestas.find(x => !halladas.has(x.clave) && (x.clave === txt || x.clave === [...txt].reverse().join('')) && x.celdas.length === celdas.length);
     if (!p) return false;
     const color = halladas.size % 6;
-    if (red) jugadores[turno].puntos += 10;
+    jugadores[turno].puntos += 1;
     halladas.set(p.clave, color);
     celdas.forEach(rc => { const el = celda(rc); el.classList.add('hallada', `c${color}`); });
     const li = $(`[data-p="${p.clave}"]`, cont); li.classList.add('hecha', `c${color}`);
     const oculta = $('.oculta', li); if (oculta) { oculta.textContent = p.palabra; oculta.classList.remove('oculta'); }
     $('[data-cuenta]', cont).textContent = `${halladas.size} / ${puestas.length}`;
-    sonar.bien(); hud(); if (halladas.size < puestas.length) decir('¡Correcto!'); if (halladas.size < puestas.length)
+    sonar.bien(); hud(); if (halladas.size < puestas.length) decir('¡Correcto!');
     if (halladas.size === puestas.length) {
       clearInterval(reloj);
       const seg = (Date.now() - t0) / 1000;
-      if (!red) jug.puntos = Math.max(10, Math.round(puestas.length * 100 - seg * 2));
       T.despues(700, () => pantallaFinal(cont, { jugadores, titulo: '¡Sopa resuelta!', detalle: `${red ? 'Encontraron' : 'Encontraste'} ${puestas.length} palabras en ${fmtTiempo(seg)}.`, alRepetir, alMenu }));
     }
     return true;
@@ -168,6 +166,7 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
   };
   grid.addEventListener('pointerup', soltar);
   grid.addEventListener('pointercancel', () => { arrastrando = false; inicio = null; marcar(null); });
+  T.cronometro(jugadores, () => turno);
   T.reloj(opciones.seg_turno, () => turno, () => { inicio = null; marcar(null); T.hacer(() => turno, { t: 'tiempo' }, aplicar); });
   return { aplicar: (a) => T.recibir(a, aplicar), turno: () => turno };
 }

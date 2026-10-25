@@ -9,11 +9,11 @@ import {
 import { descargarPlantilla, leerExcel, leerPegado, filaAPregunta, descargarErrores, descargarLibreta, descargarResultados } from './excel.js';
 import { montarEditorQuiz, montarListaPreguntas } from './editor-quiz.js';
 import { htmlTarjetaJuego, conectarTarjetaJuego, abrirEditor, publicarJuego } from './editor-juegos.js';
-import { JUEGOS } from './juegos/contenido.js?v=202610242316';
+import { JUEGOS } from './juegos/contenido.js?v=202610242346';
 import { elegirActividad } from './catalogo.js';
 import { pintarVisibilidad, chipsFiltro } from './visibilidad.js';
 import { vistaConsumo } from './consumo.js';
-import { imprimir } from './juegos/imprimir.js?v=202610242316';
+import { imprimir } from './juegos/imprimir.js?v=202610242346';
 import { htmlTarjetaProyecto, conectarTarjetaProyecto, crearProyecto, publicarProyecto } from './proyectos/lista.js';
 
 const raiz = $('#raiz');

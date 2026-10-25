@@ -1,8 +1,8 @@
 // ============================================================
-// Quiz relámpago: 15 segundos por pregunta (o el tiempo elegido); más rápido = más puntos.
+// Quiz relámpago: 15 segundos por pregunta (o el tiempo elegido); cada respuesta correcta vale 1 punto.
 // En una sala por turnos, cada pregunta la responde un jugador distinto.
 // ============================================================
-import { $, $$, esc, barajar, sonar, pantallaFinal, mezclador, hudJugadores, turnos, decir } from './util.js?v=202610242316';
+import { $, $$, esc, barajar, sonar, pantallaFinal, mezclador, hudJugadores, turnos, decir } from './util.js?v=202610242346';
 
 const COLORES = ['rojo', 'azul', 'amarillo', 'verde'];
 const FORMAS = ['▲', '◆', '●', '■'];
@@ -31,7 +31,7 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
       <div class="quiz-ops">${ops.map((o, k) => `<button class="op-q ${COLORES[k]}" data-o="${k}"><span aria-hidden="true">${FORMAS[k]}</span>${esc(o.t)}</button>`).join('')}</div>
       <div data-msg class="quiz-msg" aria-live="polite"></div>`;
     const barra = $('[data-barra]', cont);
-    const puntos = (k) => k != null && ops[k].ok ? Math.round(500 + 500 * Math.max(0, 1 - (performance.now() - t0) / 1000 / SEG)) : 0;
+    const puntos = (k) => k != null && ops[k].ok ? 1 : 0;
     clearInterval(reloj);
     reloj = setInterval(() => {
       const t = (performance.now() - t0) / 1000;
@@ -44,12 +44,11 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
     }, 100);
     $$('[data-o]', cont).forEach(b => b.onclick = () => { const k = Number(b.dataset.o); accion({ t: 'r', k, pts: puntos(k) }); });
   }
-  // los puntos (que dependen de la rapidez) los calcula quien responde y viajan con la jugada
   function responder(k, pts) {
     if (respondida) return;
     respondida = true; clearInterval(reloj);
     const ok = k != null && !!ops[k]?.ok;
-    pts = ok ? Math.max(0, Math.min(1000, Math.round(Number(pts) || 0))) : 0;
+    pts = ok ? 1 : 0;
     jugadores[turno()].puntos += pts; if (ok) aciertos++;
     $$('[data-o]', cont).forEach((b, j) => { b.disabled = true; b.classList.add(ops[j].ok ? 'correcta' : j === k ? 'incorrecta' : 'apagada'); });
     $('[data-msg]', cont).innerHTML = ok ? `<b>¡Correcto! +${pts}</b>` : k == null ? '<b>⏰ Se acabó el tiempo</b>' : '<b>Esta vez no</b>';
@@ -65,6 +64,7 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
     else if (a.t === 'pasar') responder(null, 0);
   }
   const accion = (a) => { if (!respondida) T.hacer(turno, a, aplicar); };
+  T.cronometro(jugadores, turno);
   pregunta();
   return { aplicar: (a) => T.recibir(a, aplicar), turno };
 }

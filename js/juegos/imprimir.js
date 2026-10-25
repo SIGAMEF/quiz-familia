@@ -1,8 +1,8 @@
 // ============================================================
 // Hojas para imprimir (ficha del alumno y solucionario) de cada juego
 // ============================================================
-import { esc, barajar, sinTildes, figura, lado } from './util.js?v=202610242316';
-import { sopaDe, capsulasSVG, colorSol } from './sopa.js?v=202610242316';
+import { esc, barajar, sinTildes, figura, lado } from './util.js?v=202610242346';
+import { sopaDe, capsulasSVG, colorSol } from './sopa.js?v=202610242346';
 
 const MARCA = 'Quiz Familia Marroquín';
 const ESTILO = `

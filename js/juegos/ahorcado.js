@@ -1,13 +1,13 @@
 // ============================================================
 // Ahorcado en equipo: 1 o 2 jugadores, se turnan las letras.
-// Letra correcta: +1 punto por cada vez que aparece y sigue el mismo jugador.
+// Letra correcta: sigue el mismo jugador.
 // Letra incorrecta: el cangurito pierde energía y pasa el turno.
-// Quien completa la palabra gana +2. Cada jugador tiene 3 pistas (revelan una letra).
+// Quien completa la palabra gana 1 punto. Cada jugador tiene 3 pistas (revelan una letra).
 // Nivel difícil: el teclado no marca las letras que ya salieron; repetir una cuenta como error.
 // Tiempo por turno (opcional): si se acaba, le toca al siguiente (jugando solo, el cangurito pierde energía).
 // En una sala por turnos juegan todos en la misma partida, cada uno desde su dispositivo.
 // ============================================================
-import { $, $$, esc, barajar, base, sonar, confeti, canguro, horca, hudJugadores, pantallaFinal, figura, mezclador, turnos, decir } from './util.js?v=202610242316';
+import { $, $$, esc, barajar, base, sonar, confeti, canguro, horca, hudJugadores, pantallaFinal, figura, mezclador, turnos, decir } from './util.js?v=202610242346';
 
 const VIDAS = 6;
 let teclaActiva = null;   // un solo oyente del teclado físico aunque se juegue varias veces
@@ -92,7 +92,7 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
     S.usadas.add(l);
     const veces = letras().filter(x => base(x) === l).length;
     const j = jugadores[S.turno];
-    if (veces) { j.puntos += veces; sonar.bien(); }
+    if (veces) sonar.bien();
     else { S.errores++; sonar.mal(); }
     if (!faltan().length) return fin(true);
     if (S.errores >= VIDAS) return fin(false);
@@ -115,14 +115,14 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
   function fin(gano, porPista = false) {
     S.terminada = true;
     const j = jugadores[S.turno];
-    if (gano && !porPista) { j.puntos += 2; j.ganadas++; }
+    if (gano && !porPista) { j.puntos += 1; j.ganadas++; }
     pintar();
     const ultima = S.idx === palabras.length - 1;
     const cartel = $('[data-cartel]', cont);
     cartel.innerHTML = `<div class="cartel ${gano ? 'bien' : 'mal'}" role="alert"><div class="cartel-caja">
       <div class="cartel-canguro" aria-hidden="true">${canguro({ estado: gano ? 'gana' : 'cansado', tam: 120 })}</div>
       <div class="rotulo-tabla">${gano ? '¡Correcto!' : '¡Oh no!'}</div>
-      <p>${gano ? (porPista ? 'La pista completó la palabra.' : `${esc(j.nombre)} completó la palabra: +2`) : 'El cangurito se cansó…'}</p>
+      <p>${gano ? (porPista ? 'La pista completó la palabra.' : `${esc(j.nombre)} completó la palabra: +1`) : 'El cangurito se cansó…'}</p>
       <div class="palabra-final">${esc(actual().palabra)}</div>
       ${!red || red.puedo(S.turno) ? `<button class="b3 ${gano ? 'verde' : 'azul'}" data-sig>${ultima ? 'Ver resultados' : gano ? 'Siguiente palabra' : 'Nueva palabra'}</button>`
         : `<p class="ordena-pista">Esperando a que ${esc(j.nombre)} continúe…</p>`}</div></div>`;
@@ -148,6 +148,7 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
   teclaActiva = tecla;
   document.addEventListener('keydown', tecla);
   pintar();
+  T.cronometro(jugadores, () => S.turno);
   T.reloj(opciones.seg_turno, () => S.turno, () => accion({ t: 'tiempo' }));
   return { aplicar: (a) => T.recibir(a, aplicar), turno: () => S.turno };
 }

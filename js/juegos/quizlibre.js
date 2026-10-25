@@ -2,7 +2,7 @@
 // Quiz público de un profesor: todos los tipos de pregunta, corregido en el servidor
 // En una sala por turnos, cada pregunta la responde un jugador distinto.
 // ============================================================
-import { $, $$, esc, barajar, pantallaFinal, mezclador, hudJugadores, turnos, decir } from './util.js?v=202610242316';
+import { $, $$, esc, barajar, pantallaFinal, mezclador, hudJugadores, turnos, decir } from './util.js?v=202610242346';
 
 export async function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red = null }) {
   const T = turnos(red);
@@ -50,10 +50,9 @@ export async function iniciar(cont, { set, jugadores, opciones, alMenu, alRepeti
     $$('[data-blank]', caja).forEach((inp, k) => { if (textos[k] != null) inp.value = textos[k]; });
     const idea = $('[data-idea]', caja); if (idea && textos[0]) idea.value = textos[0];
     if (r) {
-      if (p.tipo !== 'lluvia_ideas') { calificables++; if (r.es_correcta) aciertos++; jugadores[turno()].puntos += Math.round(100 * Number(r.fraccion || 0)); }
+      if (p.tipo !== 'lluvia_ideas') { calificables++; if (r.es_correcta) aciertos++; jugadores[turno()].puntos += r.es_correcta ? 1 : 0; }
       tono(r.es_correcta || p.tipo === 'lluvia_ideas' ? 'correcto' : 'incorrecto');
       if (r.es_correcta) decir('¡Correcto!');
-      if (r.es_correcta)
       mostrarCorreccion(caja, p, r, { voz: false });
       if (N > 1) { const hud = $('.hud', cont); if (hud) hud.outerHTML = hudJugadores(jugadores, turno(), (j) => `⭐ ${j.puntos}`); }
     } else caja.insertAdjacentHTML('beforeend', `<p class="err">${esc(error || 'No se pudo calificar')}</p>`);
@@ -72,6 +71,7 @@ export async function iniciar(cont, { set, jugadores, opciones, alMenu, alRepeti
   }
   pregunta();
   // tiempo por pregunta: al acabarse se envía lo que haya marcado o escrito
+  T.cronometro(jugadores, turno);
   T.reloj(opciones.seg_turno, turno, () => { if (respondida) T.hacer(turno, { t: 'sig' }, aplicar); else vista?.forzar(); });
   return { aplicar: (a) => T.recibir(a, aplicar), turno };
 }
