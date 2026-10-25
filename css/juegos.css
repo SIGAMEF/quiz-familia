@@ -330,3 +330,16 @@ body.con-reloj [data-reloj] { display: none; }   /* con cronómetro arriba, no s
 .zona-juego.no-es-mi-turno [data-ver] { pointer-events: auto; }
 .zona-juego.no-es-mi-turno :is(.teclado, .memoria, .ordena-fichas, .frase-fichas, .quiz-ops, .sopa, .puzzle, .final-botones, [data-zona]) { opacity: .8; }
 @media (prefers-reduced-motion: reduce) { .pill-turno.mio { animation: none; } }
+
+/* ---------- Tiempo por turno ---------- */
+.tiempo-propio { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-weight: 800; }
+.tiempo-propio[hidden] { display: none; }
+.tiempo-propio .input { width: 96px; text-align: center; font-size: 18px; }
+.reloj-turno { position: fixed; left: 50%; bottom: max(14px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 30;
+  background: #fff; border-radius: 20px; padding: 6px 16px 8px; box-shadow: 0 4px 14px rgba(0,0,0,.18); min-width: 120px; text-align: center;
+  font-family: var(--display); font-weight: 800; font-size: 20px; font-variant-numeric: tabular-nums; pointer-events: none; }
+.reloj-turno .rt-barra { margin-top: 4px; height: 6px; background: #eee; }
+.reloj-turno.urgente { background: var(--rosa); color: #fff; animation: latido .8s ease-in-out infinite; }
+.reloj-turno.urgente .rt-barra > div { background: #fff; }
+.ahor-aviso { margin-top: 6px; font-weight: 800; color: var(--rosa-osc); animation: pop .25s ease-out; }
+@media (prefers-reduced-motion: reduce) { .reloj-turno.urgente { animation: none; } }

@@ -6,7 +6,7 @@
 //  · carrera — cada uno juega su propia partida a la vez, con ranking en vivo.
 // Mismo cronómetro y podio al final en los dos.
 // ============================================================
-import { $, $$, esc, figura, sonar, confeti, relojBarra, alFinalizarPartida, prefs, selectorEmoji, silenciar, COLORES_SALA } from './util.js';
+import { $, $$, esc, figura, sonar, confeti, relojBarra, alFinalizarPartida, prefs, selectorEmoji, silenciar, COLORES_SALA, pararRelojTurno } from './util.js';
 import { sopaDe } from './sopa.js';
 import { enPausa } from '../reposo.js';
 
@@ -20,10 +20,10 @@ const guardarSesion = (sala, datos) => { try { sessionStorage.setItem('sala_' + 
 const leerSesion = (sala) => { try { return JSON.parse(sessionStorage.getItem('sala_' + sala) || 'null'); } catch { return null; } };
 
 // Lo que juegan todos: el mismo tema, el mismo orden (semilla) y, en la sopa, la misma grilla
-export function contenidoSala({ juego, set, campo, valor, pistas, modo = 'turnos' }) {
+export function contenidoSala({ juego, set, campo, valor, pistas, modo = 'turnos', extra = {} }) {
   if (juego === 'rompecabezas' && set.id === 'foto') throw new Error('Para jugar en línea con una foto, el profesor debe crear el rompecabezas en su panel.');
   const tipo = juego === 'quiz' && set.remoto ? 'quizpublico' : juego === 'relampago' ? 'quiz' : juego;   // el relámpago usa el módulo del Quiz
-  const opciones = { [campo]: valor, pistas, semilla: Math.floor(Math.random() * 2 ** 31) };
+  const opciones = { [campo]: valor, pistas, ...extra, semilla: Math.floor(Math.random() * 2 ** 31) };   // extra: tiempo por turno, dificultad
   if (juego === 'sopa') { const s = sopaDe(set, valor, pistas); opciones.sopa = { grilla: s.grilla, ubicaciones: s.ubicaciones }; }
   return { juego: tipo, set, opciones, modo };
 }
@@ -83,7 +83,7 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
     }
   }
   const iniciarSondeo = () => { clearInterval(S.timer); S.timer = setInterval(sondear, 1500); sondear(); };
-  const pararTurnos = () => { clearInterval(S.vigia); S.vigia = null; S.ctrl = null; S.epoca++; cont.classList.remove('no-es-mi-turno'); };
+  const pararTurnos = () => { clearInterval(S.vigia); S.vigia = null; S.ctrl = null; S.epoca++; pararRelojTurno(); cont.classList.remove('no-es-mi-turno'); };
   const pararTodo = () => {
     clearInterval(S.timer); pararTurnos(); if (S.reloj) S.reloj.ocultar(); alFinalizarPartida(null);
     if (S.canal) { S.canal.cerrar(); S.canal = null; }
@@ -161,7 +161,7 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
     paso();
   }
   async function jugar() {
-    S.fase = 'jugando'; S.terminado = false;
+    S.fase = 'jugando'; S.terminado = false; cont.classList.add('jugando');   // también si se entra directo (al recargar)
     const c = S.est.contenido;
     const guardado = prefs.leer('jugadores', [{ nombre: 'Tú', avatar: '🧒' }])[0];
     const mio = S.est.jugadores.find(j => j.id === yo.id);
@@ -252,7 +252,7 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
     pintarTurno();
   }
   async function jugarTurnos() {
-    S.fase = 'jugando'; S.terminado = false;
+    S.fase = 'jugando'; S.terminado = false; cont.classList.add('jugando');   // también si se entra directo (al recargar)
     if (S.sinTurnos) {
       cont.innerHTML = `<div class="tabla-juego center"><div style="font-size:50px;">🛠</div><h2>Falta activar el modo por turnos</h2>
         <p class="ordena-pista">Quien administra la app debe ejecutar <b>sql/11_salas_turnos.sql</b> y luego <b>sql/06_permisos.sql</b> en Supabase.</p></div>`;

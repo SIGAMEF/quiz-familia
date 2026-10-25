@@ -58,6 +58,7 @@ export const sonar = {
   clic: () => tono(660, 0.05, 'triangle', 0, 0.08),
   bien: () => { tono(660, 0.1, 'triangle'); tono(990, 0.14, 'triangle', 0.08); },
   mal: () => { tono(180, 0.18, 'sawtooth', 0, 0.12); },
+  tic: () => tono(1320, 0.06, 'square', 0, 0.07),     // ya casi se acaba el tiempo
   gana: () => [523, 659, 784, 1046].forEach((f, i) => tono(f, 0.18, 'triangle', i * 0.11)),
   pierde: () => [392, 330, 262].forEach((f, i) => tono(f, 0.22, 'sine', i * 0.16))
 };
@@ -213,14 +214,15 @@ export function pantallaFinal(cont, { jugadores, titulo = '¡Fin del juego!', de
 // Las jugadas se aplican igual en todas las pantallas; las pausas de animación (tapar cartas, pasar a la
 // siguiente palabra…) se adelantan si llega otra jugada antes de que terminen, para que nadie se desfase.
 export function turnos(red) {
-  let pend = null;
+  let pend = null, reloj = null;
+  const vale = () => !red || !red.vigente || red.vigente();   // la partida de la sala terminó o se volvió a armar
   const adelantar = () => { if (!pend) return; clearTimeout(pend.t); const f = pend.fn; pend = null; f(); };
-  return {
+  const T = {
     red,
     despues(ms, fn) {
       adelantar();
-      const vale = () => !red || !red.vigente || red.vigente();   // la partida de la sala terminó o se volvió a armar
-      pend = { fn: () => { if (vale()) fn(); }, t: setTimeout(() => { pend = null; if (vale()) fn(); }, ms) };
+      const correr = () => { if (vale()) { fn(); reloj?.reiniciar(); } };
+      pend = { fn: correr, t: setTimeout(() => { pend = null; correr(); }, ms) };
     },
     adelantar,
     pendiente: () => !!pend,
@@ -231,10 +233,50 @@ export function turnos(red) {
       if (red && !red.puedo(turno())) return;
       aplicar(accion);
       if (red) red.enviar(accion);
+      reloj?.reiniciar();
     },
     // una jugada que llega de otro dispositivo
-    recibir(accion, aplicar) { adelantar(); aplicar(accion); }
+    recibir(accion, aplicar) { adelantar(); aplicar(accion); reloj?.reiniciar(); },
+    // Tiempo por turno: cada jugada vuelve a dar el tiempo completo; al acabarse, alAcabar() (le toca al siguiente).
+    // En una sala solo lo dispara la pantalla de quien tiene el turno.
+    reloj(seg, turno, alAcabar) {
+      if (!(Number(seg) > 0)) return;
+      reloj = relojTurno(Number(seg), { pausado: () => !!pend, vigente: vale, mio: () => !red || red.puedo(turno()), alAcabar });
+    }
   };
+  return T;
+}
+
+// ---------- Reloj del turno (abajo de la pantalla) ----------
+let relojVivo = null;   // solo hay uno a la vez
+export function pararRelojTurno() { if (relojVivo) relojVivo.parar(); }
+function relojTurno(seg, { pausado, vigente, mio, alAcabar }) {
+  pararRelojTurno();
+  const el = document.createElement('div');
+  el.className = 'reloj-turno';
+  el.setAttribute('role', 'timer');
+  el.innerHTML = '<span>⏳ <b data-s></b></span><div class="rt-barra"><div data-b></div></div>';
+  document.body.append(el);
+  const juego = document.getElementById('juego');
+  let hasta = Date.now() + seg * 1000, ultimo = null, disparado = false;
+  const R = {
+    reiniciar() { hasta = Date.now() + seg * 1000; disparado = false; ultimo = null; },
+    parar() { clearInterval(id); el.remove(); if (relojVivo === R) relojVivo = null; }
+  };
+  const tic = () => {
+    if (!vigente() || (juego && (!juego.classList.contains('jugando') || juego.querySelector('.final, .podio-sala')))) return R.parar();
+    if (pausado()) hasta = Date.now() + seg * 1000;    // durante una animación no corre
+    const rest = Math.max(0, (hasta - Date.now()) / 1000), s = Math.ceil(rest);
+    el.querySelector('[data-s]').textContent = s;
+    el.querySelector('[data-b]').style.width = `${rest / seg * 100}%`;
+    el.classList.toggle('urgente', s <= 5);
+    if (s !== ultimo) { ultimo = s; if (s > 0 && s <= 5) sonar.tic(); }
+    if (rest <= 0 && !disparado && mio()) { disparado = true; sonar.pierde(); alAcabar(); }
+  };
+  const id = setInterval(tic, 200);
+  relojVivo = R;
+  tic();
+  return R;
 }
 // ---------- La horca del ahorcado con el cangurito colgado de la soga ----------
 export function horca({ energia = 1, estado = 'normal' } = {}) {

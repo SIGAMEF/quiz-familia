@@ -1,15 +1,15 @@
 // ============================================================
-// Quiz relámpago: 15 segundos por pregunta; más rápido = más puntos.
+// Quiz relámpago: 15 segundos por pregunta (o el tiempo elegido); más rápido = más puntos.
 // En una sala por turnos, cada pregunta la responde un jugador distinto.
 // ============================================================
 import { $, $$, esc, barajar, sonar, pantallaFinal, mezclador, hudJugadores, turnos } from './util.js';
 
-const SEG = 15;
 const COLORES = ['rojo', 'azul', 'amarillo', 'verde'];
 const FORMAS = ['▲', '◆', '●', '■'];
 
 export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red = null }) {
   const T = turnos(red);
+  const SEG = Number(opciones.seg_turno) > 0 ? Number(opciones.seg_turno) : 15;
   const N = jugadores.length;
   const mezclar = mezclador(opciones.semilla);
   const lista = mezclar(set.preguntas).slice(0, Math.min(Number(opciones.cantidad) || 10, set.preguntas.length));
@@ -21,6 +21,7 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
     const pr = lista[i];
     ops = mezclar(pr.opciones.map((t, k) => ({ t, ok: k === 0 })));
     const t0 = performance.now();
+    let ultimo = null;
     respondida = false;
     cont.innerHTML = `
       ${N > 1 ? hudJugadores(jugadores, turno(), (j) => `⭐ ${j.puntos}`) : ''}
@@ -36,6 +37,8 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
       const t = (performance.now() - t0) / 1000;
       if (!barra.isConnected) return clearInterval(reloj);
       barra.style.width = `${Math.max(0, 100 - t / SEG * 100)}%`;
+      const s = Math.ceil(SEG - t);
+      if (!respondida && s !== ultimo) { ultimo = s; if (s > 0 && s <= 5) sonar.tic(); }   // ya casi se acaba
       // solo el dispositivo de quien responde avisa que se acabó su tiempo
       if (t >= SEG && !respondida && (!red || red.puedo(turno()))) accion({ t: 'r', k: null, pts: 0 });
     }, 100);

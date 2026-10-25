@@ -137,7 +137,7 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
       if (comprobar(a.celdas)) return;
       sonar.mal();
       if (N > 1) { turno = (turno + 1) % N; hud(); }
-    } else if (a.t === 'pasar') { turno = (turno + 1) % N; hud(); }
+    } else if (a.t === 'pasar' || a.t === 'tiempo') { turno = (turno + 1) % N; hud(); }
   }
   const intentar = (celdas) => {
     if (!celdas || celdas.length < 2) return;
@@ -168,6 +168,7 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
   };
   grid.addEventListener('pointerup', soltar);
   grid.addEventListener('pointercancel', () => { arrastrando = false; inicio = null; marcar(null); });
+  T.reloj(opciones.seg_turno, () => turno, () => { inicio = null; marcar(null); T.hacer(() => turno, { t: 'tiempo' }, aplicar); });
   return { aplicar: (a) => T.recibir(a, aplicar), turno: () => turno };
 }
 

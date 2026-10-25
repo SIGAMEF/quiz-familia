@@ -23,7 +23,7 @@ begin
   if new.tipo in ('ahorcado','ordena','sopa') then
     n := jsonb_array_length(coalesce(d->'palabras', '[]'));
     if n < 1 then raise exception 'Agrega al menos una palabra'; end if;
-    if n > 60 then raise exception 'Máximo 60 palabras'; end if;
+    if n > 200 then raise exception 'Máximo 200 palabras'; end if;
   elsif new.tipo = 'memoria' then
     n := jsonb_array_length(coalesce(d->'parejas', '[]'));
     if n < 3 then raise exception 'Agrega al menos 3 parejas'; end if;
@@ -37,7 +37,7 @@ begin
   elsif new.tipo in ('trivia','relampago') then
     n := jsonb_array_length(coalesce(d->'preguntas', '[]'));
     if n < 1 then raise exception 'Agrega al menos una pregunta'; end if;
-    if n > 60 then raise exception 'Máximo 60 preguntas'; end if;
+    if n > 200 then raise exception 'Máximo 200 preguntas'; end if;
     for p in select * from jsonb_array_elements(d->'preguntas') loop
       if length(trim(coalesce(p->>'enunciado', ''))) = 0 then raise exception 'Hay una pregunta sin enunciado'; end if;
       if jsonb_typeof(p->'opciones') is distinct from 'array' or jsonb_array_length(p->'opciones') not between 2 and 4 then

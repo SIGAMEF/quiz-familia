@@ -960,7 +960,7 @@ begin
   if new.tipo in ('ahorcado','ordena','sopa') then
     n := jsonb_array_length(coalesce(d->'palabras', '[]'));
     if n < 1 then raise exception 'Agrega al menos una palabra'; end if;
-    if n > 60 then raise exception 'Máximo 60 palabras'; end if;
+    if n > 200 then raise exception 'Máximo 200 palabras'; end if;
   elsif new.tipo = 'memoria' then
     n := jsonb_array_length(coalesce(d->'parejas', '[]'));
     if n < 3 then raise exception 'Agrega al menos 3 parejas'; end if;

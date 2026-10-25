@@ -49,7 +49,7 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
   }
   function aplicar(a) {
     if (a.t === 'c') voltear(a.id);
-    else if (a.t === 'pasar') { tapar(abiertas); abiertas = []; turno = (turno + 1) % N; hud(); }
+    else if (a.t === 'pasar' || a.t === 'tiempo') { tapar(abiertas); abiertas = []; turno = (turno + 1) % N; hud(); }
   }
 
   $$('[data-c]', cont).forEach(b => b.onclick = () => {
@@ -57,5 +57,6 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
     if (hechas.has(c.par) || abiertas.includes(c)) return;
     T.hacer(() => turno, { t: 'c', id: c.id }, aplicar);
   });
+  T.reloj(opciones.seg_turno, () => turno, () => T.hacer(() => turno, { t: 'tiempo' }, aplicar));
   return { aplicar: (a) => T.recibir(a, aplicar), turno: () => turno };
 }

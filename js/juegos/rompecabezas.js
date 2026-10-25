@@ -95,7 +95,7 @@ function jugar(cont, { set, jugadores, opciones, alMenu, alRepetir, red = null }
   }
   function aplicar(x) {
     if (x.t === 'cambiar') cambiar(x.a, x.b);
-    else if (x.t === 'pasar') { elegida = null; turno = (turno + 1) % N; hud(); pintar(); }
+    else if (x.t === 'pasar' || x.t === 'tiempo') { elegida = null; turno = (turno + 1) % N; hud(); pintar(); }
   }
   $('[data-ver]', cont).onclick = (e) => {
     const ver = tablero.classList.toggle('mostrar');
@@ -105,5 +105,6 @@ function jugar(cont, { set, jugadores, opciones, alMenu, alRepetir, red = null }
   const otra = $('[data-otra]', cont);
   if (otra) otra.onclick = () => { clearInterval(reloj); fotoGuardada = null; elegirFoto(cont, { set, jugadores, opciones, alMenu, alRepetir }); };
   pintar();
+  T.reloj(opciones.seg_turno, () => turno, () => { elegida = null; T.hacer(() => turno, { t: 'tiempo' }, aplicar); });
   return { aplicar: (x) => T.recibir(x, aplicar), turno: () => turno };
 }

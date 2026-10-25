@@ -14,7 +14,7 @@ export async function iniciar(cont, { set, jugadores, opciones, alMenu, alRepeti
   const lista = mezclar(set.preguntas).slice(0, Math.min(n, set.preguntas.length));
   jugadores.forEach(j => { j.puntos = 0; });
   let i = 0, aciertos = 0, calificables = 0, respondida = false;
-  let caja, sig;
+  let caja, sig, vista;
   const turno = () => i % N;
   const mio = () => !red || red.puedo(turno());
 
@@ -28,7 +28,7 @@ export async function iniciar(cont, { set, jugadores, opciones, alMenu, alRepeti
         <button class="b3 azul hidden" data-sig style="margin-top:12px; width:100%;">${i === lista.length - 1 ? 'Ver resultado' : 'Siguiente →'}</button>
         <p class="ordena-pista hidden" data-espera></p></div>`;
     caja = $('[data-preg]', cont); sig = $('[data-sig]', cont);
-    pintarPregunta(caja, p, {
+    vista = pintarPregunta(caja, p, {
       onResponder: async (ids, textos) => {
         if (respondida || !mio()) return;
         let r = null, error = '';
@@ -69,5 +69,7 @@ export async function iniciar(cont, { set, jugadores, opciones, alMenu, alRepeti
     else if (a.t === 'pasar') siguiente();
   }
   pregunta();
+  // tiempo por pregunta: al acabarse se envía lo que haya marcado o escrito
+  T.reloj(opciones.seg_turno, turno, () => { if (respondida) T.hacer(turno, { t: 'sig' }, aplicar); else vista?.forzar(); });
   return { aplicar: (a) => T.recibir(a, aplicar), turno };
 }

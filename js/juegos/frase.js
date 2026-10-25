@@ -61,7 +61,7 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
       while (puestas.length && limpia(puestas[puestas.length - 1].t) !== limpia(palabras[puestas.length - 1])) puestas.pop();
       const sig = fichas.find(x => !puestas.includes(x) && limpia(x.t) === limpia(palabras[puestas.length]));
       if (sig) { ayudas++; poner(sig); }
-    } else if (a.t === 'saltar' || a.t === 'pasar') siguiente(false);
+    } else if (a.t === 'saltar' || a.t === 'pasar' || a.t === 'tiempo') siguiente(false);   // si se acaba el tiempo, la palabra se pierde y le toca al siguiente
   }
   const accion = (a) => T.hacer(turno, a, aplicar);
   function siguiente(gano) {
@@ -72,5 +72,6 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
     ronda();
   }
   ronda();
+  T.reloj(opciones.seg_turno, turno, () => T.hacer(turno, { t: 'tiempo' }, aplicar));
   return { aplicar: (a) => T.recibir(a, aplicar), turno };
 }

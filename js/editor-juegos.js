@@ -94,6 +94,19 @@ function elegirTipo(alGuardar) {
   $$('[data-t]', m.el).forEach(b => b.onclick = () => { m.cerrar(); abrirEditor(b.dataset.t, null, alGuardar); });
 }
 
+// Tiempos para elegir; "✏️ Personalizado" muestra un número (minutos o segundos)
+const TIEMPOS_JUEGO = [[0, 'Sin límite'], [60, '1 minuto'], [120, '2 minutos'], [180, '3 minutos'], [300, '5 minutos'], [600, '10 minutos']];
+const TIEMPOS_TURNO = [[0, 'Sin límite'], [10, '10 segundos'], [15, '15 segundos'], [20, '20 segundos'], [30, '30 segundos'], [60, '1 minuto']];
+function selectTiempo(clave, lista, valor, unidad, min, max) {
+  const propio = !lista.some(([x]) => x === valor);
+  const factor = unidad === 'min' ? 60 : 1;
+  return `<select class="input" data-c="${clave}" data-tiempo-sel>${lista.map(([x, t]) => `<option value="${x}" ${!propio && x === valor ? 'selected' : ''}>${t}</option>`).join('')}
+      <option value="propio" ${propio ? 'selected' : ''}>✏️ Personalizado…</option></select>
+    <div class="row" data-propio="${clave}" style="margin-top:6px; gap:6px; ${propio ? '' : 'display:none;'}"><input class="input" type="number" min="${min}" max="${max}" step="1"
+      data-factor="${factor}" data-min="${min}" data-max="${max}" value="${propio ? Math.round(valor / factor * 10) / 10 : (unidad === 'min' ? 4 : 25)}" style="max-width:110px;">
+      <span class="small muted">${unidad === 'min' ? 'minutos' : 'segundos'} (de ${min} a ${max})</span></div>`;
+}
+
 // alGuardar(juego): se llama con el juego ya guardado
 export function abrirEditor(tipo, juego, alGuardar) {
   const d = juego?.datos || {};
@@ -108,9 +121,15 @@ export function abrirEditor(tipo, juego, alGuardar) {
     </div>
     <div class="grid grid-2">
       <div><label class="lbl">Nivel</label><select class="input" data-c="nivel"><option value="">—</option>${NIVELES.map(n => `<option ${juego?.nivel === n ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
-      <div><label class="lbl">⏱ Tiempo para jugar</label><select class="input" data-c="segundos">${[[0, 'Sin límite'], [60, '1 minuto'], [120, '2 minutos'], [180, '3 minutos'], [300, '5 minutos'], [600, '10 minutos']].map(([v, t]) => `<option value="${v}" ${Number(juego?.segundos || 0) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+      <div><label class="lbl">⏱ Tiempo para jugar</label>${selectTiempo('segundos', TIEMPOS_JUEGO, Number(juego?.segundos || 0), 'min', 1, 60)}</div>
     </div>
-    <p class="hint">El tiempo viene puesto al jugarlo solo o en línea (quien lo comparte puede cambiarlo).</p>
+    <div class="grid grid-2">
+      <div><label class="lbl">⏳ Tiempo por ${esPreguntas ? 'pregunta' : 'turno'}</label>${selectTiempo('seg_turno', esPreguntas ? TIEMPOS_TURNO.slice(1) : TIEMPOS_TURNO, Number(d.seg_turno || (esPreguntas ? 15 : 0)), 's', 5, 300)}</div>
+      ${tipo === 'ahorcado' ? `<div><label class="lbl">Dificultad</label><select class="input" data-c="dificultad">
+        <option value="facil" ${d.dificultad !== 'dificil' ? 'selected' : ''}>🟢 Fácil: se marcan las letras que ya salieron</option>
+        <option value="dificil" ${d.dificultad === 'dificil' ? 'selected' : ''}>🔴 Difícil: no se marcan (repetir una es error)</option></select></div>` : ''}
+    </div>
+    <p class="hint">Los tiempos vienen puestos al jugarlo solo o en línea (quien lo comparte puede cambiarlos). Con tiempo por ${esPreguntas ? 'pregunta' : 'turno'}, faltando 5 segundos suena un aviso y al acabarse le toca al siguiente jugador.</p>
     ${esSopa ? `<div class="grid grid-2" style="margin-top:4px;">
         <div><label class="lbl">Filas</label><input class="input" type="number" min="6" max="25" data-c="filas" value="${d.filas || 12}"></div>
         <div><label class="lbl">Columnas</label><input class="input" type="number" min="6" max="25" data-c="columnas" value="${d.columnas || 12}"></div></div>
@@ -137,6 +156,14 @@ export function abrirEditor(tipo, juego, alGuardar) {
   const el = m.el;
   const v = (c) => $(`[data-c=${c}]`, el);
   const err = (t) => { $('[data-err]', el).textContent = t || ''; };
+  // tiempos con "Personalizado": el número aparece solo al elegirlo
+  $$('[data-tiempo-sel]', el).forEach(s => s.onchange = () => { $(`[data-propio="${s.dataset.c}"]`, el).style.display = s.value === 'propio' ? '' : 'none'; });
+  const leerTiempo = (c) => {
+    if (v(c).value !== 'propio') return Number(v(c).value) || 0;
+    const inp = $(`[data-propio="${c}"] input`, el);
+    const n = Math.min(Number(inp.dataset.max), Math.max(Number(inp.dataset.min), Number(inp.value) || Number(inp.dataset.min)));
+    return Math.round(n * Number(inp.dataset.factor));
+  };
   const pistasSopa = () => $('[data-pistas]:checked', el)?.dataset.pistas || 'palabras';
   const avisoPistas = () => {
     const a = $('[data-aviso-pistas]', el); if (!a) return;
@@ -222,7 +249,9 @@ export function abrirEditor(tipo, juego, alGuardar) {
     const titulo = v('titulo').value.trim();
     if (!titulo) return err('Escribe el título.');
     let datos; try { datos = armar(); } catch (e) { return err(e.message); }
-    const fila = { tipo, titulo, tema: v('tema').value.trim() || null, nivel: v('nivel').value || null, segundos: Number(v('segundos').value) || null, datos };
+    const segTurno = leerTiempo('seg_turno');
+    datos = { ...datos, ...(segTurno ? { seg_turno: segTurno } : {}), ...(tipo === 'ahorcado' && v('dificultad').value === 'dificil' ? { dificultad: 'dificil' } : {}) };
+    const fila = { tipo, titulo, tema: v('tema').value.trim() || null, nivel: v('nivel').value || null, segundos: leerTiempo('segundos') || null, datos };
     const b = $('[data-guardar]', el); b.disabled = true;
     try {
       const { data: { user } } = await supabase.auth.getUser();
