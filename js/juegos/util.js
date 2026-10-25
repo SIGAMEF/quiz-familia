@@ -57,11 +57,49 @@ function tono(f, dur = 0.12, tipo = 'sine', cuando = 0, vol = 0.18) {
 export const sonar = {
   clic: () => tono(660, 0.05, 'triangle', 0, 0.08),
   bien: () => { tono(660, 0.1, 'triangle'); tono(990, 0.14, 'triangle', 0.08); },
-  mal: () => { tono(180, 0.18, 'sawtooth', 0, 0.12); },
+  // fallo: un "bup" suave y grave (antes era un zumbido que sonaba a error en cada intento)
+  mal: () => { tono(330, 0.12, 'sine', 0, 0.07); tono(262, 0.16, 'sine', 0.09, 0.06); },
   tic: () => tono(1320, 0.06, 'square', 0, 0.07),     // ya casi se acaba el tiempo
-  gana: () => [523, 659, 784, 1046].forEach((f, i) => tono(f, 0.18, 'triangle', i * 0.11)),
-  pierde: () => [392, 330, 262].forEach((f, i) => tono(f, 0.22, 'sine', i * 0.16))
+  turno: () => { tono(784, 0.12, 'sine', 0, 0.09); tono(1046, 0.18, 'sine', 0.1, 0.08); },   // te toca
+  // fanfarria de ganador
+  gana: () => {
+    [[523, 0], [659, 0.12], [784, 0.24], [1046, 0.36]].forEach(([f, t]) => tono(f, 0.16, 'triangle', t, 0.16));
+    [[784, 0.56], [1046, 0.56], [1318, 0.56]].forEach(([f, t]) => tono(f, 0.7, 'triangle', t, 0.1));
+  },
+  pierde: () => [392, 330, 262].forEach((f, i) => tono(f, 0.22, 'sine', i * 0.16, 0.12))
 };
+
+// ---------- Voz: "Turno de Lucas", "¡Correcto!", "¡Ganó Ana!" ----------
+let vozEs = null;
+function buscarVoz() {
+  try {
+    const vs = speechSynthesis.getVoices().filter(v => /^es/i.test(v.lang));
+    vozEs = vs.find(v => /es[-_](PE|419|MX|US|CO|AR|CL)/i.test(v.lang)) || vs[0] || null;
+  } catch { vozEs = null; }
+}
+try { buscarVoz(); speechSynthesis.addEventListener?.('voiceschanged', buscarVoz); } catch { /* sin voz */ }
+export function decir(texto, { cortar = false } = {}) {
+  if (mudo || callado || !texto) return;
+  try {
+    if (!('speechSynthesis' in window)) return;
+    if (cortar) speechSynthesis.cancel();
+    else if (speechSynthesis.pending) return;      // no se acumulan frases atrasadas
+    const u = new SpeechSynthesisUtterance(texto);
+    u.lang = vozEs?.lang || 'es-ES'; if (vozEs) u.voice = vozEs;
+    u.rate = 1.02; u.pitch = 1.1; u.volume = 0.9;
+    speechSynthesis.speak(u);
+  } catch { /* sin voz */ }
+}
+// Anuncia el turno solo cuando cambia (el tablero se vuelve a pintar muchas veces)
+let turnoDicho = null;
+export function anunciarTurno(jugadores, turno) {
+  if (jugadores.length < 2 || !jugadores[turno]) return;
+  const clave = `${jugadores.map(j => j.nombre).join('|')}#${turno}`;
+  if (clave === turnoDicho) return;
+  turnoDicho = clave;
+  decir(`Turno de ${jugadores[turno].nombre}`);   // espera a que termine lo anterior (por ejemplo, "¡Correcto!")
+}
+export const olvidarTurno = () => { turnoDicho = null; };
 export function confeti() {
   if (callado || !window.confetti || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   [0.2, 0.5, 0.8].forEach((x, i) => setTimeout(() => window.confetti({ particleCount: 70, spread: 75, origin: { x, y: 0.55 } }), i * 200));
@@ -174,6 +212,7 @@ export function formJugadores(cont, { permitirDos = true, etiqueta2 = '2 jugador
 
 // Barra superior con los jugadores y el turno (como en el ahorcado en equipo)
 export function hudJugadores(jugadores, turno, extra = (j) => `${j.puntos}`) {
+  anunciarTurno(jugadores, turno);
   const tarjeta = (j, i) => `<div class="hud-j ${j.color} ${i === turno && jugadores.length > 1 ? 'activo' : ''}">
       <span class="hud-av">${j.avatar}</span><span class="hud-txt"><b>${esc(j.nombre)}</b><span>${extra(j)}</span></span></div>`;
   if (jugadores.length === 1) return `<div class="hud">${tarjeta(jugadores[0], 0)}</div>`;
@@ -193,6 +232,8 @@ export function pantallaFinal(cont, { jugadores, titulo = '¡Fin del juego!', de
   try { if (alFinal && alFinal({ jugadores, detalle: String(detalle).replace(/<[^>]+>/g, '') }) === true) return; } catch { /* el juego sigue aunque falle el registro */ }
   const orden = [...jugadores].sort((a, b) => b.puntos - a.puntos);
   const empate = jugadores.length > 1 && orden[0].puntos === orden[1].puntos;
+  olvidarTurno();
+  decir(jugadores.length > 1 ? (empate ? '¡Empate!' : `¡Ganó ${orden[0].nombre}!`) : '¡Muy bien, terminaste!', { cortar: true });
   cont.innerHTML = `<div class="final">
     <div class="trofeo" aria-hidden="true">🏆</div>
     <h2 class="rotulo-tabla">${esc(titulo)}</h2>

@@ -7,7 +7,7 @@
 // Tiempo por turno (opcional): si se acaba, le toca al siguiente (jugando solo, el cangurito pierde energía).
 // En una sala por turnos juegan todos en la misma partida, cada uno desde su dispositivo.
 // ============================================================
-import { $, $$, esc, barajar, base, sonar, confeti, canguro, horca, hudJugadores, pantallaFinal, figura, mezclador, turnos } from './util.js';
+import { $, $$, esc, barajar, base, sonar, confeti, canguro, horca, hudJugadores, pantallaFinal, figura, mezclador, turnos, decir } from './util.js';
 
 const VIDAS = 6;
 let teclaActiva = null;   // un solo oyente del teclado físico aunque se juegue varias veces
@@ -126,7 +126,7 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
       <div class="palabra-final">${esc(actual().palabra)}</div>
       ${!red || red.puedo(S.turno) ? `<button class="b3 ${gano ? 'verde' : 'azul'}" data-sig>${ultima ? 'Ver resultados' : gano ? 'Siguiente palabra' : 'Nueva palabra'}</button>`
         : `<p class="ordena-pista">Esperando a que ${esc(j.nombre)} continúe…</p>`}</div></div>`;
-    if (gano) { sonar.gana(); confeti(); } else sonar.pierde();
+    if (gano) { sonar.bien(); confeti(); decir('¡Correcto!', { cortar: true }); } else sonar.pierde();
     const b = $('[data-sig]', cartel);
     if (b) { b.focus(); b.onclick = () => accion({ t: 'sig' }); }
   }

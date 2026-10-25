@@ -2,7 +2,7 @@
 // Sopa de letras: arrastra (o toca la primera y la última letra) para marcar una palabra.
 // En una sala por turnos: cada palabra encontrada vale 10 y sigues; si fallas, pasa el turno.
 // ============================================================
-import { $, $$, esc, barajar, sinTildes, sonar, fmtTiempo, pantallaFinal, figura, hudJugadores, turnos } from './util.js';
+import { $, $$, esc, barajar, sinTildes, sonar, fmtTiempo, pantallaFinal, figura, hudJugadores, turnos, decir } from './util.js';
 
 const NIVELES = {
   facil:   { lado: 10, n: 6,  dirs: ['horizontal', 'vertical'] },
@@ -122,7 +122,7 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
     const li = $(`[data-p="${p.clave}"]`, cont); li.classList.add('hecha', `c${color}`);
     const oculta = $('.oculta', li); if (oculta) { oculta.textContent = p.palabra; oculta.classList.remove('oculta'); }
     $('[data-cuenta]', cont).textContent = `${halladas.size} / ${puestas.length}`;
-    sonar.bien(); hud();
+    sonar.bien(); hud(); if (halladas.size < puestas.length) decir('¡Correcto!');
     if (halladas.size === puestas.length) {
       clearInterval(reloj);
       const seg = (Date.now() - t0) / 1000;

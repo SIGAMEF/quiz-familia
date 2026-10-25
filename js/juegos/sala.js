@@ -6,7 +6,7 @@
 //  · carrera — cada uno juega su propia partida a la vez, con ranking en vivo.
 // Mismo cronómetro y podio al final en los dos.
 // ============================================================
-import { $, $$, esc, figura, sonar, confeti, relojBarra, alFinalizarPartida, prefs, selectorEmoji, silenciar, COLORES_SALA, pararRelojTurno } from './util.js';
+import { $, $$, esc, figura, sonar, confeti, relojBarra, alFinalizarPartida, prefs, selectorEmoji, silenciar, COLORES_SALA, pararRelojTurno, decir, olvidarTurno } from './util.js';
 import { sopaDe } from './sopa.js';
 import { enPausa } from '../reposo.js';
 
@@ -347,7 +347,7 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
       S.ctrl.aplicar(accion); enviarJugada(accion); pintarTurno();
     };
     const bf = $('[data-fin-todos]', barra); if (bf) bf.onclick = terminarTodos;
-    if (mio && antes) { sonar.bien(); try { navigator.vibrate?.(120); } catch { /* sin vibración */ } }
+    if (mio && antes) { sonar.turno(); try { navigator.vibrate?.(120); } catch { /* sin vibración */ } }
   }
   function finTurnos() {
     if (S.fase !== 'jugando') return;
@@ -387,6 +387,8 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
       <div class="final-botones">${esHost ? '<button class="b3 amarillo" data-otra>🔄 Otra ronda</button><button class="b3 azul" data-cerrar>Cerrar sala</button>'
         : '<p class="ordena-pista">Si el anfitrión inicia otra ronda, entrarás automáticamente.</p><button class="b3 azul" data-salir>Volver a los juegos</button>'}</div></div>`;
     sonar.gana(); confeti();
+    olvidarTurno();
+    if (js[0]) decir(js[1] && Number(js[1].puntaje) === Number(js[0].puntaje) ? '¡Empate!' : `¡Ganó ${js[0].alias}!`, { cortar: true });
     if (esHost) {
       $('[data-otra]', cont).onclick = async () => {
         try { S.est = await rpc('sala_otra_ronda', { p_sala: sala_id, p_host: host_token, p_contenido: ctx.nuevaRonda ? ctx.nuevaRonda() : null }); S.ronda = -1; sondear(); }
