@@ -1,17 +1,17 @@
 // ============================================================
 // juegos.html?j=<juego>&s=<set>  — prepara y lanza un juego libre
 // ============================================================
-import { $, $$, esc, paisaje, formJugadores, sonar, alternarSonido, sonidoActivo, prefs, alFinalizarPartida, relojBarra, pantallaFinal, selectorEmoji, pararRelojTurno, fondo } from './util.js?v=202610242304';
-import { contenidoSala, abrirSala, unirseSala } from './sala.js?v=202610242304';
-import { imprimir, puedeImprimir } from './imprimir.js?v=202610242304';
-import { sopaDe } from './sopa.js?v=202610242304';
-import { imagenPuzzle } from './imagenes.js?v=202610242304';
-import { JUEGOS, setsPara, buscarSet, conImagenes } from './contenido.js?v=202610242304';
+import { $, $$, esc, paisaje, formJugadores, sonar, alternarSonido, sonidoActivo, prefs, alFinalizarPartida, relojBarra, pantallaFinal, selectorEmoji, pararRelojTurno, fondo } from './util.js?v=202610242316';
+import { contenidoSala, abrirSala, unirseSala } from './sala.js?v=202610242316';
+import { imprimir, puedeImprimir } from './imprimir.js?v=202610242316';
+import { sopaDe } from './sopa.js?v=202610242316';
+import { imagenPuzzle } from './imagenes.js?v=202610242316';
+import { JUEGOS, setsPara, buscarSet, conImagenes } from './contenido.js?v=202610242316';
 
 const MODULOS = {
-  ahorcado: () => import('./ahorcado.js?v=202610242304'), sopa: () => import('./sopa.js?v=202610242304'), memoria: () => import('./memoria.js?v=202610242304'),
-  ordena: () => import('./ordena.js?v=202610242304'), quiz: () => import('./quiz.js?v=202610242304'), trivia: () => import('./quiz.js?v=202610242304'), relampago: () => import('./quiz.js?v=202610242304'),
-  frase: () => import('./frase.js?v=202610242304'), rompecabezas: () => import('./rompecabezas.js?v=202610242304'), quizpublico: () => import('./quizlibre.js?v=202610242304')
+  ahorcado: () => import('./ahorcado.js?v=202610242316'), sopa: () => import('./sopa.js?v=202610242316'), memoria: () => import('./memoria.js?v=202610242316'),
+  ordena: () => import('./ordena.js?v=202610242316'), quiz: () => import('./quiz.js?v=202610242316'), trivia: () => import('./quiz.js?v=202610242316'), relampago: () => import('./quiz.js?v=202610242316'),
+  frase: () => import('./frase.js?v=202610242316'), rompecabezas: () => import('./rompecabezas.js?v=202610242316'), quizpublico: () => import('./quizlibre.js?v=202610242316')
 };
 // Opciones de cada juego
 const OPCIONES = {

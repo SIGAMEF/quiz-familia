@@ -1,7 +1,7 @@
 // ============================================================
 // Memoria: voltea dos cartas; si forman pareja, sumas un punto y vuelves a jugar.
 // ============================================================
-import { $, $$, esc, barajar, sonar, hudJugadores, pantallaFinal, lado, figura, ladoTexto, mezclador, turnos } from './util.js?v=202610242304';
+import { $, $$, esc, barajar, sonar, hudJugadores, pantallaFinal, lado, figura, ladoTexto, mezclador, turnos, decir } from './util.js?v=202610242316';
 
 export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red = null }) {
   const T = turnos(red);
@@ -37,7 +37,7 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
     const [a, d] = abiertas;
     abiertas = [];
     if (a.par === d.par) {
-      hechas.add(a.par); jugadores[turno].puntos++; sonar.bien();
+      hechas.add(a.par); jugadores[turno].puntos++; sonar.bien(); if (hechas.size < n) decir('¡Correcto!');
       [a, d].forEach(x => $(`[data-c="${x.id}"]`, cont).classList.add('hecha', jugadores[turno].color));
       hud();
       if (hechas.size === n) T.despues(600, () => pantallaFinal(cont, { jugadores, titulo: '¡Todas las parejas!', detalle: `${movs} intentos para ${n} parejas.`, alRepetir, alMenu }));

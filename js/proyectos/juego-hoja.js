@@ -4,18 +4,18 @@
 // - en vivo: el profesor inicia la partida, todos juegan a la vez en su celular con el mismo cronómetro
 //   y la pantalla muestra el ranking en vivo (por participante o, si hay grupos, por grupo)
 // ============================================================
-import { JUEGOS } from '../juegos/contenido.js?v=202610242304';
-import { contenidoSala } from '../juegos/sala.js?v=202610242304';
-import { relojBarra, alFinalizarPartida } from '../juegos/util.js?v=202610242304';
+import { JUEGOS } from '../juegos/contenido.js?v=202610242316';
+import { contenidoSala } from '../juegos/sala.js?v=202610242316';
+import { relojBarra, alFinalizarPartida } from '../juegos/util.js?v=202610242316';
 import { ahoraServidor } from './ruleta.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const esUrl = (u) => typeof u === 'string' && /^https:\/\/[^\s"'()<>\\]+$/.test(u);
 const cara = (x) => esUrl(x?.foto_url) ? `<img src="${esc(x.foto_url)}" alt="">` : esc(x?.avatar || x?.emoji || '🙂');
 export const CARGAR = {
-  ahorcado: () => import('../juegos/ahorcado.js?v=202610242304'), sopa: () => import('../juegos/sopa.js?v=202610242304'), memoria: () => import('../juegos/memoria.js?v=202610242304'),
-  ordena: () => import('../juegos/ordena.js?v=202610242304'), quiz: () => import('../juegos/quiz.js?v=202610242304'), trivia: () => import('../juegos/quiz.js?v=202610242304'),
-  relampago: () => import('../juegos/quiz.js?v=202610242304'), frase: () => import('../juegos/frase.js?v=202610242304'), rompecabezas: () => import('../juegos/rompecabezas.js?v=202610242304')
+  ahorcado: () => import('../juegos/ahorcado.js?v=202610242316'), sopa: () => import('../juegos/sopa.js?v=202610242316'), memoria: () => import('../juegos/memoria.js?v=202610242316'),
+  ordena: () => import('../juegos/ordena.js?v=202610242316'), quiz: () => import('../juegos/quiz.js?v=202610242316'), trivia: () => import('../juegos/quiz.js?v=202610242316'),
+  relampago: () => import('../juegos/quiz.js?v=202610242316'), frase: () => import('../juegos/frase.js?v=202610242316'), rompecabezas: () => import('../juegos/rompecabezas.js?v=202610242316')
 };
 export const UNIDAD = { memoria: 'parejas', frase: 'frases', rompecabezas: 'piezas', trivia: 'preguntas', relampago: 'preguntas' };
 // (la Trivia de los profesores es de cualquier tema, no solo bíblica)

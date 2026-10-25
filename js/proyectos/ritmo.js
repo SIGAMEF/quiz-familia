@@ -9,7 +9,7 @@ import { pintarHoja, pintarHojaMovil, pintarCelular } from './lienzo.js';
 import { esPregunta } from './preguntas.js';
 import { pintarRegistro } from './agrupar.js';
 import { CARGAR, infoJuego } from './juego-hoja.js';
-import { relojBarra, alFinalizarPartida } from '../juegos/util.js?v=202610242304';
+import { relojBarra, alFinalizarPartida } from '../juegos/util.js?v=202610242316';
 
 const raiz = document.getElementById('raiz');
 const params = new URLSearchParams(location.search);

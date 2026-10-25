@@ -2,7 +2,7 @@
 // Quiz público de un profesor: todos los tipos de pregunta, corregido en el servidor
 // En una sala por turnos, cada pregunta la responde un jugador distinto.
 // ============================================================
-import { $, $$, esc, barajar, pantallaFinal, mezclador, hudJugadores, turnos } from './util.js?v=202610242304';
+import { $, $$, esc, barajar, pantallaFinal, mezclador, hudJugadores, turnos, decir } from './util.js?v=202610242316';
 
 export async function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red = null }) {
   const T = turnos(red);
@@ -52,6 +52,7 @@ export async function iniciar(cont, { set, jugadores, opciones, alMenu, alRepeti
     if (r) {
       if (p.tipo !== 'lluvia_ideas') { calificables++; if (r.es_correcta) aciertos++; jugadores[turno()].puntos += Math.round(100 * Number(r.fraccion || 0)); }
       tono(r.es_correcta || p.tipo === 'lluvia_ideas' ? 'correcto' : 'incorrecto');
+      if (r.es_correcta) decir('¡Correcto!');
       if (r.es_correcta)
       mostrarCorreccion(caja, p, r, { voz: false });
       if (N > 1) { const hud = $('.hud', cont); if (hud) hud.outerHTML = hudJugadores(jugadores, turno(), (j) => `⭐ ${j.puntos}`); }

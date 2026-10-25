@@ -6,14 +6,14 @@
 //  · carrera — cada uno juega su propia partida a la vez, con ranking en vivo.
 // Mismo cronómetro y podio al final en los dos.
 // ============================================================
-import { $, $$, esc, figura, sonar, confeti, relojBarra, alFinalizarPartida, prefs, selectorEmoji, silenciar, COLORES_SALA, pararRelojTurno, fondo } from './util.js?v=202610242304';
-import { sopaDe } from './sopa.js?v=202610242304';
+import { $, $$, esc, figura, sonar, confeti, relojBarra, alFinalizarPartida, prefs, selectorEmoji, silenciar, COLORES_SALA, pararRelojTurno, fondo, decir, olvidarTurno } from './util.js?v=202610242316';
+import { sopaDe } from './sopa.js?v=202610242316';
 import { enPausa } from '../reposo.js';
 
 const CARGADORES = {
-  ahorcado: () => import('./ahorcado.js?v=202610242304'), sopa: () => import('./sopa.js?v=202610242304'), memoria: () => import('./memoria.js?v=202610242304'),
-  ordena: () => import('./ordena.js?v=202610242304'), quiz: () => import('./quiz.js?v=202610242304'), trivia: () => import('./quiz.js?v=202610242304'), relampago: () => import('./quiz.js?v=202610242304'),
-  frase: () => import('./frase.js?v=202610242304'), rompecabezas: () => import('./rompecabezas.js?v=202610242304'), quizpublico: () => import('./quizlibre.js?v=202610242304')
+  ahorcado: () => import('./ahorcado.js?v=202610242316'), sopa: () => import('./sopa.js?v=202610242316'), memoria: () => import('./memoria.js?v=202610242316'),
+  ordena: () => import('./ordena.js?v=202610242316'), quiz: () => import('./quiz.js?v=202610242316'), trivia: () => import('./quiz.js?v=202610242316'), relampago: () => import('./quiz.js?v=202610242316'),
+  frase: () => import('./frase.js?v=202610242316'), rompecabezas: () => import('./rompecabezas.js?v=202610242316'), quizpublico: () => import('./quizlibre.js?v=202610242316')
 };
 const avatarDe = (a) => /^(https?:|data:)/.test(a || '') ? `<img src="${esc(a)}" alt="">` : esc(a || '🙂');
 const guardarSesion = (sala, datos) => { try { sessionStorage.setItem('sala_' + sala, JSON.stringify(datos)); } catch { /* sin almacenamiento */ } };
@@ -402,6 +402,8 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
       <div class="final-botones">${esHost ? '<button class="b3 amarillo" data-otra>🔄 Otra ronda</button><button class="b3 azul" data-cerrar>Cerrar sala</button>'
         : '<p class="ordena-pista">Si el anfitrión inicia otra ronda, entrarás automáticamente.</p><button class="b3 azul" data-salir>Volver a los juegos</button>'}</div></div>`;
     sonar.gana(); confeti();
+    olvidarTurno();
+    if (js[0]) decir(js[1] && Number(js[1].puntaje) === Number(js[0].puntaje) ? '¡Empate!' : `¡Ganó ${js[0].alias}!`, { cortar: true });
     if (esHost) {
       $('[data-otra]', cont).onclick = async () => {
         try { S.est = await rpc('sala_otra_ronda', { p_sala: sala_id, p_host: host_token, p_contenido: ctx.nuevaRonda ? ctx.nuevaRonda() : null }); S.ronda = -1; sondear(); }
