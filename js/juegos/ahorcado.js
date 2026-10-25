@@ -46,7 +46,7 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
           <span class="cat-lbl">Categoría</span><span class="cat">${esc(set.titulo)}</span>
           ${w.imagen ? `<div class="pista-fig">${figura(w.imagen)}</div>` : ''}
           <div class="palabra" aria-label="Palabra">${visible}</div>
-          <p class="ahor-pista">${S.ayudaTexto || S.terminada ? `💬 ${esc(w.pista)}` : ''}</p>
+          <p class="ahor-pista">${(S.ayudaTexto || S.terminada) && w.pista ? `💬 ${esc(w.pista)}` : ''}</p>
           ${S.aviso ? `<p class="ahor-aviso" role="alert">${esc(S.aviso)}</p>` : ''}
         </div>
       </div>

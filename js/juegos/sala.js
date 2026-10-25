@@ -37,7 +37,7 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
   const S = { fase: '', ronda: 0, offset: 0, est: null, jug: null, reloj: null, enviado: -1, terminado: false, modulo: null, timer: null,
     // por turnos
     sinTurnos: false, n: 0, ctrl: null, jugs: [], orden: [], cola: Promise.resolve(), desfase: false, vigia: null, turnoPintado: null, canal: null,
-    ocupado: false, otraVez: false, epoca: 0 };
+    ocupado: false, otraVez: false, epoca: 0, enVuelo: 0, desfaseDesde: 0, adelantadoDesde: 0, ultimoAviso: 0 };
   const esHost = !!host_token;
   if (yo) guardarSesion(sala_id, { yo, host_token, codigo });
 
@@ -46,13 +46,15 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
   const porTurnos = () => (S.est?.modo || S.est?.contenido?.modo) === 'turnos';
   const firma = () => ({ p_jugador: yo?.id || null, p_token: yo?.token || null, p_host: host_token });
 
+  // una consulta que no responde (señal del celular que se corta) no debe dejar la partida esperando para siempre
+  const conLimite = (promesa, ms = 10000) => Promise.race([promesa, new Promise((_, no) => setTimeout(() => no(new Error('Sin respuesta del servidor')), ms))]);
   // sala_turnos (paso 11 del SQL) trae además el modo y las jugadas nuevas; si no está instalado, sala_estado
   async function leerEstado(desde = S.n) {
     if (!S.sinTurnos) {
-      try { return await rpc('sala_turnos', { p_sala: sala_id, p_desde: desde }); }
+      try { return await conLimite(rpc('sala_turnos', { p_sala: sala_id, p_desde: desde })); }
       catch (e) { if (!/sala_turnos|PGRST202|schema cache/i.test(`${e.message} ${e.code}`)) throw e; S.sinTurnos = true; }
     }
-    return rpc('sala_estado', { p_sala: sala_id });
+    return conLimite(rpc('sala_estado', { p_sala: sala_id }));
   }
   async function sondear() {
     if (enPausa()) return;   // en pausa por inactividad (el intervalo sigue y consulta al reanudar)
@@ -72,7 +74,7 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
     }
     if (est.estado === 'en_curso') {
       if (S.fase === 'lobby' || S.fase === 'podio' || !S.fase) return yo || porTurnos() ? cuentaAtras() : tablero();
-      if (S.fase === 'jugando') return porTurnos() ? recibirJugadas(jugadas) : actualizarEnJuego();
+      if (S.fase === 'jugando') { if (!porTurnos()) return actualizarEnJuego(); recibirJugadas(jugadas); return vigilar(est); }
       if (S.fase === 'esperando' || S.fase === 'tablero') return pintarRanking();
       return;
     }
@@ -226,20 +228,46 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
   // las jugadas salen de a una, en orden; cada una lleva su número para que nadie se adelante a otro
   function enviarJugada(accion) {
     const n = ++S.n, p = puntajes();
+    S.enVuelo++;
     S.cola = S.cola.then(async () => {
       if (S.desfase) return;
-      try { await rpc('sala_jugar', { p_sala: sala_id, p_n: n, p_accion: accion, p_puntajes: p, ...firma() }); if (S.canal) S.canal.avisar(); }
+      try { await conLimite(rpc('sala_jugar', { p_sala: sala_id, p_n: n, p_accion: accion, p_puntajes: p, ...firma() })); if (S.canal) S.canal.avisar(); }
       catch (e) {
-        if (/tiempo|no está en curso/i.test(e.message || '')) return sondear();
+        if (/se acabó el tiempo|no está en curso/i.test(e.message || '')) return sondear();
         resincronizar();   // otro jugó antes (o se cortó la conexión): se vuelve a armar la partida desde el servidor
       }
-    });
+    }).finally(() => { S.enVuelo--; });
   }
   function resincronizar() {
     if (S.desfase) return;
-    S.desfase = true;
-    S.cola.finally(async () => { try { await sincronizar(); } finally { S.desfase = false; } });
+    S.desfase = true; S.desfaseDesde = Date.now();
+    S.cola.finally(async () => { try { await sincronizar(); } finally { S.desfase = false; pintarTurno(); } });
   }
+  // Autorreparación: si esta pantalla quedó adelantada al servidor (una jugada que nunca llegó)
+  // o lleva mucho rato sincronizándose, vuelve a armar la partida desde el servidor
+  function vigilar(est) {
+    if (S.desfase) {
+      if (Date.now() - S.desfaseDesde > 15000) { S.desfase = false; resincronizar(); }
+      return;
+    }
+    if (typeof est.jugadas_n === 'number' && S.n > est.jugadas_n && !S.enVuelo) {
+      if (!S.adelantadoDesde) S.adelantadoDesde = Date.now();
+      else if (Date.now() - S.adelantadoDesde > 4000) { S.adelantadoDesde = 0; resincronizar(); }
+    } else S.adelantadoDesde = 0;
+  }
+  // Si alguien toca el tablero cuando no es su turno, se le avisa (el juego no acepta la jugada)
+  cont.addEventListener('pointerdown', (e) => {
+    if (S.fase !== 'jugando' || !porTurnos() || !S.ctrl || !cont.classList.contains('no-es-mi-turno') || e.target.closest('[data-ver]')) return;
+    if (Date.now() - S.ultimoAviso < 1500) return;
+    S.ultimoAviso = Date.now();
+    const j = S.jugs[S.ctrl.turno()];
+    const el = document.createElement('div');
+    el.className = 'aviso-turno'; el.setAttribute('role', 'status');
+    el.textContent = S.desfase ? '🔄 Sincronizando…' : `⏳ Espera tu turno: le toca a ${j ? j.nombre : 'otro jugador'}`;
+    if (!yo && !S.desfase) el.textContent = `👀 Solo miras: le toca a ${j ? j.nombre : 'otro jugador'}`;
+    document.body.append(el);
+    setTimeout(() => el.remove(), 1400);
+  }, true);
   function recibirJugadas(jugadas) {
     if (!S.ctrl || S.desfase) return;
     for (const j of jugadas) {
@@ -272,6 +300,7 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
   async function sincronizar() {
     let est;
     try { est = await leerEstado(0); } catch { setTimeout(() => { if (S.fase === 'jugando') resincronizar(); }, 2000); return; }
+    S.adelantadoDesde = 0;
     S.est = est;
     if (S.fase !== 'jugando' || (est.estado !== 'en_curso' && est.estado !== 'finalizado')) return;
     const c = est.contenido;
@@ -308,7 +337,9 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
     const antes = S.turnoPintado;
     S.turnoPintado = clave;
     S.reloj.extra(`<span class="pill pill-turno ${mio ? 'mio' : ''}" aria-live="polite">${mio ? '🎯 ¡Es tu turno!' : `🎯 Turno de <b>${esc(j.avatar)} ${esc(j.nombre)}</b>`}</span>
+      <button class="b3 chico" data-resinc title="Volver a sincronizar con los demás" aria-label="Volver a sincronizar">🔄</button>
       ${esHost ? '<button class="b3 azul chico" data-pasar title="Si alguien no está, salta su turno">⏭ Pasar</button><button class="b3 morado chico" data-fin-todos>Terminar</button>' : ''}`);
+    $('[data-resinc]', barra).onclick = () => { S.turnoPintado = null; resincronizar(); };
     const bp = $('[data-pasar]', barra);
     if (bp) bp.onclick = () => {
       if (!S.ctrl || S.desfase) return;

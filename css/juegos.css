@@ -325,10 +325,12 @@ body.con-reloj [data-reloj] { display: none; }   /* con cronómetro arriba, no s
 @media (max-width: 480px) { .hud-varios .hud-j { flex-basis: 120px; } }
 .pill-turno { max-width: 60vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pill-turno.mio { background: var(--sol); color: #5A3A00; animation: latido 1s ease-in-out infinite; }
-/* cuando no es tu turno ves el tablero, pero no puedes tocarlo */
-.zona-juego.no-es-mi-turno > * { pointer-events: none; }
-.zona-juego.no-es-mi-turno [data-ver] { pointer-events: auto; }
-.zona-juego.no-es-mi-turno :is(.teclado, .memoria, .ordena-fichas, .frase-fichas, .quiz-ops, .sopa, .puzzle, .final-botones, [data-zona]) { opacity: .8; }
+/* Cuando no es tu turno ves el tablero; si lo tocas, aparece un aviso (el juego no acepta la jugada).
+   No se bloquea con pointer-events ni se aclara con opacity: con las cartas 3D del memorama algunos celulares
+   quedaban sin responder al tocar aunque ya fuera su turno. */
+.aviso-turno { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 40; background: rgba(43,36,64,.92); color: #fff;
+  padding: 12px 20px; border-radius: 16px; font-family: var(--display); font-weight: 800; font-size: 18px; text-align: center; pointer-events: none;
+  max-width: calc(100vw - 32px); animation: pop .2s ease-out; }
 @media (prefers-reduced-motion: reduce) { .pill-turno.mio { animation: none; } }
 
 /* ---------- Tiempo por turno ---------- */

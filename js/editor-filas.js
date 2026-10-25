@@ -66,7 +66,7 @@ export function montarFilas(cont, clase, datos, { alCambiar = () => {} } = {}) {
   };
 
   function pegar() {
-    const ayuda = clase === 'parejas' ? 'Una pareja por línea: Dog | Perro' : clase === 'frases' ? 'Una frase por línea: Dios es amor | 1 Juan 4:8' : 'Una palabra por línea: CÓNDOR | Ave andina';
+    const ayuda = clase === 'parejas' ? 'Una pareja por línea: Dog | Perro' : clase === 'frases' ? 'Una frase por línea (la pista es opcional): Dios es amor | 1 Juan 4:8' : 'Una palabra por línea; la pista es opcional: CÓNDOR | Ave andina, o solo CÓNDOR';
     const m = abrirModal(`<h3>📋 Pegar una lista</h3><p class="hint">${ayuda}. También puedes pegar dos columnas copiadas de Excel.</p>
       <textarea class="input" rows="10" data-txt placeholder="${esc(ayuda)}"></textarea>
       <div class="modal-pie"><button class="btn btn-outline" data-cerrar>Cancelar</button><button class="btn btn-primary" data-ok>Agregar a la lista</button></div>`);

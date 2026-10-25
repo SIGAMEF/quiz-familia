@@ -96,7 +96,7 @@ const HOJAS = {
   },
   ahorcado(set, sol) {
     return cabecera(set.titulo, set.tema || set.categoria, sol, sol ? '' : 'Lee la pista y escribe la palabra, una letra en cada casilla.') +
-      `<ol class="items">${set.palabras.map(p => `<li><div class="con-img">${figura(p.imagen)}<span>${esc(p.pista || (p.imagen ? '' : 'Sin pista'))}</span></div>${cajas(p.palabra, sol)}</li>`).join('')}</ol>`;
+      `<ol class="items">${set.palabras.map(p => `<li><div class="con-img">${figura(p.imagen)}<span>${esc(p.pista || '')}</span></div>${cajas(p.palabra, sol)}</li>`).join('')}</ol>`;
   },
   ordena(set, sol) {
     return cabecera(set.titulo, set.tema || set.categoria, sol, sol ? '' : 'Ordena las letras para formar la palabra. Usa la pista.') +

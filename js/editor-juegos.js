@@ -14,10 +14,10 @@ import { montarFilas } from './editor-filas.js';
 export const TIPOS_JUEGO = ['sopa', 'ahorcado', 'memoria', 'ordena', 'frase', 'rompecabezas', 'trivia', 'relampago'];
 const AYUDA = {
   sopa: 'Una palabra por línea. Si quieres, agrega una pista después de una barra: VOLCÁN | Expulsa lava',
-  ahorcado: 'Una palabra (o dos) por línea, con su pista después de una barra: CÓNDOR | Ave andina de alas enormes',
-  ordena: 'Una palabra por línea, con su pista después de una barra: MARIPOSA | Antes fue oruga',
+  ahorcado: 'Una palabra (o dos) por línea. La pista es opcional: si quieres, ponla después de una barra: CÓNDOR | Ave andina de alas enormes',
+  ordena: 'Una palabra por línea. La pista es opcional: si quieres, ponla después de una barra: MARIPOSA | Antes fue oruga',
   memoria: 'Una pareja por línea, separada con una barra: Red | Rojo   (también puedes usar emojis: 🐶 | Perro)',
-  frase: 'Una frase por línea, con su pista después de una barra: Dios es amor | 1 Juan 4:8'
+  frase: 'Una frase por línea. La pista es opcional: si quieres, ponla después de una barra: Dios es amor | 1 Juan 4:8'
 };
 const NIVELES = ['Inicial', 'Primaria', 'Secundaria', 'Para toda la familia'];
 const DIRS = [['horizontal', '➡ Horizontal'], ['vertical', '⬇ Vertical'], ['diagonal', '↘ Diagonal'], ['reves', '↩ Al revés']];

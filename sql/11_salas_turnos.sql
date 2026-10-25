@@ -45,7 +45,9 @@ begin
     'orden', (select coalesce(jsonb_agg(id order by unido_en), '[]'::jsonb) from sala_jugadores
               where sala_id = p_sala and (v.inicio is null or unido_en <= v.inicio)),
     'jugadas', (select coalesce(jsonb_agg(jsonb_build_object('n', n, 'jugador', jugador_id, 'accion', accion) order by n), '[]'::jsonb)
-                from sala_jugadas where sala_id = p_sala and ronda = v.ronda and n > coalesce(p_desde, 0)));
+                from sala_jugadas where sala_id = p_sala and ronda = v.ronda and n > coalesce(p_desde, 0)),
+    -- cuántas jugadas hay: si una pantalla tiene más (una jugada suya que nunca llegó), se vuelve a sincronizar
+    'jugadas_n', (select coalesce(max(n), 0) from sala_jugadas where sala_id = p_sala and ronda = v.ronda));
 end $$;
 
 -- Una jugada. p_n debe ser la siguiente (si otro jugó antes, la app vuelve a sincronizarse).
