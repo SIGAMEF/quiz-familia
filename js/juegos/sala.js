@@ -6,14 +6,14 @@
 //  · carrera — cada uno juega su propia partida a la vez, con ranking en vivo.
 // Mismo cronómetro y podio al final en los dos.
 // ============================================================
-import { $, $$, esc, figura, sonar, confeti, relojBarra, alFinalizarPartida, prefs, selectorEmoji, silenciar, COLORES_SALA, pararRelojTurno, decir, olvidarTurno } from './util.js';
-import { sopaDe } from './sopa.js';
+import { $, $$, esc, figura, sonar, confeti, relojBarra, alFinalizarPartida, prefs, selectorEmoji, silenciar, COLORES_SALA, pararRelojTurno, fondo } from './util.js?v=202610242304';
+import { sopaDe } from './sopa.js?v=202610242304';
 import { enPausa } from '../reposo.js';
 
 const CARGADORES = {
-  ahorcado: () => import('./ahorcado.js'), sopa: () => import('./sopa.js'), memoria: () => import('./memoria.js'),
-  ordena: () => import('./ordena.js'), quiz: () => import('./quiz.js'), trivia: () => import('./quiz.js'), relampago: () => import('./quiz.js'),
-  frase: () => import('./frase.js'), rompecabezas: () => import('./rompecabezas.js'), quizpublico: () => import('./quizlibre.js')
+  ahorcado: () => import('./ahorcado.js?v=202610242304'), sopa: () => import('./sopa.js?v=202610242304'), memoria: () => import('./memoria.js?v=202610242304'),
+  ordena: () => import('./ordena.js?v=202610242304'), quiz: () => import('./quiz.js?v=202610242304'), trivia: () => import('./quiz.js?v=202610242304'), relampago: () => import('./quiz.js?v=202610242304'),
+  frase: () => import('./frase.js?v=202610242304'), rompecabezas: () => import('./rompecabezas.js?v=202610242304'), quizpublico: () => import('./quizlibre.js?v=202610242304')
 };
 const avatarDe = (a) => /^(https?:|data:)/.test(a || '') ? `<img src="${esc(a)}" alt="">` : esc(a || '🙂');
 const guardarSesion = (sala, datos) => { try { sessionStorage.setItem('sala_' + sala, JSON.stringify(datos)); } catch { /* sin almacenamiento */ } };
@@ -85,7 +85,7 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
     }
   }
   const iniciarSondeo = () => { clearInterval(S.timer); S.timer = setInterval(sondear, 1500); sondear(); };
-  const pararTurnos = () => { clearInterval(S.vigia); S.vigia = null; S.ctrl = null; S.epoca++; pararRelojTurno(); cont.classList.remove('no-es-mi-turno'); };
+  const pararTurnos = () => { clearInterval(S.vigia); S.vigia = null; S.ctrl = null; S.epoca++; pararRelojTurno(); fondo.parar(); cont.classList.remove('no-es-mi-turno'); };
   const pararTodo = () => {
     clearInterval(S.timer); pararTurnos(); if (S.reloj) S.reloj.ocultar(); alFinalizarPartida(null);
     if (S.canal) { S.canal.cerrar(); S.canal = null; }
@@ -145,6 +145,19 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
     const b = $('[data-iniciar]', cont); if (b) b.disabled = !js.length;
   }
 
+  // Si el juego no carga (sin conexión, o archivos viejos guardados en el navegador), se ofrece recargar
+  async function cargarJuego(tipo) {
+    try { return await (CARGADORES[tipo] || CARGADORES.ahorcado)(); }
+    catch (e) {
+      console.error(e);
+      cont.innerHTML = `<div class="tabla-juego center"><div style="font-size:50px;">📶</div><h2>No se pudo cargar el juego</h2>
+        <p class="ordena-pista">Revisa la conexión y recarga la página: volverás a la misma partida.</p>
+        <button class="b3 amarillo" data-recargar style="margin-top:10px;">🔄 Recargar</button></div>`;
+      $('[data-recargar]', cont).onclick = () => location.reload();
+      return null;
+    }
+  }
+
   // ---------- Cuenta atrás y juego ----------
   function cuentaAtras() {
     S.fase = 'cuenta';
@@ -164,11 +177,12 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
   }
   async function jugar() {
     S.fase = 'jugando'; S.terminado = false; cont.classList.add('jugando');   // también si se entra directo (al recargar)
+    fondo.iniciar();
     const c = S.est.contenido;
     const guardado = prefs.leer('jugadores', [{ nombre: 'Tú', avatar: '🧒' }])[0];
     const mio = S.est.jugadores.find(j => j.id === yo.id);
     S.jug = { nombre: mio?.alias || guardado.nombre, avatar: mio?.avatar || guardado.avatar, color: 'j1', puntos: 0 };
-    S.modulo = await (CARGADORES[c.juego] || CARGADORES.ahorcado)();
+    S.modulo = await cargarJuego(c.juego); if (!S.modulo) return;
     alFinalizarPartida(({ detalle }) => { terminarYo(detalle); });
     if (S.est.fin) S.reloj = relojBarra(barra, aLocal(S.est.fin), { total: S.est.segundos, alAcabar: () => { if (!S.terminado) terminarYo('Se acabó el tiempo', true); } });
     else { barra.hidden = false; S.reloj = relojBarra(barra, Date.now() + 864e5, {}); $('[data-rt]', barra).parentElement.innerHTML = '⏱ Sin límite'; }
@@ -281,13 +295,14 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
   }
   async function jugarTurnos() {
     S.fase = 'jugando'; S.terminado = false; cont.classList.add('jugando');   // también si se entra directo (al recargar)
+    fondo.iniciar();
     if (S.sinTurnos) {
       cont.innerHTML = `<div class="tabla-juego center"><div style="font-size:50px;">🛠</div><h2>Falta activar el modo por turnos</h2>
         <p class="ordena-pista">Quien administra la app debe ejecutar <b>sql/11_salas_turnos.sql</b> y luego <b>sql/06_permisos.sql</b> en Supabase.</p></div>`;
       return;
     }
     const c = S.est.contenido;
-    S.modulo = await (CARGADORES[c.juego] || CARGADORES.ahorcado)();
+    S.modulo = await cargarJuego(c.juego); if (!S.modulo) return;
     alFinalizarPartida(() => { finTurnos(); return true; });
     if (S.reloj) S.reloj.ocultar();
     if (S.est.fin) S.reloj = relojBarra(barra, aLocal(S.est.fin), { total: S.est.segundos, alAcabar: () => sondear() });
@@ -387,8 +402,6 @@ export function abrirSala(ctx, { sala_id, codigo, host_token = null, yo = null }
       <div class="final-botones">${esHost ? '<button class="b3 amarillo" data-otra>🔄 Otra ronda</button><button class="b3 azul" data-cerrar>Cerrar sala</button>'
         : '<p class="ordena-pista">Si el anfitrión inicia otra ronda, entrarás automáticamente.</p><button class="b3 azul" data-salir>Volver a los juegos</button>'}</div></div>`;
     sonar.gana(); confeti();
-    olvidarTurno();
-    if (js[0]) decir(js[1] && Number(js[1].puntaje) === Number(js[0].puntaje) ? '¡Empate!' : `¡Ganó ${js[0].alias}!`, { cortar: true });
     if (esHost) {
       $('[data-otra]', cont).onclick = async () => {
         try { S.est = await rpc('sala_otra_ronda', { p_sala: sala_id, p_host: host_token, p_contenido: ctx.nuevaRonda ? ctx.nuevaRonda() : null }); S.ronda = -1; sondear(); }

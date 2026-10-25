@@ -4,18 +4,18 @@
 // - en vivo: el profesor inicia la partida, todos juegan a la vez en su celular con el mismo cronómetro
 //   y la pantalla muestra el ranking en vivo (por participante o, si hay grupos, por grupo)
 // ============================================================
-import { JUEGOS } from '../juegos/contenido.js';
-import { contenidoSala } from '../juegos/sala.js';
-import { relojBarra, alFinalizarPartida } from '../juegos/util.js';
+import { JUEGOS } from '../juegos/contenido.js?v=202610242304';
+import { contenidoSala } from '../juegos/sala.js?v=202610242304';
+import { relojBarra, alFinalizarPartida } from '../juegos/util.js?v=202610242304';
 import { ahoraServidor } from './ruleta.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const esUrl = (u) => typeof u === 'string' && /^https:\/\/[^\s"'()<>\\]+$/.test(u);
 const cara = (x) => esUrl(x?.foto_url) ? `<img src="${esc(x.foto_url)}" alt="">` : esc(x?.avatar || x?.emoji || '🙂');
 export const CARGAR = {
-  ahorcado: () => import('../juegos/ahorcado.js'), sopa: () => import('../juegos/sopa.js'), memoria: () => import('../juegos/memoria.js'),
-  ordena: () => import('../juegos/ordena.js'), quiz: () => import('../juegos/quiz.js'), trivia: () => import('../juegos/quiz.js'),
-  relampago: () => import('../juegos/quiz.js'), frase: () => import('../juegos/frase.js'), rompecabezas: () => import('../juegos/rompecabezas.js')
+  ahorcado: () => import('../juegos/ahorcado.js?v=202610242304'), sopa: () => import('../juegos/sopa.js?v=202610242304'), memoria: () => import('../juegos/memoria.js?v=202610242304'),
+  ordena: () => import('../juegos/ordena.js?v=202610242304'), quiz: () => import('../juegos/quiz.js?v=202610242304'), trivia: () => import('../juegos/quiz.js?v=202610242304'),
+  relampago: () => import('../juegos/quiz.js?v=202610242304'), frase: () => import('../juegos/frase.js?v=202610242304'), rompecabezas: () => import('../juegos/rompecabezas.js?v=202610242304')
 };
 export const UNIDAD = { memoria: 'parejas', frase: 'frases', rompecabezas: 'piezas', trivia: 'preguntas', relampago: 'preguntas' };
 // (la Trivia de los profesores es de cualquier tema, no solo bíblica)

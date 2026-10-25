@@ -1,7 +1,7 @@
 // ============================================================
 // Ilustraciones propias para el rompecabezas (SVG cuadrado 600×600)
 // ============================================================
-import { canguro } from './util.js';
+import { canguro } from './util.js?v=202610242304';
 
 const nube = (x, y, s = 1) => `<g fill="#fff" opacity=".95" transform="translate(${x} ${y}) scale(${s})"><ellipse cx="0" cy="0" rx="46" ry="22"/><ellipse cx="34" cy="-12" rx="34" ry="24"/><ellipse cx="-30" cy="-6" rx="28" ry="18"/></g>`;
 const sol = (x, y) => `<g transform="translate(${x} ${y})"><g stroke="#FFB300" stroke-width="8" stroke-linecap="round">${Array.from({ length: 12 }, (_, i) => `<line x1="0" y1="-62" x2="0" y2="-80" transform="rotate(${i * 30})"/>`).join('')}</g><circle r="48" fill="#FFD23F" stroke="#FFB300" stroke-width="6"/></g>`;

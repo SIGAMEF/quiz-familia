@@ -2,7 +2,7 @@
 // Quiz relámpago: 15 segundos por pregunta (o el tiempo elegido); más rápido = más puntos.
 // En una sala por turnos, cada pregunta la responde un jugador distinto.
 // ============================================================
-import { $, $$, esc, barajar, sonar, pantallaFinal, mezclador, hudJugadores, turnos, decir } from './util.js';
+import { $, $$, esc, barajar, sonar, pantallaFinal, mezclador, hudJugadores, turnos } from './util.js?v=202610242304';
 
 const COLORES = ['rojo', 'azul', 'amarillo', 'verde'];
 const FORMAS = ['▲', '◆', '●', '■'];
@@ -53,7 +53,7 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
     jugadores[turno()].puntos += pts; if (ok) aciertos++;
     $$('[data-o]', cont).forEach((b, j) => { b.disabled = true; b.classList.add(ops[j].ok ? 'correcta' : j === k ? 'incorrecta' : 'apagada'); });
     $('[data-msg]', cont).innerHTML = ok ? `<b>¡Correcto! +${pts}</b>` : k == null ? '<b>⏰ Se acabó el tiempo</b>' : '<b>Esta vez no</b>';
-    if (ok) { sonar.bien(); decir('¡Correcto!'); } else sonar.mal();
+    if (ok) { sonar.bien(); } else sonar.mal();
     T.despues(1400, () => {
       i++;
       if (i >= lista.length) return pantallaFinal(cont, { jugadores, titulo: '¡Quiz terminado!', detalle: `${aciertos} de ${lista.length} correctas.`, alRepetir, alMenu });

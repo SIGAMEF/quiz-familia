@@ -2,7 +2,7 @@
 // Ordena la frase: toca las palabras en el orden correcto.
 // En una sala por turnos, cada frase la arma un jugador distinto.
 // ============================================================
-import { $, $$, esc, barajar, sinTildes, sonar, confeti, pantallaFinal, figura, mezclador, hudJugadores, turnos, decir } from './util.js';
+import { $, $$, esc, barajar, sinTildes, sonar, confeti, pantallaFinal, figura, mezclador, hudJugadores, turnos } from './util.js?v=202610242304';
 
 const COLORES = ['#14A3B8', '#F5B700', '#8E5BE8', '#F28C0F', '#4CAF2E', '#EC4C93', '#2F80ED'];
 const limpia = (t) => sinTildes(t).replace(/[^A-ZÑ0-9]/g, '');
@@ -49,7 +49,7 @@ export function iniciar(cont, { set, jugadores, opciones, alMenu, alRepetir, red
     puestas.push(x); sonar.clic();
     if (puestas.length < palabras.length) return pintar();
     const ok = puestas.map(y => limpia(y.t)).join(' ') === palabras.map(limpia).join(' ');
-    if (ok) { jugadores[turno()].puntos += Math.max(3, 10 - ayudas * 2); aciertos++; sonar.bien(); decir('¡Correcto!'); } else sonar.mal();
+    if (ok) { jugadores[turno()].puntos += Math.max(3, 10 - ayudas * 2); aciertos++; sonar.bien(); } else sonar.mal();
     pintar(ok ? 'correcta' : 'incorrecta');
     T.despues(ok ? 1000 : 800, () => ok ? siguiente(true) : (puestas.length = 0, pintar()));
   }

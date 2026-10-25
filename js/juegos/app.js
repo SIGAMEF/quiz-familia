@@ -1,17 +1,17 @@
 // ============================================================
 // juegos.html?j=<juego>&s=<set>  — prepara y lanza un juego libre
 // ============================================================
-import { $, $$, esc, paisaje, formJugadores, sonar, alternarSonido, sonidoActivo, prefs, alFinalizarPartida, relojBarra, pantallaFinal, selectorEmoji, pararRelojTurno } from './util.js';
-import { contenidoSala, abrirSala, unirseSala } from './sala.js';
-import { imprimir, puedeImprimir } from './imprimir.js';
-import { sopaDe } from './sopa.js';
-import { imagenPuzzle } from './imagenes.js';
-import { JUEGOS, setsPara, buscarSet, conImagenes } from './contenido.js';
+import { $, $$, esc, paisaje, formJugadores, sonar, alternarSonido, sonidoActivo, prefs, alFinalizarPartida, relojBarra, pantallaFinal, selectorEmoji, pararRelojTurno, fondo } from './util.js?v=202610242304';
+import { contenidoSala, abrirSala, unirseSala } from './sala.js?v=202610242304';
+import { imprimir, puedeImprimir } from './imprimir.js?v=202610242304';
+import { sopaDe } from './sopa.js?v=202610242304';
+import { imagenPuzzle } from './imagenes.js?v=202610242304';
+import { JUEGOS, setsPara, buscarSet, conImagenes } from './contenido.js?v=202610242304';
 
 const MODULOS = {
-  ahorcado: () => import('./ahorcado.js'), sopa: () => import('./sopa.js'), memoria: () => import('./memoria.js'),
-  ordena: () => import('./ordena.js'), quiz: () => import('./quiz.js'), trivia: () => import('./quiz.js'), relampago: () => import('./quiz.js'),
-  frase: () => import('./frase.js'), rompecabezas: () => import('./rompecabezas.js'), quizpublico: () => import('./quizlibre.js')
+  ahorcado: () => import('./ahorcado.js?v=202610242304'), sopa: () => import('./sopa.js?v=202610242304'), memoria: () => import('./memoria.js?v=202610242304'),
+  ordena: () => import('./ordena.js?v=202610242304'), quiz: () => import('./quiz.js?v=202610242304'), trivia: () => import('./quiz.js?v=202610242304'), relampago: () => import('./quiz.js?v=202610242304'),
+  frase: () => import('./frase.js?v=202610242304'), rompecabezas: () => import('./rompecabezas.js?v=202610242304'), quizpublico: () => import('./quizlibre.js?v=202610242304')
 };
 // Opciones de cada juego
 const OPCIONES = {
@@ -291,7 +291,7 @@ function preparar() {
         const jugs = jugadores.map(j => ({ ...j }));
         const alMenu = () => { location.href = volverA; };
         if (relojLocal) relojLocal.ocultar();
-        relojLocal = null; pararRelojTurno();
+        relojLocal = null; pararRelojTurno(); fondo.iniciar();
         alFinalizarPartida((info) => { if (relojLocal) relojLocal.ocultar(); if (registrarAlTerminar) registrarAlTerminar(info); });
         if (segundos) {
           relojLocal = relojBarra(barra, Date.now() + segundos * 1000, { total: segundos, alAcabar: () => {
@@ -359,7 +359,7 @@ arrancar();
 $('#bVolver').onclick = () => {
   if (PIN_SALA || new URLSearchParams(location.search).get('sala')) { if (confirm('¿Salir de la sala?')) location.href = INICIO; return; }
   if (relojLocal) { relojLocal.ocultar(); relojLocal = null; }
-  pararRelojTurno();
+  pararRelojTurno(); fondo.parar();
   if (cont.classList.contains('jugando')) { cont.classList.remove('jugando'); preparar(); }
   else location.href = volverA;
 };

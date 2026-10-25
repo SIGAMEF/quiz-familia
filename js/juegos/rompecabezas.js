@@ -3,8 +3,8 @@
 // En una sala por turnos: si tu cambio deja piezas en su sitio (+1 por pieza) sigues; si no, pasa el turno.
 // Quien coloca la última pieza gana 5 más.
 // ============================================================
-import { $, $$, esc, barajar, sonar, fmtTiempo, pantallaFinal, mezclador, hudJugadores, turnos } from './util.js';
-import { imagenPuzzle, fotoCuadrada } from './imagenes.js';
+import { $, $$, esc, barajar, sonar, fmtTiempo, pantallaFinal, mezclador, hudJugadores, turnos } from './util.js?v=202610242304';
+import { imagenPuzzle, fotoCuadrada } from './imagenes.js?v=202610242304';
 
 let fotoGuardada = null;   // la foto elegida se mantiene mientras la página esté abierta
 

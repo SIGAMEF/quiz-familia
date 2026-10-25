@@ -28,3 +28,12 @@ Ejecuta **`05_parche_paneles.sql`** (incluido en este zip). Si ya ejecutaste una
 3. El profesor crea quizzes (a mano o con la plantilla Excel), crea un grupo y comparte el **enlace o QR** del grupo.
 4. Los **alumnos** se registran con ese enlace y quedan en el grupo.
 5. El profesor **publica** el quiz en el grupo y revisa la **libreta** (descargable en Excel).
+
+## Al publicar cambios en los juegos
+Antes de subir cambios de `js/juegos/` (o de `css/juegos.css`), ejecuta:
+
+```
+python herramientas/version_juegos.py
+```
+
+Pone una marca de versión (`?v=...`) en todos los archivos de los juegos. Así, el navegador de cada celular descarga la versión nueva completa y no mezcla archivos viejos guardados con los nuevos (eso hacía que una sala se viera, pero el juego no iniciara).

@@ -1,9 +1,9 @@
 // ============================================================
 // Portal "Quiz Familia Marroquín": juegos libres de acceso rápido
 // ============================================================
-import { $, $$, esc, canguro, horca } from './juegos/util.js';
-import { JUEGOS, SETS, SETS_MEMORIA, SETS_QUIZ, SETS_FRASES, SETS_TRIVIA } from './juegos/contenido.js';
-import { imagenPuzzle } from './juegos/imagenes.js';
+import { $, $$, esc, canguro, horca } from './juegos/util.js?v=202610242304';
+import { JUEGOS, SETS, SETS_MEMORIA, SETS_QUIZ, SETS_FRASES, SETS_TRIVIA } from './juegos/contenido.js?v=202610242304';
+import { imagenPuzzle } from './juegos/imagenes.js?v=202610242304';
 
 const PREVIA = !!window.__VISTA_PREVIA__;   // vista previa publicada: sin cuentas ni servidor
 // En la vista previa el juego va en el #ancla (j.set); en el sitio, en la dirección (?j=&s=)
