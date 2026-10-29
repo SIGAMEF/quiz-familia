@@ -5,10 +5,27 @@
 // ============================================================
 
 // ---------- Fuentes (Google Fonts, legibles e infantiles) ----------
-export const FUENTES = ['Baloo 2', 'Fredoka', 'Nunito', 'Poppins', 'Comic Neue', 'Patrick Hand', 'Pacifico', 'Bebas Neue', 'Merriweather'];
+export const FUENTES = ['Baloo 2', 'Fredoka', 'Nunito', 'Poppins', 'Comic Neue', 'Patrick Hand', 'Pacifico', 'Bebas Neue', 'Merriweather',
+  // para cultos y carteles
+  'Montserrat', 'Anton', 'Archivo Black', 'Oswald', 'Josefin Sans', 'Cinzel', 'Cormorant Garamond', 'Playfair Display', 'DM Serif Display',
+  'Caveat', 'Great Vibes', 'Press Start 2P'];
 export const URL_FUENTES = 'https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;800&family=Fredoka:wght@400;600;700&family=Nunito:wght@400;700;900' +
-  '&family=Poppins:wght@400;600;800&family=Comic+Neue:wght@400;700&family=Patrick+Hand&family=Pacifico&family=Bebas+Neue&family=Merriweather:wght@400;700&display=swap';
-export function fuenteValida(f) { return FUENTES.includes(f) ? f : 'Nunito'; }
+  '&family=Poppins:wght@400;600;800&family=Comic+Neue:wght@400;700&family=Patrick+Hand&family=Pacifico&family=Bebas+Neue&family=Merriweather:wght@400;700' +
+  '&family=Montserrat:wght@300;500;700;800&family=Anton&family=Archivo+Black&family=Oswald:wght@400;500;700&family=Josefin+Sans:wght@300;600&family=Cinzel:wght@500;700' +
+  '&family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&family=Playfair+Display:ital,wght@0,600;1,600&family=DM+Serif+Display&family=Caveat:wght@600&family=Great+Vibes' +
+  '&family=Press+Start+2P&display=swap';
+// Más fuentes de Google Fonts para resaltar palabras: se cargan solo cuando se usan
+export const FUENTES_EXTRA = ['Outfit', 'Lobster', 'Righteous', 'Bangers', 'Permanent Marker', 'Dancing Script', 'Satisfy', 'Raleway',
+  'Lilita One', 'Sacramento', 'Kaushan Script', 'Fjalla One', 'Rubik', 'Quicksand', 'Abril Fatface', 'Shadows Into Light'];
+export function fuenteValida(f) { return FUENTES.includes(f) || FUENTES_EXTRA.includes(f) ? f : 'Nunito'; }
+export function cargarFuente(f) {
+  if (!FUENTES_EXTRA.includes(f) || document.querySelector(`link[data-fuente="${CSS.escape(f)}"]`)) return;
+  const l = document.createElement('link');
+  l.rel = 'stylesheet'; l.dataset.fuente = f;
+  const pesos = ['Outfit', 'Raleway', 'Rubik', 'Quicksand', 'Dancing Script'].includes(f) ? ':wght@400;500;700' : '';   // las demás tienen un solo grosor
+  l.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(f).replace(/%20/g, '+')}${pesos}&display=swap`;
+  document.head.appendChild(l);
+}
 
 // ---------- Colores ----------
 export const COLORES = ['#FFFFFF', '#F8F7FC', '#2D2A45', '#000000', '#7C6FF0', '#6C5CE7', '#A855F7', '#EC4899', '#E14D72', '#FF6F91',

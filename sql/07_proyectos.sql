@@ -252,6 +252,8 @@ create table if not exists public.sesion_participantes (
   visto_en   timestamptz not null default now()
 );
 create unique index if not exists sesion_participantes_alias on public.sesion_participantes (sesion_id, lower(coalesce(alias, nombre)));
+-- hoja que se mostraba cuando se unió (la ruleta de participantes toma a los de su hoja Unirse/Agrupar y a los que llegaron después)
+alter table public.sesion_participantes add column if not exists hoja_registro uuid;
 create index if not exists sesion_participantes_token_idx on public.sesion_participantes (token);
 
 create table if not exists public.sesion_respuestas (
@@ -332,6 +334,46 @@ $$;
 create or replace function public._ruta_foto(p_url text) returns text
 language sql immutable as $$ select nullif(substring(p_url from '/preguntas-imagenes/(proyectos/sesiones/[^?]+)$'), '') $$;
 
+-- ---------- Sesiones inactivas ----------
+-- Una sesión sin actividad durante 12 horas (el profesor no cambió de hoja ni tocó nada, nadie se unió, respondió
+-- ni salió en la ruleta) se finaliza sola: al abrir la lista de proyectos o al iniciar otra sesión.
+-- Mirar la pantalla (las consultas cada 1,5 s) no cuenta como actividad.
+create or replace function public._sesion_inactiva(p_sesion uuid) returns boolean
+language plpgsql stable security definer set search_path = public as $$
+declare v_ultima timestamptz;
+begin
+  select greatest(s.updated_at, s.hoja_inicio, s.created_at,
+           (select max(created_at) from sesion_participantes where sesion_id = s.id),
+           (select max(updated_at) from sesion_respuestas where sesion_id = s.id),
+           (select max(created_at) from ruleta_sorteos where sesion_id = s.id))
+    into v_ultima from proyecto_sesiones s where s.id = p_sesion;
+  return v_ultima is not null and v_ultima < now() - interval '12 hours';
+end $$;
+-- Finaliza una sesión: quita las fotos de los participantes (devuelve sus rutas para borrarlas de Storage)
+create or replace function public._sesion_cerrar(p_sesion uuid) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_fotos jsonb;
+begin
+  select coalesce(jsonb_agg(_ruta_foto(foto_url)) filter (where _ruta_foto(foto_url) is not null), '[]') into v_fotos
+  from sesion_participantes where sesion_id = p_sesion;
+  update sesion_participantes set foto_url = null where sesion_id = p_sesion and foto_url is not null;
+  update proyecto_sesiones set estado = 'finalizada', finalizada_en = coalesce(finalizada_en, now()), updated_at = now()
+  where id = p_sesion and estado <> 'finalizada';
+  return v_fotos;
+end $$;
+-- Finaliza las sesiones inactivas de mis proyectos. Devuelve { cerradas, fotos }.
+create or replace function public.proyectos_cerrar_inactivas() returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare s record; n int := 0; v_fotos jsonb := '[]';
+begin
+  if auth.uid() is null then return jsonb_build_object('cerradas', 0, 'fotos', '[]'::jsonb); end if;
+  for s in select ps.id from proyecto_sesiones ps join proyectos p on p.id = ps.proyecto_id
+           where p.profesor_id = auth.uid() and ps.estado <> 'finalizada' loop
+    if _sesion_inactiva(s.id) then v_fotos := v_fotos || _sesion_cerrar(s.id); n := n + 1; end if;
+  end loop;
+  return jsonb_build_object('cerradas', n, 'fotos', v_fotos);
+end $$;
+
 -- =====================================================================
 -- FASE D — PROYECTO "A SU RITMO" (publicado a grupos, con enlace para invitados, o público)
 -- El alumno abre el proyecto y avanza solo; se guardan sus respuestas y puntajes.
@@ -388,9 +430,11 @@ $$;
 -- Inicia una sesión en vivo (o devuelve la que ya está abierta)
 create or replace function public.proyecto_iniciar_sesion(p_proyecto uuid) returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare v proyecto_sesiones%rowtype;
+declare v proyecto_sesiones%rowtype; v_fotos jsonb := '[]';
 begin
   perform _proyecto_editable(p_proyecto);
+  -- antes de empezar, se cierran las sesiones que quedaron abandonadas (de este y de los demás proyectos)
+  v_fotos := coalesce(proyectos_cerrar_inactivas()->'fotos', '[]');
   select * into v from proyecto_sesiones where proyecto_id = p_proyecto and estado <> 'finalizada' order by created_at desc limit 1;
   if not found then
     insert into proyecto_sesiones (proyecto_id, profesor_id, pin, hoja_id)
@@ -398,7 +442,7 @@ begin
             (select id from proyecto_hojas where proyecto_id = p_proyecto order by orden, created_at limit 1))
     returning * into v;
   end if;
-  return _sesion_resumen(v);
+  return _sesion_resumen(v) || jsonb_build_object('fotos_viejas', v_fotos);
 end $$;
 
 -- Sesión sin terminar de un proyecto (para "Tienes una sesión en curso…"); null si no hay
@@ -608,6 +652,7 @@ begin
   return jsonb_build_object(
     'ahora', now(),
     'sesion', _sesion_resumen(v),
+    'inactiva', v.estado <> 'finalizada' and _sesion_inactiva(v.id),   -- la pantalla la finaliza y deja de consultar
     'ruleta', case when h.tipo = 'ruleta' then _ruleta_estado(v.id, h) end,
     'participantes', (select coalesce(jsonb_agg(jsonb_build_object('id', p.id, 'alias', _visible(p), 'nombre', p.nombre, 'avatar', p.avatar,
         'foto_url', p.foto_url, 'grupo_id', p.grupo_id, 'conectado', p.visto_en > now() - interval '12 seconds') order by p.created_at), '[]'::jsonb)
@@ -670,8 +715,8 @@ begin
   where g.sesion_id = v.id and g.confirmado
     and g.hoja_id = (select hoja_id from sesion_grupos where sesion_id = v.id and confirmado order by created_at desc limit 1)
   order by (select count(*) from sesion_participantes p where p.grupo_id = g.id and not p.expulsado), g.numero limit 1;
-  insert into sesion_participantes (sesion_id, nombre, alias, avatar, grupo_id, alumno_id)
-  values (v.id, v_nombre, v_alias, left(nullif(trim(coalesce(p_avatar, '')), ''), 16), v_grupo, auth.uid())
+  insert into sesion_participantes (sesion_id, nombre, alias, avatar, grupo_id, alumno_id, hoja_registro)
+  values (v.id, v_nombre, v_alias, left(nullif(trim(coalesce(p_avatar, '')), ''), 16), v_grupo, auth.uid(), v.hoja_id)
   returning * into v_p;
   return jsonb_build_object('sesion_id', v.id, 'participante_id', v_p.id, 'token', v_p.token, 'foto_clave', v_p.foto_clave);
 end $$;
@@ -724,6 +769,8 @@ begin
   select * into v from proyecto_sesiones where id = v_p.sesion_id;
   if v_p.expulsado then return jsonb_build_object('estado', 'expulsado'); end if;
   if v.estado = 'finalizada' then return jsonb_build_object('estado', 'finalizada', 'proyecto', (select nombre from proyectos where id = v.proyecto_id)); end if;
+  -- abandonada (12 horas sin actividad): el celular deja de consultar
+  if _sesion_inactiva(v.id) then return jsonb_build_object('estado', 'finalizada', 'inactiva', true, 'proyecto', (select nombre from proyectos where id = v.proyecto_id)); end if;
   if v_p.visto_en < now() - interval '5 seconds' then update sesion_participantes set visto_en = now() where id = v_p.id; end if;
 
   select * into h from proyecto_hojas where id = v.hoja_id;
@@ -939,8 +986,16 @@ begin
     return (select coalesce(jsonb_agg(jsonb_build_object('clave', g.id, 'texto', g.nombre, 'color', g.color, 'emoji', g.emoji) order by g.numero), '[]'::jsonb)
             from sesion_grupos g where g.sesion_id = p_sesion and g.hoja_id = v_hoja);
   elsif v_origen = 'participantes' then
+    -- los registrados en la hoja Unirse/Agrupar elegida (si no, la más cercana antes de la ruleta) y los que llegaron
+    -- tarde; no entran los expulsados ni los que se registraron en otra hoja Unirse/Agrupar
+    begin v_hoja := nullif(h.config->>'hoja_registro', '')::uuid; exception when others then v_hoja := null; end;
+    if v_hoja is null or not exists (select 1 from proyecto_hojas where id = v_hoja and proyecto_id = h.proyecto_id and tipo in ('unirse', 'agrupar') and orden < h.orden) then
+      select id into v_hoja from proyecto_hojas where proyecto_id = h.proyecto_id and tipo in ('unirse', 'agrupar') and orden < h.orden order by orden desc limit 1;
+    end if;
     return (select coalesce(jsonb_agg(jsonb_build_object('clave', p.id, 'texto', _visible(p), 'avatar', p.avatar, 'foto_url', p.foto_url) order by p.created_at), '[]'::jsonb)
-            from sesion_participantes p where p.sesion_id = p_sesion and not p.expulsado);
+            from sesion_participantes p where p.sesion_id = p_sesion and not p.expulsado
+              and (v_hoja is null or p.hoja_registro is null or p.hoja_registro = v_hoja
+                   or not exists (select 1 from proyecto_hojas x where x.id = p.hoja_registro and x.tipo in ('unirse', 'agrupar'))));
   end if;
   -- nombres escritos a mano: sin vacíos ni repetidos, máximo 200
   return (select coalesce(jsonb_agg(jsonb_build_object('clave', t, 'texto', t) order by o), '[]'::jsonb) from (
@@ -978,10 +1033,12 @@ begin
       when 'participantes' then 'Todavía no hay participantes en la sesión.'
       else 'La ruleta no tiene nombres. Escríbelos en el editor.' end;
   end if;
-  select e into x from jsonb_array_elements(c) e
-  where coalesce((h.config->>'repetir')::boolean, false)
-     or not exists (select 1 from ruleta_sorteos s where s.sesion_id = p_sesion and s.hoja_id = p_hoja and s.clave = e->>'clave')
-  order by random() limit 1;
+  -- al azar, solo entre los que siguen en la ruleta (gen_random_uuid: cada fila recibe un valor nuevo y distinto)
+  with quedan as materialized (
+    select e from jsonb_array_elements(c) e
+    where coalesce((h.config->>'repetir')::boolean, false)
+       or not exists (select 1 from ruleta_sorteos s where s.sesion_id = p_sesion and s.hoja_id = p_hoja and s.clave = e->>'clave'))
+  select e into x from quedan order by gen_random_uuid() limit 1;
   if x is null then raise exception '¡Todos han salido! Reinicia la ruleta para volver a empezar.'; end if;
   select coalesce(max(ronda), 0) + 1 into v_ronda from ruleta_sorteos where sesion_id = p_sesion and hoja_id = p_hoja;
   insert into ruleta_sorteos (sesion_id, hoja_id, ronda, clave, elegido_texto, elegido_grupo_id)

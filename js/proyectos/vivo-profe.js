@@ -31,6 +31,13 @@ export function crearVivo(sesion, { alCambiar = () => {}, alError = () => {} } =
     if (!activo || enPausa()) return;   // en pausa por inactividad: se vuelve a consultar al reanudar
     try {
       datos = await rpc('proyecto_estado_profe', { p_sesion: datos.sesion.id });
+      // abandonada (12 horas sin actividad): se finaliza y se deja de consultar
+      if (datos.inactiva) {
+        try { const r = await rpc('proyecto_finalizar', { p_sesion: datos.sesion.id }); await borrarFotos(r.fotos); } catch { /* la cierra la lista */ }
+        datos.sesion = { ...datos.sesion, estado: 'finalizada' };
+        activo = false;
+        api.alError('La sesión estuvo 12 horas sin actividad y se finalizó. Inicia una nueva desde la lista de proyectos.');
+      }
       ajustarReloj(datos.ahora);
       fallos = 0;
       api.alCambiar(datos);

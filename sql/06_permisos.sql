@@ -43,6 +43,8 @@ grant select, update, delete         on public.juego_publicaciones to authentica
 grant select, delete                 on public.juego_resultados    to authenticated;  -- se crean con registrar_juego
 grant select, delete                 on public.proyectos      to authenticated;  -- se crean, guardan y duplican con funciones (07)
 grant select                         on public.proyecto_hojas to authenticated;  -- RLS: solo el dueño o el admin
+grant select, insert, update, delete on public.canciones      to authenticated;  -- RLS: cada profesor lo suyo; se leen las compartidas de su institución (12)
+grant select, insert, update, delete on public.plantillas_culto to authenticated;  -- RLS: cada profesor las suyas (12)
 
 -- Participantes en vivo: todos ven el ranking, nadie ve el token
 grant select (id, sesion_id, alumno_id, alias, avatar, estado, puntaje, tiempo_total_seg, iniciado_en, finalizado_en, created_at)

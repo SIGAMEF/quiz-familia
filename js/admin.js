@@ -7,6 +7,7 @@ import {
 } from './comun.js';
 import { montarEditorQuiz } from './editor-quiz.js';
 import { vistaProyectos } from './proyectos/lista.js';
+import { vistaCultos } from './cultos/vista.js';
 import { vistaConsumo } from './consumo.js';
 import { fmtMB } from './proyectos/archivos.js';
 
@@ -22,6 +23,7 @@ const VISTAS = {
   quizzes: { ico: '📚', txt: 'Quizzes' },
   publicos: { ico: '🌐', txt: 'Públicos y destacados' },
   proyectos: { ico: '🎨', txt: 'Proyectos en grupo' },
+  cultos: { ico: '🎵', txt: 'Cultos' },
   periodos: { ico: '📅', txt: 'Periodos' },
   consumo: { ico: '📈', txt: 'Consumo' }
 };
@@ -61,7 +63,7 @@ function enrutar() {
   $$('[data-ir]').forEach(b => b.classList.toggle('activo', b.dataset.ir === clave));
   $('#tituloVista').textContent = vista === 'quiz' ? 'Editar quiz' : (VISTAS[vista]?.txt || 'Resumen');
   window.scrollTo(0, 0);
-  const v = { inicio: vInicio, profesores: vProfesores, instituciones: vInstituciones, alumnos: vAlumnos, quizzes: vQuizzes, quiz: vQuiz, periodos: vPeriodos, publicos: vPublicos, proyectos: () => vistaProyectos(contenido, { rpc, panel: 'admin' }), consumo: () => vistaConsumo(contenido, { rpc }) };
+  const v = { inicio: vInicio, profesores: vProfesores, instituciones: vInstituciones, alumnos: vAlumnos, quizzes: vQuizzes, quiz: vQuiz, periodos: vPeriodos, publicos: vPublicos, proyectos: () => vistaProyectos(contenido, { rpc, panel: 'admin' }), cultos: (p) => vistaCultos(contenido, { perfil, param: p }), consumo: () => vistaConsumo(contenido, { rpc }) };
   (v[vista] || vInicio)(param ? decodeURIComponent(param) : '');
 }
 

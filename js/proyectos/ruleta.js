@@ -54,11 +54,19 @@ export function restantes(hoja, candidatos, sorteos) {
   return candidatos.filter(c => !salieron.has(c.clave));
 }
 
+// Número al azar entre 0 y n-1 con el generador criptográfico del navegador (sin sesgo: se descartan los valores
+// del final que harían más probables a los primeros)
+export function azar(n) {
+  if (n <= 1) return 0;
+  const limite = Math.floor(0x100000000 / n) * n, buf = new Uint32Array(1);
+  do crypto.getRandomValues(buf); while (buf[0] >= limite);
+  return buf[0] % n;
+}
 // Sorteo sin servidor (presentación o simulación); devuelve null si no queda nadie
 export function sortearLocal(hoja, candidatos, sorteos) {
   const quedan = restantes(hoja, candidatos, sorteos);
   if (!quedan.length) return null;
-  const x = quedan[Math.floor(Math.random() * quedan.length)];
+  const x = quedan[azar(quedan.length)];
   return { ronda: (sorteos.at(-1)?.ronda || 0) + 1, clave: x.clave, texto: x.texto, created_at: new Date().toISOString() };
 }
 

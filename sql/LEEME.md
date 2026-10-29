@@ -10,17 +10,20 @@ Ejecutar en el **SQL Editor de Supabase**, en este orden.
 | 3 | `03_migrar.sql` | Justo después del 2 | No |
 | 4 | `04_bancos_html.sql` | Opcional, después del 3 | No. Importa las 322 preguntas de `quiz.html` y `lucas.html` |
 | 5 | `05_parche_paneles.sql` | Después del 4 (y cada vez que llegue una versión nueva) | No. Funciones de los paneles; se puede ejecutar varias veces |
-| 6 | `06_permisos.sql` | **Siempre al final** (después del 05, 07, 08, 09, 10 y 11) | No. Da a la app los permisos sobre las tablas; se puede ejecutar varias veces |
+| 6 | `06_permisos.sql` | **Siempre al final** (después del 05, 07, 08, 09, 10, 11 y 12) | No. Da a la app los permisos sobre las tablas; se puede ejecutar varias veces |
 | 7 | `07_proyectos.sql` | Después del 05 (y cada vez que llegue una versión nueva). Luego, otra vez el 06 | No. Proyectos en grupo (tablas, funciones y la política de Storage para `proyectos/`); se puede ejecutar varias veces |
 | 8 | `08_archivos.sql` | Después del 07 (si vuelves a ejecutar el 07, ejecuta otra vez el 08). Luego, otra vez el 06 | No. "Mis archivos": registro de imágenes y videos, límite de espacio por profesor y políticas de Storage de la carpeta propia. Registra los archivos que ya estaban subidos |
 | 9 | `09_actividades.sql` | Después del 08 (y después del 05, si lo vuelves a ejecutar). Luego, otra vez el 06 | No. Mis actividades: Trivia y Quiz relámpago como juegos, visibilidad (privado, grupos, público, destacado), fila de destacados de la portada y biblioteca con proyectos. También fija los máximos de cada juego (200 palabras o preguntas): si actualizas la app, vuelve a ejecutarlo |
 | 10 | `10_consumo.sql` | Después del 09. Luego, otra vez el 06 | No. Visor de consumo de Supabase en el panel (solo el admin): tamaño de la base, Storage, usuarios activos del mes y sesiones en vivo abiertas; se puede ejecutar varias veces |
 | 11 | `11_salas_turnos.sql` | Después del 05 (y cada vez que llegue una versión nueva). Luego, otra vez el 06 | No. Salas en línea **por turnos**: una sola partida para todos, cada jugador mueve en su turno desde su dispositivo (tabla de jugadas y funciones `sala_turnos`, `sala_jugar`, `sala_fin_turnos`); se puede ejecutar varias veces |
+| 12 | `12_cultos.sql` | Después del 05 (y cada vez que llegue una versión nueva). Luego, otra vez el **08** (para que "Mis archivos" revise también las plantillas) y el 06 | No. Cultos: biblioteca de **canciones** (letra en estrofas, orden de canto, división en pantallas y "Compartir con mi iglesia" entre profesores de la misma institución) y **plantillas propias** (las 18 prediseñadas, los fondos animados y los objetos están en el código, no en la base); se puede ejecutar varias veces |
 
 Pruebas opcionales (después del 07, 08, 09 y 06). Todo se deshace al final:
 - `pruebas/flujos_proyectos.sql` → "TODAS LAS PRUEBAS DE PROYECTOS PASARON".
 - `pruebas/flujos_archivos.sql` → "TODAS LAS PRUEBAS DE ARCHIVOS PASARON".
 - `pruebas/flujos_actividades.sql` → "TODAS LAS PRUEBAS DE ACTIVIDADES PASARON" (después del 09).
+- `pruebas/flujos_ruleta.sql` → "TODAS LAS PRUEBAS DE RULETA PASARON" (después del 07 y el 06): ruleta al azar, ruleta de participantes y cierre de sesiones inactivas.
+- `pruebas/flujos_cultos.sql` → "TODAS LAS PRUEBAS DE CULTOS PASARON" (después del 12 y el 06).
 
 Antes del paso 2, en Supabase → **Authentication → Sign In / Providers**:
 - *Allow new users to sign up*: **activado**

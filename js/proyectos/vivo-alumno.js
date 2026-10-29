@@ -116,7 +116,7 @@ async function sondear() {
   }
   if (e.estado === 'finalizada') {
     olvidar(yo.sesion_id);
-    return pantalla(`<div style="font-size:54px;">🎉</div><h2>¡Terminamos!</h2><p class="muted" style="font-weight:700;">La sesión “${esc(e.proyecto || '')}” terminó. ¡Gracias por participar!</p><p style="margin-top:14px;"><a class="btn btn-primary" href="index.html">Ir al inicio</a></p>`);
+    return pantalla(`<div style="font-size:54px;">🎉</div><h2>¡Terminamos!</h2><p class="muted" style="font-weight:700;">La sesión “${esc(e.proyecto || '')}” ${e.inactiva ? 'se cerró porque estuvo mucho tiempo sin actividad' : 'terminó'}. ¡Gracias por participar!</p><p style="margin-top:14px;"><a class="btn btn-primary" href="index.html">Ir al inicio</a></p>`);
   }
   ajustarReloj(e.ahora);
   if (e.hoja) hoja = e.hoja;

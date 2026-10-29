@@ -14,7 +14,8 @@ import { elegirActividad } from './catalogo.js';
 import { pintarVisibilidad, chipsFiltro } from './visibilidad.js';
 import { vistaConsumo } from './consumo.js';
 import { imprimir } from './juegos/imprimir.js?v=202610242346';
-import { htmlTarjetaProyecto, conectarTarjetaProyecto, crearProyecto, publicarProyecto } from './proyectos/lista.js';
+import { htmlTarjetaProyecto, conectarTarjetaProyecto, crearProyecto, publicarProyecto, misProyectos } from './proyectos/lista.js';
+import { vistaCultos } from './cultos/vista.js';
 
 const raiz = $('#raiz');
 let perfil = null;
@@ -27,6 +28,7 @@ const VISTAS = {
   grupos: { ico: '👥', txt: 'Grupos y alumnos' },
   publicar: { ico: '📣', txt: 'Publicar' },
   vivo: { ico: '🏆', txt: 'En vivo' },
+  cultos: { ico: '🎵', txt: 'Cultos' },
   libreta: { ico: '📒', txt: 'Libreta de notas' }
 };
 
@@ -71,7 +73,7 @@ function enrutar() {
   const titulos = { ...Object.fromEntries(Object.entries(VISTAS).map(([k, v]) => [k, v.txt])), perfil: 'Mi perfil', quiz: 'Editar quiz', juegos: 'Mis actividades', proyectos: 'Mis actividades' };
   $('#tituloVista').textContent = titulos[vista] || 'Inicio';
   window.scrollTo(0, 0);
-  const vistas = { inicio: vInicio, quizzes: vQuizzes, juegos: () => vQuizzes('juegos'), quiz: vQuiz, banco: vBanco, carga: vCarga, grupos: vGrupos, publicar: vPublicar, vivo: vVivo, proyectos: () => vQuizzes('proyectos'), libreta: vLibreta, perfil: vPerfil, consumo: () => perfil.rol === 'admin' ? vistaConsumo(contenido, { rpc }) : vInicio() };
+  const vistas = { inicio: vInicio, quizzes: vQuizzes, juegos: () => vQuizzes('juegos'), quiz: vQuiz, banco: vBanco, carga: vCarga, grupos: vGrupos, publicar: vPublicar, vivo: vVivo, proyectos: () => vQuizzes('proyectos'), libreta: vLibreta, perfil: vPerfil, cultos: (p) => vistaCultos(contenido, { perfil, param: p }), consumo: () => perfil.rol === 'admin' ? vistaConsumo(contenido, { rpc }) : vInicio() };
   (vistas[vista] || vInicio)(param ? decodeURIComponent(param) : '');
 }
 
@@ -173,7 +175,7 @@ async function vQuizzes(filtroIni = '') {
   spinner();
   let quizzes, juegos, proyectos, grupos;
   try {
-    [quizzes, juegos, proyectos, grupos] = await Promise.all([misQuizzes(), rpc('mis_juegos_profesor'), rpc('mis_proyectos'), misGrupos()]);
+    [quizzes, juegos, proyectos, grupos] = await Promise.all([misQuizzes(), rpc('mis_juegos_profesor'), misProyectos(rpc), misGrupos()]);
   } catch (e) { return falla(e); }
   let filtro = { quizzes: 'quiz', juegos: 'juego', proyectos: 'proyecto' }[filtroIni] || '';
   const items = [

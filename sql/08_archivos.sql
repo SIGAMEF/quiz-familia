@@ -89,6 +89,20 @@ begin
     v := v || x;
   exception when others then null;
   end;
+  begin   -- plantillas de culto propias (12_cultos.sql)
+    select coalesce(jsonb_agg(jsonb_build_object('donde', 'plantilla', 'id', t.id, 'propio', t.profesor_id = auth.uid(),
+             'nombre', case when t.profesor_id = auth.uid() or es_admin() then t.nombre else 'Una plantilla de otro profesor' end)), '[]'::jsonb) into x
+    from plantillas_culto t where strpos(t.diseno::text, p_ruta) > 0;
+    v := v || x;
+  exception when others then null;   -- si todavía no se ejecutó el 12
+  end;
+  begin   -- detalles de las pantallas de una canción (12_cultos.sql)
+    select coalesce(jsonb_agg(jsonb_build_object('donde', 'cancion', 'id', c.id, 'propio', c.profesor_id = auth.uid(),
+             'nombre', case when c.profesor_id = auth.uid() or es_admin() then c.titulo else 'Una canción de otro profesor' end)), '[]'::jsonb) into x
+    from canciones c where strpos(c.detalles::text, p_ruta) > 0;
+    v := v || x;
+  exception when others then null;
+  end;
   return v;
 end $$;
 

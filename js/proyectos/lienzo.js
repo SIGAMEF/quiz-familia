@@ -10,6 +10,9 @@ import { esPregunta, pintarZona, textoEnunciado, pintarParticipante } from './pr
 import { pintarZonaAgrupar, pintarRegistro } from './agrupar.js';
 import { pintarZonaRuleta, pintarRuletaCelular } from './ruleta.js';
 import { pintarZonaJuego, pintarEsperaJuego } from './juego-hoja.js';
+import { montarFondoAnimado } from '../cultos/fondos.js';
+import { SVG as SVG_OBJETOS, ANIMACIONES, ANIMACIONES_TEXTO, DURACION, VELOCIDADES } from '../cultos/objetos.js';
+import { pintarLetraRica, PALETAS } from '../cultos/resaltar.js';
 
 export const ASPECTO = 16 / 9;
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -45,9 +48,11 @@ export function miniaturaVideo(el) {
 // Imagen: { tipo:'imagen', valor:url, color, modo:'cubrir'|'ajustar'|'estirar'|'mosaico'|'original',
 //           zoom:50–300, px/py: punto de enfoque en %, opacidad, oscurecer:0–0.7, desenfoque:0–20, nat:[ancho,alto] }
 export const MODOS_FONDO = { cubrir: 'Cubrir', ajustar: 'Ajustar', estirar: 'Estirar', mosaico: 'Mosaico', original: 'Tamaño original' };
-export function pintarFondo(capa, f = {}) {
+// Fondo animado: { tipo: 'animado', valor: 'aurora', p: { base: [...], colores: [...] } } (js/cultos/fondos.js)
+export function pintarFondo(capa, f = {}, { calidad = 'alta' } = {}) {
   capa.replaceChildren();
   capa.removeAttribute('style');
+  if (f?.tipo === 'animado') { montarFondoAnimado(capa, f, { calidad }); return; }
   if (f.tipo !== 'imagen' || !urlSegura(f.valor)) { Object.assign(capa.style, estiloFondo(f)); return; }
   capa.style.backgroundColor = colorValido(f.color, '#2D2A45');
   const img = document.createElement('div');
@@ -107,6 +112,8 @@ function crearElemento(el, modo, ctx) {
   const d = document.createElement('div');
   d.className = 'pe pe-' + el.tipo;
   d.dataset.id = el.id;
+  if (el.vinculo === 'letra' || el.vinculo === 'pie') d.dataset.vinculo = el.vinculo;
+  if (el.bloqueado) d.classList.add('bloq');   // de la plantilla: en el editor de canciones no se elige ni se mueve
   let altoCqw;   // alto del elemento en cqw (para el tamaño de los emojis)
   if (fmt === 'web') { colocar(d, el); altoCqw = num(el.h, 20, 1, 300) * 0.5625; }
   else if (fmt === 'manual') { const p = posMovil(ctx.hoja, el); colocar(d, p, 'manual'); altoCqw = num(p.h, 20, 1, 2000); }
@@ -125,15 +132,85 @@ function crearElemento(el, modo, ctx) {
   if (el.tipo === 'texto') {
     const t = document.createElement('div');
     t.className = 'pe-txt';
-    t.textContent = el.vinculo === 'enunciado' && ctx.hoja ? textoEnunciado(ctx.hoja) : (el.texto ?? '');
+    t.textContent = el.vinculo === 'enunciado' && ctx.hoja ? textoEnunciado(ctx.hoja)
+      : el.vinculo === 'letra' ? (ctx.textos?.letra ?? LETRA_EJEMPLO) : el.vinculo === 'pie' ? (ctx.textos?.pie ?? 'Canción de ejemplo · Estrofa 1') : (el.texto ?? '');
     Object.assign(t.style, {
       fontFamily: `'${fuenteValida(el.fuente)}', 'Nunito', sans-serif`, fontSize: (fmt === 'web' ? num(el.tam, 4, 0.5, 40) : tamMovil(el.tam)) + 'cqw',
       color: colorValido(el.color, '#2D2A45'), textAlign: ['left', 'center', 'right'].includes(el.alinear) ? el.alinear : 'center',
-      fontWeight: el.negrita ? '800' : '400', fontStyle: el.cursiva ? 'italic' : 'normal'
+      fontWeight: el.peso ? String(Math.round(num(el.peso, 400, 100, 900) / 100) * 100) : el.negrita ? '800' : '400', fontStyle: el.cursiva ? 'italic' : 'normal'
     });
-    if (el.fondoCaja) { d.style.background = colorValido(el.fondoCaja, 'transparent'); d.style.borderRadius = '1.2cqw'; if (fmt === 'auto') t.style.padding = '2cqw 3cqw'; }
+    if (el.espaciado) t.style.letterSpacing = num(el.espaciado, 0, -0.1, 0.8) + 'em';
+    if (el.interlineado) t.style.lineHeight = String(num(el.interlineado, 1.15, 0.7, 2.5));
+    if (el.mayus) t.style.textTransform = 'uppercase';
+    if (el.fondoCaja) {
+      d.style.background = colorValido(el.fondoCaja, 'transparent');
+      d.style.borderRadius = el.redondo ? '99cqw' : '1.2cqw';
+      if (fmt === 'auto' || el.redondo) t.style.padding = el.redondo ? '0 2.4cqw' : '2cqw 3cqw';
+    }
     if (el.sombra) t.style.textShadow = '0 0.25cqw 0.6cqw rgba(0,0,0,.35)';
+    efectoTexto(t, el.efecto);
+    if (el.vinculo === 'letra' && Array.isArray(ctx.textos?.fuente)) {
+      pintarLetraRica(t, ctx.textos.fuente, ctx.resaltados, { animar: animar(ctx), marcar: !!ctx.marcar });
+      t.style.whiteSpace = ctx.textos.partir ? 'pre-wrap' : 'pre';
+      t.style.overflowWrap = ctx.textos.chico ? 'anywhere' : 'normal';
+    }
+    if (el.anim === 'marquesina' && animar(ctx)) {
+      // el texto corre dentro de su caja: dos copias seguidas que se desplazan la mitad
+      const banda = document.createElement('span');
+      banda.className = 'pe-marq';
+      banda.textContent = `${t.textContent}\u2003\u2003${t.textContent}\u2003\u2003`;
+      t.textContent = '';
+      t.appendChild(banda);
+      t.classList.add('marq');
+      ponerAnimacion(banda, el);
+    } else if (el.anim === 'escribir' && animar(ctx)) {
+      t.style.setProperty('--pasos', String(Math.max(4, Math.min(120, t.textContent.length))));
+      ponerAnimacion(t, el);
+    }
     d.appendChild(t);
+  } else if (el.tipo === 'objeto') {
+    const o = SVG_OBJETOS[el.obj];
+    if (!o) return null;
+    const c = document.createElement('div');
+    c.className = 'pe-svg';
+    c.innerHTML = o.svg;   // dibujo fijo de js/cultos/objetos.js (se elige por identificador, nunca viene de los datos)
+    d.appendChild(c);
+  } else if (el.tipo === 'busqueda') {
+    // caja de búsqueda (diseño propio): lupa, el texto que se escribe solo con un cursor y un micrófono
+    const b = document.createElement('div');
+    b.className = 'pe-busq';
+    b.style.fontSize = (altoCqw * 0.36).toFixed(2) + 'cqw';
+    b.innerHTML = '<svg viewBox="0 0 24 24" class="pe-busq-ico" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="#9AA0A6" stroke-width="2.4"/><path d="M15.5 15.5 21 21" stroke="#9AA0A6" stroke-width="2.4" stroke-linecap="round"/></svg>'
+      + '<span class="pe-busq-txt"></span><span class="pe-busq-cursor"></span>'
+      + '<svg viewBox="0 0 24 24" class="pe-busq-ico" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="#4285F4"/><path d="M6 11a6 6 0 0 0 12 0" fill="none" stroke="#34A853" stroke-width="2"/><path d="M12 17v4" stroke="#FBBC05" stroke-width="2"/><path d="M9 21h6" stroke="#EA4335" stroke-width="2" stroke-linecap="round"/></svg>';   // dibujos fijos
+    const tx = b.querySelector('.pe-busq-txt');
+    tx.textContent = String(el.texto ?? '').slice(0, 120);
+    if (animar(ctx)) {
+      tx.classList.add('a-escribir');
+      tx.style.setProperty('--pasos', String(Math.max(4, tx.textContent.length)));
+      tx.style.setProperty('--t', (num(el.dur, 3, 0.5, 20) * (VELOCIDADES[el.vel] || 1)).toFixed(2) + 's');
+      if (el.retraso) tx.style.setProperty('--d', num(el.retraso, 0, 0, 60) + 's');
+    }
+    d.appendChild(b);
+  } else if (el.tipo === 'lluvia') {
+    // emojis que suben desde abajo; quietos (repartidos) cuando no se anima, para ver cuáles son
+    const emojis = (Array.isArray(el.emojis) ? el.emojis : []).map(e => String(e || '').slice(0, 16)).filter(Boolean).slice(0, 6);
+    const lista = emojis.length ? emojis : ['✨'];
+    const n = Math.round(num(el.cantidad, 10, 3, 24)), tam = num(el.tam, 5, 1, 20), mover = animar(ctx);
+    const vel = VELOCIDADES[el.vel] || 1;
+    for (let i = 0; i < n; i++) {
+      const g = document.createElement('span');
+      g.className = 'pe-gota' + (mover ? ' a-subir' : '');
+      g.textContent = lista[i % lista.length];
+      const k = (i * 37) % 100;   // reparto que no se ve ordenado
+      g.style.left = `${((i + 0.5) * (100 / n) - 2 + (k % 5)).toFixed(1)}%`;
+      g.style.fontSize = (tam * (0.75 + ((i * 7) % 5) * 0.12)).toFixed(2) + 'cqw';
+      if (mover) {
+        g.style.setProperty('--t', ((6 + (i % 4)) * vel).toFixed(2) + 's');
+        g.style.setProperty('--d', `-${(i * 1.3 * vel).toFixed(2)}s`);
+      } else g.style.bottom = `${8 + (k % 70)}%`;
+      d.appendChild(g);
+    }
   } else if (el.tipo === 'imagen') {
     if (urlSegura(el.url)) {
       const img = document.createElement('img');
@@ -200,7 +277,56 @@ function crearElemento(el, modo, ctx) {
   } else {
     return null;
   }
+  if (animar(ctx) && el.tipo !== 'lluvia' && el.tipo !== 'busqueda' && el.anim !== 'marquesina' && el.anim !== 'escribir' && el.anim !== 'ninguna' && (ANIMACIONES[el.anim] || ANIMACIONES_TEXTO[el.anim])) {
+    const a = document.createElement('div');
+    a.className = 'pe-anim';
+    a.append(...d.childNodes);
+    // la caja de color se mueve con el texto (si no, en "aparecer" o "chat" se vería la caja vacía)
+    if (d.style.background) { a.style.background = d.style.background; a.style.borderRadius = d.style.borderRadius; d.style.background = ''; }
+    d.appendChild(a);
+    ponerAnimacion(a, el);
+  }
   return d;
+}
+
+// ---------- Animaciones y efectos ----------
+export const LETRA_EJEMPLO = 'Te alabaré con todo mi ser\ntu amor me sostiene\nen ti está mi fe';
+// En el editor todo está quieto (para poder elegir y mover), salvo que se pida ver las animaciones
+const animar = (ctx) => ctx.animar !== false;
+function ponerAnimacion(nodo, el) {
+  const dur = num(el.dur, DURACION[el.anim] || 3, 0.3, 60) * (VELOCIDADES[el.vel] || 1);
+  nodo.classList.add('a-' + el.anim);
+  nodo.style.setProperty('--t', dur.toFixed(2) + 's');
+  if (el.retraso) nodo.style.setProperty('--d', num(el.retraso, 0, -60, 60) + 's');
+}
+// efecto: { tipo: 'brillo'|'solida'|'contorno'|'degradado', color, color2 }
+export const EFECTOS_TEXTO = { brillo: 'Brillo', solida: 'Sombra sólida', contorno: 'Contorno', degradado: 'Degradado', multicolor: 'Multicolor por letra' };
+function efectoTexto(t, ef) {
+  if (!ef || typeof ef !== 'object' || !EFECTOS_TEXTO[ef.tipo]) return;
+  if (ef.tipo === 'multicolor') {
+    const colores = (Array.isArray(ef.colores) && ef.colores.length ? ef.colores : (PALETAS[ef.paleta] || PALETAS.buscador).colores).slice(0, 8).map(c => colorValido(c, '#FFFFFF'));
+    const texto = t.textContent;
+    t.textContent = '';
+    const bloque = document.createElement('div');   // un solo hijo: el .pe-txt es una grilla y cada letra sería una fila
+    bloque.className = 'pe-letra';
+    let i = 0;
+    for (const ch of texto) {
+      if (/\s/.test(ch)) { bloque.append(ch); continue; }
+      const l = document.createElement('span');
+      l.textContent = ch;
+      l.style.color = colores[i++ % colores.length];
+      bloque.appendChild(l);
+    }
+    t.appendChild(bloque);
+    return;
+  }
+  const c = colorValido(ef.color, '#FFFFFF'), c2 = colorValido(ef.color2, '#F0ABFC');
+  if (ef.tipo === 'brillo') t.style.textShadow = `0 0 3cqw ${c}`;
+  else if (ef.tipo === 'solida') t.style.textShadow = `0.45cqw 0.45cqw 0 ${c}`;
+  else if (ef.tipo === 'contorno') { t.style.webkitTextStroke = `${num(ef.grosor, 0.3, 0.05, 1.5)}cqw ${c}`; t.style.paintOrder = 'stroke fill'; }
+  else {
+    Object.assign(t.style, { backgroundImage: `linear-gradient(${num(ef.angulo, 90, 0, 360)}deg, ${c}, ${c2})`, webkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' });
+  }
 }
 
 // Orden del acomodo automático: de arriba hacia abajo y, en una misma franja, de izquierda a derecha
@@ -215,16 +341,21 @@ export function ordenAuto(elementos) {
 }
 
 // Dibuja la hoja (Web, 16:9) dentro de `cont`. Devuelve el nodo .lienzo
-export function pintarHoja(cont, hoja, { modo = 'ver', res = null } = {}) {
+// ver: 'portada' | 'letra' en las plantillas de culto (un elemento puede ser de una sola: el.en);
+// textos: { letra, pie } para la zona de la letra; animar: false deja todo quieto (así lo usa el editor)
+export const seVe = (el, ver) => !ver || !el.en || el.en === ver;
+export function pintarHoja(cont, hoja, { modo = 'ver', res = null, ver = hoja?.ver ?? null, textos = hoja?.textos ?? null, resaltados = hoja?.resaltados ?? null,
+  animar = modo !== 'editor', calidad, marcar = false } = {}) {
   asegurarFuentes();
   const lienzo = document.createElement('div');
   lienzo.className = 'lienzo' + (modo !== 'ver' ? ' estatico' : '');
   const fondo = document.createElement('div');
   fondo.className = 'lienzo-fondo';
-  pintarFondo(fondo, hoja?.diseno?.fondo);
+  pintarFondo(fondo, hoja?.diseno?.fondo, { calidad: calidad || (modo === 'miniatura' ? 'baja' : 'alta') });
   lienzo.appendChild(fondo);
-  const ctx = { hoja, res, fmt: 'web' };
+  const ctx = { hoja, res, fmt: 'web', ver, textos, resaltados, animar, marcar };
   for (const el of (hoja?.diseno?.elementos || [])) {
+    if (!seVe(el, ver)) continue;
     const n = crearElemento(el, modo, ctx);
     if (n) lienzo.appendChild(n);
   }
@@ -245,7 +376,7 @@ export function pintarHojaMovil(cont, hoja, { modo = 'ver', res = null } = {}) {
   scroll.className = 'movil-scroll';
   const lienzo = document.createElement('div');
   lienzo.className = `lienzo movil ${manual ? 'manual' : 'auto'}${modo !== 'ver' ? ' estatico' : ''}`;
-  const ctx = { hoja, res, fmt: manual ? 'manual' : 'auto' };
+  const ctx = { hoja, res, fmt: manual ? 'manual' : 'auto', animar: modo !== 'editor' };
   const els = hoja?.diseno?.elementos || [];
   let fondoY = 0;
   for (const el of manual ? els : ordenAuto(els)) {
@@ -264,7 +395,7 @@ export function pintarHojaMovil(cont, hoja, { modo = 'ver', res = null } = {}) {
 // Vuelve a dibujar solo un elemento (más rápido mientras se edita)
 export function repintarElemento(lienzo, el, modo = 'editor', ctx = {}) {
   const viejo = lienzo.querySelector(`.pe[data-id="${CSS.escape(el.id)}"]`);
-  const nuevo = crearElemento(el, modo, { fmt: lienzo.classList.contains('movil') ? (lienzo.classList.contains('manual') ? 'manual' : 'auto') : 'web', ...ctx });
+  const nuevo = crearElemento(el, modo, { fmt: lienzo.classList.contains('movil') ? (lienzo.classList.contains('manual') ? 'manual' : 'auto') : 'web', animar: modo !== 'editor', ...ctx });
   if (viejo && nuevo) viejo.replaceWith(nuevo);
   return nuevo;
 }

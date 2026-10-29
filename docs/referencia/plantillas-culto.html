@@ -1,0 +1,554 @@
+<title>Plantillas de culto</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Bebas+Neue&family=Caveat:wght@600&family=Cinzel:wght@500;700&family=Cormorant+Garamond:ital,wght@0,500;1,500&family=DM+Serif+Display&family=Great+Vibes&family=Josefin+Sans:wght@300;600&family=Manrope:wght@400;600;800&family=Montserrat:wght@500;700;800&family=Oswald:wght@500&family=Press+Start+2P&family=Playfair+Display:ital,wght@1,600&family=Unbounded:wght@600&display=swap">
+<style>
+/* Cabina de proyección: interfaz oscura y sobria para que las plantillas sean lo único con color. */
+:root{
+  color-scheme: dark;
+  --bg:#0d0f14; --panel:#151821; --linea:#262a36; --fg:#e9e6df; --suave:#9aa0ad; --acento:#f2b84b;
+  --f-ui:"Manrope",system-ui,sans-serif; --f-titulo:"Unbounded","Manrope",sans-serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-ui);font-size:15px;line-height:1.5}
+.envoltura{max-width:1280px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.cab{display:flex;flex-wrap:wrap;gap:16px 32px;align-items:end;justify-content:space-between;margin-bottom:22px}
+h1{font-family:var(--f-titulo);font-size:clamp(24px,4vw,38px);margin:0;letter-spacing:-.01em;text-wrap:balance}
+.cab p{margin:6px 0 0;color:var(--suave);max-width:62ch}
+.pestanas{display:flex;gap:4px;background:var(--panel);border:1px solid var(--linea);border-radius:999px;padding:4px}
+.pestanas button,.chips button,.seg button{font:inherit;cursor:pointer;border:0;background:none;color:var(--suave);padding:7px 14px;border-radius:999px;font-weight:600}
+.pestanas button[aria-pressed="true"],.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 18px}
+.chips button{border:1px solid var(--linea);font-size:13px;padding:5px 12px}
+.chips button[aria-pressed="true"]{border-color:var(--acento);color:var(--acento)}
+button:focus-visible{outline:2px solid var(--acento);outline-offset:2px}
+.rejilla{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:22px}
+.tarjeta{background:none;border:0;padding:0;text-align:left;color:inherit;font:inherit;cursor:pointer;display:grid;gap:9px}
+.tarjeta .slide{border-radius:10px;box-shadow:0 0 0 1px var(--linea);transition:transform .2s, box-shadow .2s}
+.tarjeta:hover .slide{transform:translateY(-3px);box-shadow:0 0 0 2px var(--acento),0 14px 30px rgba(0,0,0,.45)}
+.tarjeta .meta{display:flex;justify-content:space-between;gap:10px;font-size:13px}
+.tarjeta .meta b{font-weight:800}
+.tarjeta .meta span{color:var(--suave)}
+.nota{margin-top:40px;border-top:1px solid var(--linea);padding-top:20px;color:var(--suave);font-size:14px;max-width:80ch}
+.nota b{color:var(--fg)}
+.nota code{background:var(--panel);padding:1px 6px;border-radius:5px;color:var(--fg)}
+
+/* ---------- Diapositiva 16:9 ---------- */
+.slide{position:relative;aspect-ratio:16/9;width:100%;max-width:100%;overflow:hidden;container-type:inline-size;background:#000;isolation:isolate}
+.slide canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.capa{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:6cqw 8cqw;gap:1.4cqw;z-index:1}
+.capa > *{margin:0}
+.k{font-family:"Montserrat",sans-serif;font-weight:700;font-size:1.5cqw;letter-spacing:.45em;text-transform:uppercase;opacity:.9}
+.cita{font-family:"Josefin Sans",sans-serif;font-weight:600;font-size:1.6cqw;letter-spacing:.3em;text-transform:uppercase;opacity:.85}
+.letra .lin{white-space:pre-line;font-size:5.4cqw;line-height:1.28}
+.letra .pie{position:absolute;bottom:3.2cqw;left:0;right:0;font-family:"Montserrat",sans-serif;font-size:1.2cqw;letter-spacing:.35em;text-transform:uppercase;opacity:.55}
+
+/* 1 Bienvenida */
+.tpl-bienvenida{color:#fff}
+.tpl-bienvenida .t{line-height:.9;display:grid}
+.tpl-bienvenida .t .sc{font-family:"Great Vibes",cursive;font-size:10cqw;color:#a7f3d0;text-shadow:0 .4cqw 2cqw rgba(0,0,0,.35)}
+.tpl-bienvenida .t .bo{font-family:"Anton",sans-serif;font-size:8.5cqw;letter-spacing:.14em;margin-top:-1.2cqw}
+.tpl-bienvenida .s{font-family:"Montserrat",sans-serif;font-size:1.8cqw;font-weight:500;opacity:.85}
+.tpl-bienvenida .letra .lin{font-family:"Montserrat",sans-serif;font-weight:800}
+/* 2 Adoración */
+.tpl-adoracion{color:#fff7e6}
+.tpl-adoracion .t{font-family:"Cormorant Garamond",serif;font-style:italic;font-weight:500;font-size:10cqw;line-height:1;text-shadow:0 0 3cqw rgba(255,214,140,.45)}
+.tpl-adoracion .k,.tpl-adoracion .s{display:flex;align-items:center;gap:2cqw}
+.tpl-adoracion .k::before,.tpl-adoracion .k::after{content:"";width:6cqw;height:1px;background:currentColor;opacity:.6}
+.tpl-adoracion .s{font-family:"Cormorant Garamond",serif;font-size:2.4cqw}
+.tpl-adoracion .letra .lin{font-family:"Cormorant Garamond",serif;font-weight:500;font-size:6.2cqw}
+/* 3 Alabanza */
+.tpl-alabanza{color:#fff}
+.tpl-alabanza .t{font-family:"Archivo Black",sans-serif;font-size:10.5cqw;line-height:.95;text-transform:uppercase;text-shadow:.5cqw .5cqw 0 #7c2d92}
+.tpl-alabanza .s{font-family:"Caveat",cursive;font-size:5cqw;color:#fff3b0;transform:rotate(-3deg)}
+.tpl-alabanza .letra .lin{font-family:"Archivo Black",sans-serif;font-size:5cqw;text-shadow:.35cqw .35cqw 0 #7c2d92}
+/* 4 Juvenil */
+.tpl-juvenil{color:#fff}
+.tpl-juvenil .portada{align-items:flex-start;text-align:left;padding-left:9cqw}
+.tpl-juvenil .k{background:#22d3ee;color:#0b0420;padding:.6cqw 1.6cqw;letter-spacing:.25em;border-radius:.4cqw}
+.tpl-juvenil .t{font-family:"Bebas Neue",sans-serif;font-size:15cqw;line-height:.82;background:linear-gradient(90deg,#22d3ee,#f0abfc 55%,#fb7185);-webkit-background-clip:text;background-clip:text;color:transparent}
+.tpl-juvenil .s{font-family:"Montserrat",sans-serif;font-weight:800;font-size:2cqw;letter-spacing:.2em}
+.tpl-juvenil .letra .lin{font-family:"Bebas Neue",sans-serif;font-size:7.4cqw;letter-spacing:.03em;line-height:1.05}
+/* 5 Palabra */
+.tpl-palabra{color:#f4f1ff}
+.tpl-palabra .t{font-family:"DM Serif Display",serif;font-size:6.6cqw;line-height:1.12;max-width:70cqw;position:relative}
+.tpl-palabra .t::before{content:"“";position:absolute;left:-6cqw;top:-5cqw;font-size:16cqw;color:#c4b5fd;opacity:.5}
+.tpl-palabra .letra .lin{font-family:"DM Serif Display",serif;font-size:5.6cqw}
+/* 6 Oración */
+.tpl-oracion{color:#1e293b}
+.tpl-oracion .t{font-family:"Josefin Sans",sans-serif;font-weight:300;font-size:8.2cqw;letter-spacing:.06em}
+.tpl-oracion .letra .lin{font-family:"Josefin Sans",sans-serif;font-weight:600;font-size:5.4cqw}
+/* 7 Ofrenda */
+.tpl-ofrenda{color:#fde68a}
+.tpl-ofrenda .t{font-family:"Cinzel",serif;font-weight:700;font-size:6.4cqw;line-height:1.15;max-width:72cqw;text-shadow:0 .3cqw 1.5cqw rgba(0,0,0,.5)}
+.tpl-ofrenda .k{color:#fff}
+.tpl-ofrenda .letra .lin{font-family:"Cinzel",serif;font-weight:500;font-size:4.8cqw}
+/* 8 Santa Cena */
+.tpl-cena{color:#fdf2f8}
+.tpl-cena .t{font-family:"Playfair Display",serif;font-style:italic;font-weight:600;font-size:7.4cqw;line-height:1.1;max-width:70cqw}
+.tpl-cena .k{color:#fcd34d}
+.tpl-cena .letra .lin{font-family:"Playfair Display",serif;font-style:italic;font-size:5.6cqw}
+/* 9 Anuncio */
+.tpl-anuncio{color:#111}
+.tpl-anuncio .portada{flex-direction:row;gap:5cqw;text-align:left}
+.tpl-anuncio .fecha{font-family:"Anton",sans-serif;font-size:11cqw;line-height:.85;color:#fff;text-shadow:0 .5cqw 0 rgba(0,0,0,.18)}
+.tpl-anuncio .fecha small{display:block;font-size:4.4cqw;letter-spacing:.12em}
+.tpl-anuncio .bloque{display:grid;gap:1.2cqw;max-width:44cqw;background:#fff;padding:3cqw 3.4cqw;border-radius:1.2cqw;box-shadow:0 1.4cqw 4cqw rgba(0,0,0,.2)}
+.tpl-anuncio .bloque .t{font-family:"Montserrat",sans-serif;font-weight:800;font-size:4.6cqw;line-height:1.05}
+.tpl-anuncio .bloque .s{font-size:1.7cqw;color:#444}
+.tpl-anuncio .bloque .k{color:#db2777;letter-spacing:.3em}
+.tpl-anuncio .letra{color:#fff}
+.tpl-anuncio .letra .lin{font-family:"Montserrat",sans-serif;font-weight:800;text-shadow:0 .3cqw 1.2cqw rgba(0,0,0,.25)}
+/* 10 Cuenta regresiva */
+.tpl-regresiva{color:#fff}
+.tpl-regresiva .t{font-family:"Oswald",sans-serif;font-weight:500;font-size:20cqw;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:.02em;text-shadow:0 0 4cqw rgba(251,191,36,.35)}
+.tpl-regresiva .s{font-family:"Montserrat",sans-serif;font-size:1.7cqw;opacity:.75;letter-spacing:.2em;text-transform:uppercase}
+.tpl-regresiva .letra .lin{font-family:"Oswald",sans-serif;font-size:5.8cqw}
+/* 11 Bautismo */
+.tpl-bautismo{color:#fff}
+.tpl-bautismo .t{font-family:"Cormorant Garamond",serif;font-weight:500;font-size:10cqw;line-height:1;text-shadow:0 .3cqw 2cqw rgba(0,40,80,.5)}
+.tpl-bautismo .letra .lin{font-family:"Cormorant Garamond",serif;font-weight:500;font-size:6cqw}
+/* 12 Avivamiento */
+.tpl-avivamiento{color:#fff}
+.tpl-avivamiento .t{font-family:"Anton",sans-serif;font-size:11cqw;line-height:.95;letter-spacing:.03em;background:linear-gradient(180deg,#fff 30%,#fdba74);-webkit-background-clip:text;background-clip:text;color:transparent}
+.tpl-avivamiento .k{color:#fdba74}
+.tpl-avivamiento .letra .lin{font-family:"Anton",sans-serif;font-size:6cqw;letter-spacing:.03em}
+
+/* ---------- Objetos animados ---------- */
+.deco{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
+.capa{z-index:2}
+.obj{position:absolute;line-height:1;pointer-events:none;animation-duration:var(--t,4s);animation-delay:var(--d,0s);animation-iteration-count:infinite;animation-timing-function:ease-in-out}
+.obj svg{width:100%;height:auto;display:block;overflow:visible}
+.emo{font-size:var(--s,6cqw)}
+.a-flotar{animation-name:flotar}.a-rebotar{animation-name:rebotar}.a-girar{animation-name:girar;animation-timing-function:linear}
+.a-latir{animation-name:latir}.a-balancear{animation-name:balancear}.a-subir{animation-name:subir;animation-timing-function:linear}
+.a-brillo{animation-name:brillo}.a-pop{animation-name:pop}.a-chat{animation-name:chat;animation-duration:9s}
+.giro-lento{animation:girar 18s linear infinite;transform-origin:50px 50px}
+@keyframes flotar{0%,100%{transform:translateY(0) rotate(var(--r,0deg))}50%{transform:translateY(-1.6cqw) rotate(calc(var(--r,0deg) + 5deg))}}
+@keyframes rebotar{0%,100%{transform:translateY(0) scale(1,1)}35%{transform:translateY(-3cqw) scale(.95,1.05)}55%{transform:translateY(0) scale(1.08,.92)}70%{transform:translateY(-.8cqw) scale(1)}}
+@keyframes girar{to{transform:rotate(360deg)}}
+@keyframes latir{0%,100%{transform:scale(1)}15%{transform:scale(1.16)}30%{transform:scale(1)}45%{transform:scale(1.1)}}
+@keyframes balancear{0%,100%{transform:rotate(-10deg)}50%{transform:rotate(10deg)}}
+@keyframes subir{0%{transform:translateY(0) rotate(0);opacity:0}12%{opacity:1}80%{opacity:1}100%{transform:translateY(-62cqw) rotate(25deg);opacity:0}}
+@keyframes brillo{0%,100%{opacity:.35;transform:scale(.75) rotate(0)}50%{opacity:1;transform:scale(1.1) rotate(45deg)}}
+@keyframes pop{0%,100%{transform:scale(1)}50%{transform:scale(1.1) rotate(-3deg)}}
+@keyframes chat{0%,4%{opacity:0;transform:translateY(1.5cqw) scale(.8)}9%,86%{opacity:1;transform:none}94%,100%{opacity:0;transform:translateY(-1cqw)}}
+@keyframes marq{to{transform:translateX(-50%)}}
+/* 13 Vibes */
+.tpl-vibes{color:#fff}
+.tpl-vibes .t{font-family:"Bebas Neue",sans-serif;font-size:14cqw;line-height:.9;text-shadow:0 0 3cqw rgba(244,114,182,.6)}
+.tpl-vibes .s{font-family:"Montserrat",sans-serif;font-weight:800;font-size:2cqw;letter-spacing:.3em;text-transform:uppercase}
+.tpl-vibes .letra .lin{font-family:"Bebas Neue",sans-serif;font-size:7.2cqw;line-height:1.05}
+/* 14 Stickers */
+.tpl-stickers{color:#1f1147}
+.tpl-stickers .t{font-family:"Archivo Black",sans-serif;font-size:7.6cqw;line-height:1;max-width:66cqw;color:#fff;-webkit-text-stroke:.35cqw #1f1147;paint-order:stroke fill;text-shadow:.6cqw .6cqw 0 #1f1147}
+.tpl-stickers .s{font-size:5cqw}
+.tpl-stickers .letra .lin{font-family:"Archivo Black",sans-serif;font-size:5cqw;color:#fff;-webkit-text-stroke:.25cqw #1f1147;paint-order:stroke fill}
+/* 15 Arcade */
+.tpl-arcade{color:#fef08a}
+.tpl-arcade .t{font-family:"Press Start 2P",monospace;font-size:7cqw;line-height:1.2;text-shadow:.5cqw .5cqw 0 #db2777,1cqw 1cqw 0 #312e81}
+.tpl-arcade .s{font-family:"Press Start 2P",monospace;font-size:1.5cqw;line-height:1.8;color:#a5f3fc}
+.tpl-arcade .letra .lin{font-family:"Press Start 2P",monospace;font-size:3.2cqw;line-height:1.7;text-shadow:.3cqw .3cqw 0 #db2777}
+/* 16 Chat */
+.tpl-chat{color:#fff}
+.tpl-chat .portada{align-items:stretch;justify-content:center;gap:1.6cqw;padding:5cqw 18cqw}
+.burbuja{position:relative;font-family:"Montserrat",sans-serif;font-weight:700;font-size:3.4cqw;padding:1.6cqw 2.6cqw;border-radius:2.6cqw;max-width:70%;opacity:0;animation:chat 9s infinite;animation-delay:var(--d,0s)}
+.burbuja.izq{align-self:flex-start;background:#fff;color:#1e1b4b;border-bottom-left-radius:.6cqw}
+.burbuja.der{align-self:flex-end;background:#22c55e;color:#fff;border-bottom-right-radius:.6cqw}
+.burbuja small{display:block;font-size:1.3cqw;font-weight:600;opacity:.6;margin-bottom:.3cqw}
+.tpl-chat .letra .lin{font-family:"Montserrat",sans-serif;font-weight:800}
+/* 17 Marquesina */
+.tpl-marquesina{color:#fff}
+.banda{position:absolute;left:-10%;width:120%;padding:1.1cqw 0;overflow:hidden;white-space:nowrap;font-family:"Anton",sans-serif;font-size:3.4cqw;letter-spacing:.08em;z-index:1}
+.banda span{display:inline-block;animation:marq 16s linear infinite}
+.banda.b1{top:9%;background:#facc15;color:#111;transform:rotate(-4deg)}
+.banda.b2{bottom:9%;background:#ec4899;transform:rotate(3deg)}
+.banda.b2 span{animation-direction:reverse}
+.tpl-marquesina .t{font-family:"Anton",sans-serif;font-size:15cqw;line-height:.9;letter-spacing:.04em}
+.tpl-marquesina .s{font-family:"Caveat",cursive;font-size:4.4cqw;color:#fde68a}
+.tpl-marquesina .letra .lin{font-family:"Anton",sans-serif;font-size:5.6cqw;letter-spacing:.03em}
+/* 18 Collage */
+.tpl-collage{color:#fff}
+.polaroid{position:absolute;background:#fff;padding:.9cqw .9cqw 3.2cqw;width:17cqw;box-shadow:0 1.2cqw 3cqw rgba(0,0,0,.3);animation:flotar 6s ease-in-out infinite;animation-delay:var(--d,0s)}
+.polaroid i{display:grid;place-items:center;aspect-ratio:1;font-style:normal;font-size:8cqw;background:var(--c,#bae6fd)}
+.polaroid b{position:absolute;left:0;right:0;bottom:.7cqw;text-align:center;font-family:"Caveat",cursive;font-size:2.2cqw;color:#333;font-weight:600}
+.tpl-collage .portada{align-items:flex-end;text-align:right;padding-right:7cqw}
+.tpl-collage .t{font-family:"Caveat",cursive;font-size:10cqw;line-height:.9;text-shadow:0 .3cqw 1.4cqw rgba(0,0,0,.25)}
+.tpl-collage .s{font-family:"Montserrat",sans-serif;font-weight:700;font-size:2cqw}
+.tpl-collage .letra .lin{font-family:"Montserrat",sans-serif;font-weight:800}
+/* Pestaña Objetos */
+.rejilla.objetos{grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr));gap:14px}
+.ficha{background:var(--panel);border:1px solid var(--linea);border-radius:12px;display:grid;gap:8px;padding:10px 10px 12px;text-align:center}
+.ficha .escena{position:relative;aspect-ratio:1;container-type:inline-size;border-radius:8px;background:radial-gradient(circle at 50% 40%,#232838,#141721);overflow:hidden;display:grid;place-items:center}
+.ficha .escena .obj{position:relative;width:46cqw;--s:40cqw}
+.ficha .escena .obj.emo{width:auto}
+.ficha > b{font-size:13px}.ficha > span{font-size:12px;color:var(--suave)}
+.sello-txt{font-family:"Anton",sans-serif}
+@media (prefers-reduced-motion: reduce){.obj,.burbuja,.banda span,.polaroid,.giro-lento{animation:none!important;opacity:1!important}}
+
+/* ---------- Vista grande ---------- */
+.modal{position:fixed;inset:0;z-index:20;background:rgba(5,6,9,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.modal .marco{width:min(100%,calc((100vh - 170px)*16/9),1180px)}
+.modal .barra{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center;width:min(100%,1180px)}
+.modal .barra h2{font-family:var(--f-titulo);font-size:17px;margin:0 auto 0 0}
+.seg{display:flex;background:var(--panel);border:1px solid var(--linea);border-radius:999px;padding:3px}
+.btn{font:inherit;font-weight:600;cursor:pointer;background:var(--panel);color:var(--fg);border:1px solid var(--linea);border-radius:999px;padding:7px 14px}
+.btn:hover{border-color:var(--suave)}
+.modal .ayuda{color:var(--suave);font-size:12px}
+.marco:fullscreen{width:100vw;max-width:none;display:grid;place-items:center;background:#000}
+.marco:fullscreen .slide{width:min(100vw,calc(100vh*16/9))}
+@media (prefers-reduced-motion: reduce){.tarjeta .slide{transition:none}}
+</style>
+
+<div class="envoltura">
+  <header class="cab">
+    <div>
+      <h1>Plantillas de culto</h1>
+      <p>18 plantillas, 12 fondos animados y más de 30 objetos en movimiento, todos de diseño propio y dibujados con código: pesan casi nada, se ven nítidos en un proyector 4K y no gastan la cuota de Supabase. Toca una plantilla para verla en grande, en modo portada o con letra.</p>
+    </div>
+    <div class="pestanas" role="group" aria-label="Ver">
+      <button id="tabPlantillas" aria-pressed="true">Plantillas</button>
+      <button id="tabFondos" aria-pressed="false">Fondos animados</button>
+      <button id="tabObjetos" aria-pressed="false">Objetos</button>
+    </div>
+  </header>
+  <div class="chips" id="chips" role="group" aria-label="Categoría"></div>
+  <div class="rejilla" id="rejilla"></div>
+  <section class="nota">
+    <b>Para Claude Code:</b> este archivo es la referencia visual. Los objetos animados están en <code>OBJETOS</code> y <code>SVG</code>; el motor de fondos está en el objeto <code>FONDOS</code> (cada fondo es <code>init()</code> + <code>draw(ctx, w, h, t)</code> con coordenadas normalizadas) y las plantillas en <code>PLANTILLAS</code> (fondo + colores + estilos de texto en unidades <code>cqw</code> para que escalen a cualquier pantalla). Pásalo a <code>js/cultos/fondos.js</code> y <code>js/cultos/plantillas.js</code>, adaptando cada plantilla al modelo de elementos del lienzo de Proyectos, con una zona de texto para la letra o el versículo.
+  </section>
+</div>
+
+<div class="modal" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="mTitulo">
+  <div class="barra">
+    <h2 id="mTitulo"></h2>
+    <div class="seg" role="group" aria-label="Modo">
+      <button id="mPortada" aria-pressed="true">Portada</button>
+      <button id="mLetra" aria-pressed="false">Con letra</button>
+    </div>
+    <button class="btn" id="mPausa">Pausar</button>
+    <button class="btn" id="mFull">Pantalla completa</button>
+    <button class="btn" id="mCerrar">Cerrar</button>
+  </div>
+  <div class="marco" id="marco"></div>
+  <div class="ayuda">← → cambia de plantilla · Esc cierra</div>
+</div>
+
+<script>
+// ===================== Utilidades =====================
+const TAU = Math.PI * 2;
+const azar = (s => () => (s = (s * 16807) % 2147483647) / 2147483647)(20261028);
+const R = (a, b) => a + azar() * (b - a);
+const elegir = arr => arr[Math.floor(azar() * arr.length)];
+function rgba(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; }
+const sprites = new Map();
+function sprite(hex) { // luz suave reutilizable (más barato que shadowBlur)
+  if (sprites.has(hex)) return sprites.get(hex);
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d'), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gr.addColorStop(0, rgba(hex, 1)); gr.addColorStop(.35, rgba(hex, .45)); gr.addColorStop(1, rgba(hex, 0));
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128); sprites.set(hex, c); return c;
+}
+function degradadoV(ctx, w, h, colores) {
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  colores.forEach((c, i) => g.addColorStop(i / (colores.length - 1), c));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+}
+function mancha(ctx, x, y, r, hex, a) {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, rgba(hex, a)); g.addColorStop(1, rgba(hex, 0));
+  ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+}
+const ciclo = (v) => ((v % 1) + 1) % 1;
+
+// ===================== Fondos animados =====================
+// Cada fondo: init(p) devuelve su estado; draw(ctx, w, h, t, st, p) dibuja el cuadro t (segundos).
+const FONDOS = {
+  aurora: { nombre: 'Aurora', p: { base: ['#050816', '#0b1033'], colores: ['#2dd4bf', '#6366f1', '#a855f7', '#22c55e'] },
+    init: p => ({ b: p.colores.map(c => ({ c, fx: R(.05, .11), fy: R(.04, .09), ph: R(0, TAU) })) }),
+    draw(ctx, w, h, t, st, p) {
+      degradadoV(ctx, w, h, p.base); ctx.globalCompositeOperation = 'lighter';
+      for (const b of st.b) mancha(ctx, w * (.5 + .42 * Math.sin(t * b.fx + b.ph)), h * (.5 + .38 * Math.cos(t * b.fy + b.ph * 1.3)), Math.max(w, h) * .55, b.c, .38);
+      ctx.globalCompositeOperation = 'source-over'; mancha(ctx, w / 2, h / 2, w * .9, '#000000', 0); // reservado para viñeta
+    } },
+  bokeh: { nombre: 'Bokeh', p: { base: ['#0f172a', '#1e1b4b'], colores: ['#fbbf24', '#f472b6', '#60a5fa', '#fde68a'], n: 46 },
+    init: p => ({ c: Array.from({ length: p.n }, () => ({ x: R(0, 1), y: R(0, 1.2), r: R(.025, .11), v: R(.008, .025), a: R(.12, .4), ph: R(0, TAU), c: elegir(p.colores) })) }),
+    draw(ctx, w, h, t, st, p) {
+      degradadoV(ctx, w, h, p.base); ctx.globalCompositeOperation = 'lighter';
+      for (const o of st.c) {
+        const y = ciclo(o.y - t * o.v) * 1.3 - .15, x = o.x + Math.sin(t * .3 + o.ph) * .02, r = o.r * w;
+        ctx.globalAlpha = o.a * (.7 + .3 * Math.sin(t * .8 + o.ph)); ctx.drawImage(sprite(o.c), x * w - r, y * h - r, r * 2, r * 2);
+      }
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    } },
+  chispas: { nombre: 'Chispas de luz', p: { base: ['#07080d', '#1a1206'], colores: ['#fde68a', '#fbbf24', '#ffffff'], n: 110 },
+    init: p => ({ c: Array.from({ length: p.n }, () => ({ x: R(0, 1), y: R(0, 1), v: R(.02, .07), s: R(.003, .009), ph: R(0, TAU), sw: R(.005, .03), c: elegir(p.colores) })) }),
+    draw(ctx, w, h, t, st, p) {
+      degradadoV(ctx, w, h, p.base); mancha(ctx, w / 2, h * 1.05, w * .7, p.colores[1], .28 + .05 * Math.sin(t));
+      ctx.globalCompositeOperation = 'lighter';
+      for (const o of st.c) {
+        const y = 1.05 - ciclo(o.y + t * o.v) * 1.1, x = o.x + Math.sin(t * .9 + o.ph) * o.sw, r = o.s * w * (2 + Math.sin(t * 3 + o.ph));
+        ctx.globalAlpha = Math.min(1, y * 1.6) * (.6 + .4 * Math.sin(t * 4 + o.ph)); ctx.drawImage(sprite(o.c), x * w - r, y * h - r, r * 2, r * 2);
+      }
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    } },
+  estrellas: { nombre: 'Cielo estrellado', p: { base: ['#02030a', '#0c0a2a', '#1b1145'], nebulosa: ['#7c3aed', '#2563eb'] },
+    init: () => ({ s: Array.from({ length: 240 }, () => ({ x: R(0, 1), y: R(0, 1), z: R(.4, 1.6), ph: R(0, TAU), v: R(.6, 2.2) })) }),
+    draw(ctx, w, h, t, st, p) {
+      degradadoV(ctx, w, h, p.base); ctx.globalCompositeOperation = 'lighter';
+      mancha(ctx, w * (.7 + .03 * Math.sin(t * .05)), h * .3, w * .5, p.nebulosa[0], .22); mancha(ctx, w * .25, h * .75, w * .45, p.nebulosa[1], .16);
+      ctx.fillStyle = '#ffffff';
+      for (const s of st.s) { ctx.globalAlpha = .25 + .75 * Math.abs(Math.sin(t * s.v * .5 + s.ph)); const z = s.z * w / 900; ctx.fillRect(ciclo(s.x + t * .002 * s.z) * w, s.y * h, z, z); }
+      const f = (t % 9) / 9; // estrella fugaz cada 9 s
+      if (f < .12) { const k = f / .12, x0 = w * .15, y0 = h * .12, x = x0 + k * w * .45, y = y0 + k * h * .25;
+        const g = ctx.createLinearGradient(x - w * .12, y - h * .065, x, y); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(255,255,255,.9)');
+        ctx.globalAlpha = 1 - k; ctx.strokeStyle = g; ctx.lineWidth = Math.max(1, w / 700); ctx.beginPath(); ctx.moveTo(x - w * .12, y - h * .065); ctx.lineTo(x, y); ctx.stroke(); }
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    } },
+  ondas: { nombre: 'Ondas', p: { base: ['#0b1d3a', '#132a5e'], colores: ['#38bdf8', '#818cf8', '#c084fc', '#22d3ee'] },
+    init: p => ({ l: p.colores.map((c, i) => ({ c, y: .5 + i * .1, a: R(.04, .08), f: R(1, 2.2), v: R(.25, .5), ph: R(0, TAU) })) }),
+    draw(ctx, w, h, t, st, p) {
+      degradadoV(ctx, w, h, p.base);
+      for (const l of st.l) {
+        ctx.beginPath(); ctx.moveTo(0, h);
+        for (let x = 0; x <= w + 8; x += 8) { const u = x / w; ctx.lineTo(x, h * (l.y + l.a * Math.sin(u * TAU * l.f + t * l.v + l.ph) + .02 * Math.sin(u * TAU * 3.1 - t * .7))); }
+        ctx.lineTo(w, h); ctx.closePath(); const g = ctx.createLinearGradient(0, h * (l.y - .1), 0, h); g.addColorStop(0, rgba(l.c, .35)); g.addColorStop(1, rgba(l.c, .05)); ctx.fillStyle = g; ctx.fill();
+      }
+    } },
+  rayos: { nombre: 'Rayos de luz', p: { base: ['#1a1033', '#3b1d5a', '#7a4a2a'], luz: '#ffe7b0' },
+    init: () => ({ r: Array.from({ length: 15 }, (_, i) => ({ a: -.55 + i * (1.1 / 14) + R(-.03, .03), w: R(.025, .07), v: R(.3, .9), ph: R(0, TAU) })), d: Array.from({ length: 50 }, () => ({ x: R(0, 1), y: R(0, 1), v: R(.005, .02), ph: R(0, TAU) })) }),
+    draw(ctx, w, h, t, st, p) {
+      degradadoV(ctx, w, h, p.base); const ox = w * .5, oy = -h * .25, L = h * 1.6, giro = Math.sin(t * .12) * .12;
+      ctx.globalCompositeOperation = 'lighter';
+      for (const r of st.r) {
+        const a = Math.PI / 2 + r.a + giro, g = ctx.createLinearGradient(ox, oy, ox + Math.cos(a) * L, oy + Math.sin(a) * L);
+        const al = .06 + .07 * (.5 + .5 * Math.sin(t * r.v + r.ph)); g.addColorStop(0, rgba(p.luz, al * 2)); g.addColorStop(1, rgba(p.luz, 0));
+        ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox + Math.cos(a - r.w) * L, oy + Math.sin(a - r.w) * L); ctx.lineTo(ox + Math.cos(a + r.w) * L, oy + Math.sin(a + r.w) * L); ctx.fill();
+      }
+      mancha(ctx, ox, 0, w * .45, p.luz, .25);
+      for (const d of st.d) { const r = w * .004; ctx.globalAlpha = .5 + .5 * Math.sin(t + d.ph); ctx.drawImage(sprite(p.luz), ciclo(d.x + Math.sin(t * .2 + d.ph) * .01) * w - r * 3, ciclo(d.y - t * d.v) * h - r * 3, r * 6, r * 6); }
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    } },
+  nubes: { nombre: 'Nubes al amanecer', p: { base: ['#93c5fd', '#e0e7ff', '#fbcfe8', '#fde2c8'] },
+    init: () => ({ n: Array.from({ length: 13 }, () => ({ x: R(0, 1), y: R(.1, .9), v: R(.004, .012), s: R(.12, .26), p: Array.from({ length: 6 }, () => [R(-1, 1), R(-.35, .35), R(.5, 1)]) })) }),
+    draw(ctx, w, h, t, st, p) {
+      degradadoV(ctx, w, h, p.base); mancha(ctx, w * .5, h * .95, w * .6, '#fff7ed', .55);
+      const blanco = sprite('#ffffff');
+      for (const n of st.n) { const cx = (ciclo(n.x + t * n.v) * 1.5 - .25) * w, cy = n.y * h, s = n.s * w;
+        ctx.globalAlpha = .35; for (const [dx, dy, k] of n.p) ctx.drawImage(blanco, cx + dx * s - s * k, cy + dy * s - s * k * .6, s * k * 2, s * k * 1.2); }
+      ctx.globalAlpha = 1;
+    } },
+  malla: { nombre: 'Malla de color', p: { base: '#ff7a59', colores: ['#ffd166', '#ef476f', '#a855f7', '#ff9f1c'] },
+    init: p => ({ b: p.colores.map(c => ({ c, fx: R(.08, .16), fy: R(.06, .14), ph: R(0, TAU) })) }),
+    draw(ctx, w, h, t, st, p) {
+      ctx.fillStyle = p.base; ctx.fillRect(0, 0, w, h);
+      for (const b of st.b) mancha(ctx, w * (.5 + .45 * Math.sin(t * b.fx + b.ph)), h * (.5 + .45 * Math.cos(t * b.fy + b.ph)), Math.max(w, h) * .6, b.c, .85);
+    } },
+  confeti: { nombre: 'Confeti festivo', p: { base: '#7c3aed', colores: ['#fde047', '#f472b6', '#22d3ee', '#ffffff', '#fb923c'], fondo: ['#f472b6', '#fb923c', '#facc15'] },
+    init: p => ({ m: FONDOS.malla.init({ colores: p.fondo }), c: Array.from({ length: 80 }, () => ({ x: R(0, 1), y: R(0, 1), v: R(.04, .1), r: R(1, 3), ph: R(0, TAU), w: R(.006, .012), c: elegir(p.colores) })) }),
+    draw(ctx, w, h, t, st, p) {
+      FONDOS.malla.draw(ctx, w, h, t, st.m, { base: p.base });
+      for (const o of st.c) { ctx.save(); ctx.translate((o.x + Math.sin(t * 1.3 + o.ph) * .02) * w, (ciclo(o.y + t * o.v) * 1.2 - .1) * h);
+        ctx.rotate(t * o.r + o.ph); ctx.scale(1, Math.cos(t * 2.4 + o.ph)); ctx.fillStyle = o.c; ctx.fillRect(-o.w * w, -o.w * w * .45, o.w * w * 2, o.w * w * .9); ctx.restore(); }
+    } },
+  brasas: { nombre: 'Brasas', p: { base: ['#0c0a09', '#1c0f08', '#3b1206'], colores: ['#f97316', '#fbbf24', '#ef4444'] },
+    init: p => ({ c: Array.from({ length: 130 }, () => ({ x: R(0, 1), y: R(0, 1), v: R(.03, .09), s: R(.002, .006), ph: R(0, TAU), sw: R(.01, .05), c: elegir(p.colores) })) }),
+    draw(ctx, w, h, t, st, p) {
+      degradadoV(ctx, w, h, p.base); ctx.globalCompositeOperation = 'lighter';
+      mancha(ctx, w * .5, h * 1.1, w * .8, '#ea580c', .35 + .08 * Math.sin(t * 1.7) + .04 * Math.sin(t * 4.3));
+      for (const o of st.c) { const y = 1.05 - ciclo(o.y + t * o.v) * 1.15, x = o.x + Math.sin(t * 1.4 + o.ph) * o.sw * (1 - y), r = o.s * w * 3;
+        ctx.globalAlpha = Math.max(0, Math.min(1, y * 1.4)) * (.5 + .5 * Math.sin(t * 6 + o.ph)); ctx.drawImage(sprite(o.c), x * w - r, y * h - r, r * 2, r * 2); }
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    } },
+  agua: { nombre: 'Agua', p: { base: ['#0e7490', '#0c4a6e', '#082f49'] },
+    init: () => ({ b: Array.from({ length: 28 }, () => ({ x: R(0, 1), y: R(0, 1), v: R(.03, .08), r: R(.003, .01), ph: R(0, TAU) })) }),
+    draw(ctx, w, h, t, st, p) {
+      degradadoV(ctx, w, h, p.base); ctx.globalCompositeOperation = 'lighter'; ctx.lineWidth = Math.max(1, w / 500);
+      for (let i = 0; i < 22; i++) { ctx.strokeStyle = `rgba(186,230,253,${.05 + .03 * Math.sin(t + i)})`; ctx.beginPath();
+        for (let x = 0; x <= w + 10; x += 10) { const u = x / w; const y = h * (i / 22) * .75 + h * .03 * Math.sin(u * 9 + t * .9 + i * 1.7) + h * .02 * Math.sin(u * 17 - t * 1.3 + i); x ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); }
+      mancha(ctx, w * (.5 + .1 * Math.sin(t * .2)), -h * .1, w * .55, '#7dd3fc', .35);
+      ctx.strokeStyle = 'rgba(224,242,254,.5)';
+      for (const o of st.b) { const y = 1.05 - ciclo(o.y + t * o.v) * 1.1; ctx.beginPath(); ctx.arc((o.x + Math.sin(t * 2 + o.ph) * .008) * w, y * h, o.r * w, 0, TAU); ctx.stroke(); }
+      ctx.globalCompositeOperation = 'source-over';
+    } },
+  neon: { nombre: 'Neón', p: { base: ['#0b0420', '#1a0b3d', '#2e0f4f'], linea: '#f0abfc', linea2: '#22d3ee' },
+    init: () => ({}),
+    draw(ctx, w, h, t, st, p) {
+      degradadoV(ctx, w, h, p.base); const hz = h * .58, vx = w / 2;
+      ctx.globalCompositeOperation = 'lighter'; mancha(ctx, vx, hz, w * .35, '#ec4899', .35);
+      const trazo = (col, a, lw) => { ctx.strokeStyle = rgba(col, a); ctx.lineWidth = lw; ctx.stroke(); };
+      ctx.beginPath(); for (let i = 0; i < 14; i++) { const k = ciclo(i / 14 + t * .08), y = hz + (h - hz) * k * k; ctx.moveTo(0, y); ctx.lineTo(w, y); }
+      trazo(p.linea, .12, w / 180); trazo(p.linea, .7, Math.max(1, w / 900));
+      ctx.beginPath(); for (let i = -12; i <= 12; i++) { ctx.moveTo(vx + i * w * .012, hz); ctx.lineTo(vx + i * w * .16, h); }
+      trazo(p.linea2, .1, w / 180); trazo(p.linea2, .55, Math.max(1, w / 900));
+      ctx.globalCompositeOperation = 'source-over';
+    } },
+};
+
+
+// ===================== Objetos animados (stickers) =====================
+// Todo es SVG o emoji con animación CSS: no se descarga nada ni se guarda en Supabase.
+const rayosSVG = (n, color, r1, r2, ancho = 3) => Array.from({ length: n }, (_, i) => { const a = i / n * TAU;
+  return `<line x1="${50 + Math.cos(a) * r1}" y1="${50 + Math.sin(a) * r1}" x2="${50 + Math.cos(a) * r2}" y2="${50 + Math.sin(a) * r2}" stroke="${color}" stroke-width="${ancho}" stroke-linecap="round"/>`; }).join('');
+const estrellaPts = (n, r1, r2) => Array.from({ length: n * 2 }, (_, i) => { const a = i / (n * 2) * TAU - Math.PI / 2, r = i % 2 ? r2 : r1; return `${(50 + Math.cos(a) * r).toFixed(1)},${(50 + Math.sin(a) * r).toFixed(1)}`; }).join(' ');
+const SVG = {
+  cruz: `<svg viewBox="0 0 100 100"><g class="giro-lento" opacity=".7">${rayosSVG(16, '#fde68a', 30, 48, 2.5)}</g><rect x="44" y="16" width="12" height="70" rx="2" fill="#fff"/><rect x="27" y="34" width="46" height="12" rx="2" fill="#fff"/></svg>`,
+  corazon: `<svg viewBox="0 0 100 100"><path d="M50 86C20 64 8 46 8 31 8 18 18 9 30 9c9 0 16 5 20 12 4-7 11-12 20-12 12 0 22 9 22 22 0 15-12 33-42 55z" fill="#f43f5e"/><path d="M26 24c-6 2-9 8-8 14" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round" opacity=".6"/></svg>`,
+  estrella: `<svg viewBox="0 0 100 100"><polygon points="${estrellaPts(5, 46, 20)}" fill="#facc15" stroke="#f59e0b" stroke-width="3" stroke-linejoin="round"/></svg>`,
+  nota: `<svg viewBox="0 0 100 100"><path d="M36 26l44-10v52a11 9 0 1 1-6-8V30L42 37v38a11 9 0 1 1-6-8z" fill="#a78bfa"/></svg>`,
+  sol: `<svg viewBox="0 0 100 100"><g class="giro-lento">${rayosSVG(12, '#fbbf24', 32, 46, 6)}</g><circle cx="50" cy="50" r="24" fill="#fcd34d"/></svg>`,
+  chispa: `<svg viewBox="0 0 100 100"><path d="M50 4c4 34 12 42 46 46-34 4-42 12-46 46-4-34-12-42-46-46 34-4 42-12 46-46z" fill="#fef9c3"/></svg>`,
+  hoy: `<svg viewBox="0 0 100 100"><polygon points="${estrellaPts(14, 48, 42)}" fill="#ef4444"/><circle cx="50" cy="50" r="34" fill="none" stroke="#fff" stroke-width="2" stroke-dasharray="4 4"/><text x="50" y="60" text-anchor="middle" font-size="28" fill="#fff" class="sello-txt">HOY</text></svg>`,
+  nuevo: `<svg viewBox="0 0 120 50"><path d="M4 8h112l-10 17 10 17H4l10-17z" fill="#22d3ee"/><text x="60" y="33" text-anchor="middle" font-size="19" fill="#0b0420" class="sello-txt" letter-spacing="2">NUEVO</text></svg>`,
+  corona: `<svg viewBox="0 0 100 100"><path d="M14 70l6-40 18 20 12-28 12 28 18-20 6 40z" fill="#fbbf24" stroke="#d97706" stroke-width="3" stroke-linejoin="round"/><rect x="14" y="70" width="72" height="12" rx="3" fill="#f59e0b"/><circle cx="50" cy="56" r="5" fill="#ef4444"/></svg>`,
+  llama: `<svg viewBox="0 0 100 100"><defs><linearGradient id="gLl" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#dc2626"/><stop offset=".6" stop-color="#f97316"/><stop offset="1" stop-color="#fde047"/></linearGradient></defs><path d="M50 6c12 22 30 32 28 56-2 20-16 30-28 30S24 82 22 62c-1-14 10-22 14-34 4 12 10 16 14 18 2-12 0-26 0-40z" fill="url(#gLl)"/></svg>`,
+  amen: `<svg viewBox="0 0 120 80"><path d="M10 6h100a6 6 0 0 1 6 6v40a6 6 0 0 1-6 6H40l-18 16 4-16H10a6 6 0 0 1-6-6V12a6 6 0 0 1 6-6z" fill="#fff"/><text x="60" y="41" text-anchor="middle" font-size="22" fill="#4c1d95" class="sello-txt">¡AMÉN!</text></svg>`,
+  flecha: `<svg viewBox="0 0 100 60"><path d="M6 30h70M58 10l22 20-22 20" stroke="#f472b6" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+};
+const OBJETOS = [
+  ...[['cruz', 'Cruz radiante', 'flotar'], ['corazon', 'Corazón', 'latir'], ['estrella', 'Estrella', 'girar', '8s'], ['nota', 'Nota musical', 'balancear', '2.5s'],
+      ['sol', 'Sol', 'flotar'], ['chispa', 'Destello', 'brillo', '2s'], ['hoy', 'Sello HOY', 'pop', '2s'], ['nuevo', 'Cinta NUEVO', 'flotar'],
+      ['corona', 'Corona', 'flotar'], ['llama', 'Llama', 'latir', '1.6s'], ['amen', 'Globo ¡Amén!', 'pop', '2.4s'], ['flecha', 'Flecha', 'rebotar', '1.8s']]
+    .map(([id, nombre, a, t]) => ({ nombre, cat: 'Ilustración', html: `<span class="obj a-${a}" style="--t:${t || '4s'}">${SVG[id]}</span>` })),
+  ...[['🙌', 'Manos arriba', 'rebotar', '1.6s'], ['🔥', 'Fuego', 'latir', '1.4s'], ['🎉', 'Fiesta', 'balancear', '2s'], ['🙏', 'Oración', 'flotar'],
+      ['🕊️', 'Paloma', 'flotar', '3s'], ['✨', 'Brillos', 'brillo', '2s'], ['🎶', 'Música', 'balancear', '2.2s'], ['❤️', 'Amor', 'latir', '1.5s'],
+      ['😇', 'Ángel', 'flotar'], ['📖', 'Biblia', 'flotar'], ['🎸', 'Guitarra', 'balancear', '2.6s'], ['🎤', 'Micrófono', 'balancear', '2.6s'],
+      ['📣', 'Anuncio', 'latir', '1.8s'], ['🌟', 'Estrella brillante', 'girar', '6s'], ['🎂', 'Cumpleaños', 'rebotar', '2s'], ['⛺', 'Campamento', 'flotar']]
+    .map(([e, nombre, a, t]) => ({ nombre, cat: 'Emoji', html: `<span class="obj emo a-${a}" style="--t:${t || '4s'}">${e}</span>` })),
+  { nombre: 'Frase: ¡Bienvenido!', cat: 'Frase', html: `<span class="obj a-pop" style="--t:2.4s;width:auto;font:800 11cqw/1 Montserrat,sans-serif;background:#facc15;color:#111;padding:3cqw 5cqw;border-radius:99px;transform:rotate(-4deg)">¡Bienvenido! 🙌</span>` },
+  { nombre: 'Frase: Dios te bendiga', cat: 'Frase', html: `<span class="obj a-flotar" style="width:auto;font:600 14cqw/1 Caveat,cursive;color:#fde68a">Dios te bendiga ✨</span>` },
+];
+
+// ===================== Plantillas =====================
+const LETRA = 'Te alabaré con todo mi ser\ntu amor me sostiene\nen ti está mi fe';
+const PLANTILLAS = [
+  { id: 'bienvenida', nombre: 'Bienvenida', cat: 'Bienvenida', fondo: 'aurora',
+    portada: `<p class="k">Domingo · 10:00 a. m.</p><h3 class="t"><span class="sc">Bienvenidos</span><span class="bo">A CASA</span></h3><p class="s">Qué bueno que estás aquí</p>` },
+  { id: 'adoracion', nombre: 'Adoración', cat: 'Adoración', fondo: 'rayos',
+    portada: `<p class="k">Tiempo de adoración</p><h3 class="t">Santo eres tú</h3><p class="s">Levantemos nuestra voz</p>` },
+  { id: 'alabanza', nombre: 'Celebración', cat: 'Alabanza', fondo: 'confeti',
+    portada: `<h3 class="t">¡Celebremos!</h3><p class="s">alabanza y gratitud</p>` },
+  { id: 'juvenil', nombre: 'Noche de jóvenes', cat: 'Juvenil', fondo: 'neon',
+    portada: `<p class="k">Viernes · 7:30 p. m.</p><h3 class="t">NOCHE DE<br>JÓVENES</h3><p class="s">Trae a un amigo</p>` },
+  { id: 'palabra', nombre: 'Palabra', cat: 'Versículo', fondo: 'estrellas',
+    portada: `<h3 class="t">Jehová es mi pastor; nada me faltará.</h3><p class="cita">Salmo 23:1 · RV1909</p>` },
+  { id: 'oracion', nombre: 'Oración', cat: 'Oración', fondo: 'nubes',
+    portada: `<p class="k">Momento de oración</p><h3 class="t">orad sin cesar</h3><p class="cita">1 Tesalonicenses 5:17</p>` },
+  { id: 'ofrenda', nombre: 'Ofrenda', cat: 'Ofrenda', fondo: 'bokeh', p: { base: ['#052e2b', '#0b1f1a'], colores: ['#fbbf24', '#fde68a', '#f59e0b', '#fef3c7'], n: 46 },
+    portada: `<p class="k">Ofrenda</p><h3 class="t">Dios ama al dador alegre</h3><p class="cita">2 Corintios 9:7</p>` },
+  { id: 'cena', nombre: 'Santa Cena', cat: 'Santa Cena', fondo: 'bokeh', p: { base: ['#2a0a14', '#12040a'], colores: ['#f59e0b', '#be123c', '#fda4af', '#fcd34d'], n: 40 },
+    portada: `<p class="k">Santa Cena</p><h3 class="t">Haced esto en memoria de mí</h3><p class="cita">Lucas 22:19</p>` },
+  { id: 'anuncio', nombre: 'Anuncio', cat: 'Anuncio', fondo: 'malla', p: { base: '#38bdf8', colores: ['#a78bfa', '#f472b6', '#facc15', '#34d399'] },
+    portada: `<div class="fecha">14–16<small>NOVIEMBRE</small></div><div class="bloque"><p class="k">Inscripciones abiertas</p><h3 class="t">Retiro de jóvenes</h3><p class="s">Tres días de campamento, alabanza y amistad. Pregunta en recepción al terminar el culto.</p></div>` },
+  { id: 'regresiva', nombre: 'Cuenta regresiva', cat: 'Cuenta regresiva', fondo: 'chispas',
+    portada: `<p class="k">El culto empieza en</p><h3 class="t" data-reloj>05:00</h3><p class="s">Busca tu lugar · silencia tu celular</p>` },
+  { id: 'bautismo', nombre: 'Bautismo', cat: 'Bautismo', fondo: 'agua',
+    portada: `<p class="k">Bautismos</p><h3 class="t">Novedad de vida</h3><p class="cita">Romanos 6:4</p>` },
+  { id: 'avivamiento', nombre: 'Avivamiento', cat: 'Evento', fondo: 'brasas',
+    portada: `<p class="k">Noche de avivamiento</p><h3 class="t">CON MI ESPÍRITU</h3><p class="cita">Zacarías 4:6</p>` },
+  { id: 'vibes', nombre: 'Dios está aquí', cat: 'Juvenil', fondo: 'aurora', p: { base: ['#14051f', '#2a0a3d'], colores: ['#ec4899', '#8b5cf6', '#f97316', '#06b6d4'] },
+    deco: ['🔥', '🙌', '✨', '❤️', '🎶', '🔥', '🙌', '✨'].map((e, i) => `<span class="obj emo a-subir" style="left:${6 + i * 12}%;bottom:-10%;--s:${4 + (i % 3)}cqw;--t:${6 + (i % 4)}s;--d:-${i * 1.3}s">${e}</span>`).join(''),
+    portada: `<h3 class="t">DIOS ESTÁ AQUÍ 🔥</h3><p class="s">Jóvenes · viernes 7:30 p. m.</p>` },
+  { id: 'stickers', nombre: 'Día de fiesta', cat: 'Juvenil', fondo: 'malla', p: { base: '#fde047', colores: ['#f472b6', '#fb923c', '#a3e635', '#fde68a'] },
+    deco: `<span class="obj a-girar" style="left:5%;top:8%;width:11cqw;--t:9s">${SVG.estrella}</span><span class="obj a-pop" style="right:6%;top:7%;width:13cqw;--t:2s">${SVG.hoy}</span><span class="obj emo a-rebotar" style="left:9%;bottom:10%;--s:8cqw;--t:1.8s">🎉</span><span class="obj emo a-balancear" style="right:9%;bottom:12%;--s:8cqw;--t:2.4s">😄</span>`,
+    portada: `<h3 class="t">¡Hoy es día de fiesta!</h3><p class="s">🎉 🙌 🎶</p>` },
+  { id: 'arcade', nombre: 'Level up', cat: 'Juvenil', fondo: 'neon',
+    deco: `<span class="obj emo a-flotar" style="left:8%;top:12%;--s:7cqw">🎮</span><span class="obj emo a-girar" style="right:9%;top:14%;--s:6cqw;--t:6s">⭐</span><span class="obj emo a-latir" style="right:12%;bottom:30%;--s:5cqw;--t:1.4s">❤️</span>`,
+    portada: `<h3 class="t">LEVEL UP</h3><p class="s">TORNEO DE JUEGOS<br>SÁBADO 4:00 P. M. 🎮</p>` },
+  { id: 'chat', nombre: 'Chat del grupo', cat: 'Juvenil', fondo: 'ondas', p: { base: ['#1e1b4b', '#312e81'], colores: ['#f472b6', '#a78bfa', '#22d3ee', '#818cf8'] },
+    portada: `<p class="burbuja izq" style="--d:0s"><small>Ana</small>¿Vienes el viernes? 👀</p><p class="burbuja der" style="--d:1.2s">¡Claro! 🙌🔥</p><p class="burbuja izq" style="--d:2.4s"><small>Ana</small>Trae a un amigo 😎</p><p class="burbuja der" style="--d:3.6s">Noche de jóvenes · 7:30 p. m. 🎶</p>` },
+  { id: 'marquesina', nombre: 'Marquesina', cat: 'Juvenil', fondo: 'bokeh', p: { base: ['#111827', '#1e1b4b'], colores: ['#f472b6', '#22d3ee', '#facc15', '#a78bfa'], n: 40 },
+    deco: (() => { const t = 'FE ✦ AMISTAD ✦ ALABANZA ✦ JÓVENES ✦ '.repeat(4); return `<div class="banda b1"><span>${t}${t}</span></div><div class="banda b2"><span>${t}${t}</span></div>`; })(),
+    portada: `<h3 class="t">JÓVENES</h3><p class="s">una generación que adora</p>` },
+  { id: 'collage', nombre: 'Recuerdos', cat: 'Juvenil', fondo: 'malla', p: { base: '#0ea5e9', colores: ['#22d3ee', '#a78bfa', '#34d399', '#38bdf8'] },
+    deco: `<div class="polaroid" style="left:6%;top:10%;transform:rotate(-8deg);--d:0s;--r:-8deg"><i style="--c:#fde68a">⛺</i><b>la fogata</b></div><div class="polaroid" style="left:23%;top:42%;--d:-2s;--r:6deg"><i style="--c:#fbcfe8">🎸</i><b>alabanza</b></div><div class="polaroid" style="left:5%;top:58%;--d:-4s;--r:-3deg"><i style="--c:#bbf7d0">🙏</i><b>oración</b></div>`,
+    portada: `<h3 class="t">Campamento<br>2026</h3><p class="s">¡Revive los mejores momentos! 📸</p>` },
+];
+
+// ===================== Motor de dibujo =====================
+const reducido = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const vivos = new Set();
+let pausa = false;
+function crearSlide({ fondo, p, clase = '', html = '', deco = '' }, grande = false) {
+  const el = document.createElement('div'); el.className = 'slide ' + clase;
+  const cv = document.createElement('canvas'); cv.setAttribute('aria-hidden', 'true'); el.append(cv);
+  if (deco) { const d = document.createElement('div'); d.className = 'deco'; d.setAttribute('aria-hidden', 'true'); d.innerHTML = deco; el.append(d); }
+  if (html) { const capa = document.createElement('div'); capa.className = 'capa portada'; capa.innerHTML = html; el.append(capa); }
+  const F = FONDOS[fondo], params = { ...F.p, ...(p || {}) };
+  const s = { el, cv, ctx: cv.getContext('2d'), F, params, st: F.init(params), visible: grande, escala: grande ? Math.min(devicePixelRatio || 1, 2) : Math.min(devicePixelRatio || 1, 1.25) };
+  new ResizeObserver(() => { s.cv.width = Math.max(1, Math.round(cv.clientWidth * s.escala)); s.cv.height = Math.max(1, Math.round(cv.clientHeight * s.escala)); dibujar(s, performance.now() / 1000); }).observe(cv);
+  if (!grande) io.observe(el);
+  vivos.add(s); el._s = s; return el;
+}
+function dibujar(s, t) { const { width: w, height: h } = s.cv; if (w > 1) s.F.draw(s.ctx, w, h, reducido ? 12 : t, s.st, s.params); }
+const io = new IntersectionObserver(es => es.forEach(e => { if (e.target._s) e.target._s.visible = e.isIntersecting; }), { rootMargin: '100px' });
+function bucle(ms) { if (!pausa && !reducido) for (const s of vivos) if (s.visible) dibujar(s, ms / 1000); requestAnimationFrame(bucle); }
+requestAnimationFrame(bucle);
+function soltar(el) { el.querySelectorAll('.slide').forEach(x => { if (x._s) { vivos.delete(x._s); io.unobserve(x); } }); }
+
+// Cuenta regresiva de muestra (se reinicia cada 5 minutos)
+setInterval(() => { const r = 300 - Math.floor(Date.now() / 1000) % 300, txt = `${String(Math.floor(r / 60)).padStart(2, '0')}:${String(r % 60).padStart(2, '0')}`; document.querySelectorAll('[data-reloj]').forEach(e => e.textContent = txt); }, 1000);
+
+// ===================== Galería =====================
+const rejilla = document.getElementById('rejilla'), chips = document.getElementById('chips');
+let vista = 'plantillas', filtro = 'Todas';
+const htmlLetra = () => `<p class="lin">${LETRA}</p><p class="pie">Canción de ejemplo · Estrofa 1</p>`;
+
+function pintar() {
+  soltar(rejilla); rejilla.innerHTML = ''; rejilla.classList.remove('objetos');
+  if (vista === 'plantillas') {
+    const cats = ['Todas', ...new Set(PLANTILLAS.map(x => x.cat))];
+    chips.hidden = false; chips.innerHTML = cats.map(c => `<button aria-pressed="${c === filtro}" data-c="${c}">${c}</button>`).join('');
+    PLANTILLAS.filter(x => filtro === 'Todas' || x.cat === filtro).forEach(x => {
+      const b = document.createElement('button'); b.className = 'tarjeta'; b.setAttribute('aria-label', `Ver plantilla ${x.nombre}`);
+      b.append(crearSlide({ fondo: x.fondo, p: x.p, clase: 'tpl-' + x.id, html: x.portada, deco: x.deco }));
+      b.insertAdjacentHTML('beforeend', `<div class="meta"><b>${x.nombre}</b><span>${x.cat} · ${FONDOS[x.fondo].nombre}</span></div>`);
+      b.onclick = () => abrir(PLANTILLAS.indexOf(x)); rejilla.append(b);
+    });
+  } else if (vista === 'objetos') {
+    chips.hidden = true; rejilla.classList.add('objetos');
+    OBJETOS.forEach(o => { const f = document.createElement('div'); f.className = 'ficha';
+      f.innerHTML = `<div class="escena" aria-hidden="true">${o.html}</div><b>${o.nombre}</b><span>${o.cat}</span>`; rejilla.append(f); });
+  } else {
+    chips.hidden = true;
+    Object.entries(FONDOS).forEach(([id, F]) => {
+      const b = document.createElement('button'); b.className = 'tarjeta'; b.setAttribute('aria-label', `Ver fondo ${F.nombre}`);
+      b.append(crearSlide({ fondo: id }));
+      b.insertAdjacentHTML('beforeend', `<div class="meta"><b>${F.nombre}</b><span>fondo animado</span></div>`);
+      b.onclick = () => abrir(-1, id); rejilla.append(b);
+    });
+  }
+}
+chips.onclick = e => { const c = e.target.closest('button')?.dataset.c; if (c) { filtro = c; pintar(); } };
+const tabs = { plantillas: document.getElementById('tabPlantillas'), fondos: document.getElementById('tabFondos'), objetos: document.getElementById('tabObjetos') };
+Object.entries(tabs).forEach(([v, b]) => b.onclick = () => { vista = v; Object.values(tabs).forEach(x => x.setAttribute('aria-pressed', String(x === b))); pintar(); });
+
+// ===================== Vista grande =====================
+const modal = document.getElementById('modal'), marco = document.getElementById('marco');
+const bP = document.getElementById('mPortada'), bL = document.getElementById('mLetra'), bPausa = document.getElementById('mPausa');
+let actual = 0, fondoSolo = null, modo = 'portada', ultimoFoco = null;
+function montar() {
+  soltar(marco); marco.innerHTML = '';
+  let el, titulo;
+  if (fondoSolo) { el = crearSlide({ fondo: fondoSolo }, true); titulo = FONDOS[fondoSolo].nombre; bP.parentElement.hidden = true; }
+  else { const x = PLANTILLAS[actual]; titulo = `${x.nombre} · ${x.cat}`; bP.parentElement.hidden = false;
+    el = crearSlide({ fondo: x.fondo, p: x.p, clase: 'tpl-' + x.id, html: modo === 'portada' ? x.portada : htmlLetra(), deco: x.deco }, true);
+    if (modo === 'letra') el.querySelector('.capa').className = 'capa letra'; }
+  document.getElementById('mTitulo').textContent = titulo; marco.append(el);
+  bP.setAttribute('aria-pressed', modo === 'portada'); bL.setAttribute('aria-pressed', modo === 'letra');
+}
+function abrir(i, fondo = null) { ultimoFoco = document.activeElement; actual = i; fondoSolo = fondo; modal.hidden = false; montar(); document.getElementById('mCerrar').focus(); }
+function cerrar() { soltar(marco); marco.innerHTML = ''; modal.hidden = true; if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); ultimoFoco?.focus(); }
+bP.onclick = () => { modo = 'portada'; montar(); };
+bL.onclick = () => { modo = 'letra'; montar(); };
+bPausa.onclick = () => { pausa = !pausa; bPausa.textContent = pausa ? 'Reanudar' : 'Pausar'; };
+document.getElementById('mCerrar').onclick = cerrar;
+document.getElementById('mFull').onclick = () => { (marco.requestFullscreen?.() || Promise.reject()).catch(() => {}); };
+modal.onclick = e => { if (e.target === modal) cerrar(); };
+addEventListener('keydown', e => {
+  if (modal.hidden) return;
+  if (e.key === 'Escape') cerrar();
+  if (!fondoSolo && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) { actual = (actual + (e.key === 'ArrowRight' ? 1 : -1) + PLANTILLAS.length) % PLANTILLAS.length; montar(); }
+});
+pintar();
+</script>

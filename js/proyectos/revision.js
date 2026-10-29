@@ -24,6 +24,15 @@ export function nombreHoja(hojas, i) {
 export const agruparAntes = (hojas, i) => hojas.slice(0, i).map((h, k) => ({ h, k }))
   .filter(x => x.h.tipo === 'agrupar').map(x => ({ i: x.k, id: x.h.id, nombre: nombreHoja(hojas, x.k) }));
 
+// Las hojas Unirse o Agrupar antes de la hoja i (de donde salen los participantes): [{ i, id, nombre, tipo }]
+export const registroAntes = (hojas, i) => hojas.slice(0, i).map((h, k) => ({ h, k }))
+  .filter(x => esRegistro(x.h)).map(x => ({ i: x.k, id: x.h.id, tipo: x.h.tipo, nombre: nombreHoja(hojas, x.k) }));
+// La hoja de registro que usará una ruleta de participantes: la elegida (si sigue antes) o la más cercana
+export function registroDeRuleta(hojas, i) {
+  const r = registroAntes(hojas, i), elegida = hojas[i]?.config?.hoja_registro;
+  return r.find(x => x.id === elegida) || r.at(-1) || null;
+}
+
 /**
  * Lo que le falta a la hoja i: [{ txt, arreglo }]
  * arreglo: { tipo: 'unirse' | 'agrupar', en } (insertar esa hoja en la posición "en"), { tipo: 'zona' },
@@ -58,6 +67,9 @@ export function problemas(hojas, i) {
       if (ops.length < 2) out.push({ txt: 'Necesita al menos 2 opciones.', arreglo: null });
       else if (ops.some(o => !String(o.texto || '').trim() && !o.imagen)) out.push({ txt: 'Hay una opción vacía.', arreglo: null });
     }
+  }
+  if (h.tipo === 'ruleta' && c.origen === 'participantes' && c.hoja_registro && registroAntes(hojas, i).length && !registroAntes(hojas, i).some(x => x.id === c.hoja_registro)) {
+    out.push({ txt: 'La hoja Unirse/Agrupar elegida ya no está antes de la ruleta: se usará la más cercana.', arreglo: null });
   }
   if (h.tipo === 'ruleta' && (c.origen || 'nombres') === 'nombres' && !(c.lista || []).some(x => String(x).trim())) {
     out.push({ txt: 'La ruleta no tiene nombres.', arreglo: null });

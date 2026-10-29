@@ -20,6 +20,13 @@ export async function crearProyecto({ rpc, panel = 'profesor' }) {
   catch (e) { toast(mensajeError(e), 'error'); }
 }
 
+// Mis proyectos, cerrando antes las sesiones abandonadas (12 horas sin actividad) y borrando sus fotos
+export async function misProyectos(rpc) {
+  try { const r = await rpc('proyectos_cerrar_inactivas'); if (r?.fotos?.length) await borrarFotos(r.fotos); }
+  catch (e) { console.warn('No se pudieron revisar las sesiones inactivas', e); }
+  return rpc('mis_proyectos');
+}
+
 // Tarjeta de un proyecto (la usan esta lista y "Mis actividades"). La visibilidad se pinta en [data-visibilidad].
 export function htmlTarjetaProyecto(p) {
   const s = p.sesion;
@@ -30,7 +37,7 @@ export function htmlTarjetaProyecto(p) {
           <p class="act-meta">Proyecto · ${p.n_hojas} ${p.n_hojas === 1 ? 'hoja' : 'hojas'}</p></div></div>
       <div class="vis-fila" data-visibilidad></div>
       ${s ? `<div class="proy-vivo">📡 <b>Sesión en curso</b> · hoja ${s.hoja_indice} de ${s.total_hojas} · ${s.participantes} ${s.participantes === 1 ? 'participante' : 'participantes'} · PIN ${esc(s.pin)}${s.estado === 'pausada' ? ' · en pausa' : ''}
-        <div class="row" style="gap:6px; margin-top:6px;"><button class="btn btn-sm btn-primary" data-continuar>Continuar sesión</button><button class="btn btn-sm btn-outline" data-reiniciar>Reiniciar</button></div></div>` : ''}
+        <div class="row" style="gap:6px; margin-top:6px;"><button class="btn btn-sm btn-primary" data-continuar>Continuar sesión</button><button class="btn btn-sm btn-outline" data-reiniciar>Reiniciar</button><button class="btn btn-sm btn-ghost" data-finalizar title="Cerrar la sesión: el PIN deja de funcionar y los resultados quedan guardados">⏹ Finalizar</button></div></div>` : ''}
       <div class="act-pie"><span class="act-fecha">Editado ${fmtFecha(p.updated_at, true)}</span>
         <div class="act-acciones">
           <button class="btn btn-sm btn-primary" data-abrir>✏️ Abrir</button>
@@ -64,6 +71,12 @@ export function conectarTarjetaProyecto(card, p, { rpc, panel = 'profesor', reca
     try { const r = await rpc('proyecto_reiniciar_sesion', { p_sesion: p.sesion.id }); await borrarFotos(r.fotos); toast('Sesión reiniciada · PIN nuevo: ' + r.sesion.pin); recargar(); }
     catch (e) { toast(mensajeError(e), 'error'); }
   });
+  en('[data-finalizar]', async () => {
+    if (!await confirmar('El PIN dejará de funcionar y las pantallas abiertas dejarán de consultar. Los resultados quedan guardados en “Resultados”.',
+      { titulo: '¿Finalizar la sesión?', boton: '⏹ Finalizar', peligro: false })) return;
+    try { const r = await rpc('proyecto_finalizar', { p_sesion: p.sesion.id }); await borrarFotos(r.fotos); toast('Sesión finalizada'); recargar(); }
+    catch (e) { toast(mensajeError(e), 'error'); }
+  });
   en('[data-duplicar]', async () => {
     try { await rpc('proyecto_duplicar', { p_proyecto: id }); toast('Proyecto duplicado'); recargar(); }
     catch (e) { toast(mensajeError(e), 'error'); }
@@ -79,7 +92,7 @@ export function conectarTarjetaProyecto(card, p, { rpc, panel = 'profesor', reca
 export async function vistaProyectos(cont, { rpc, panel = 'profesor' }) {
   cont.innerHTML = '<div class="center" style="padding:50px;"><div class="spinner"></div></div>';
   let lista;
-  try { lista = await rpc('mis_proyectos'); }
+  try { lista = await misProyectos(rpc); }
   catch (e) { cont.innerHTML = `<div class="card empty"><span class="big">⚠️</span>${esc(mensajeError(e))}</div>`; return; }
   const recargar = () => vistaProyectos(cont, { rpc, panel });
 

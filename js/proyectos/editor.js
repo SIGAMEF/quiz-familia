@@ -1,10 +1,14 @@
 // ============================================================
 // Proyectos en grupo: editor de hojas (pantalla completa)
 // proyectos.html?id=<proyecto>[&volver=admin][&presentar=1]
+// Plantillas de culto (una sola hoja, con vista Portada / Con letra):
+// proyectos.html?plantilla=<id> (una mía) o ?plantilla=nueva&base=<prediseñada|blanco>[&volver=admin]
+// Canciones (cada pantalla de la canción es una hoja; la letra, la plantilla y los resaltados se editan aquí):
+// proyectos.html?cancion=<id> o ?cancion=nueva[&volver=admin]
 // ============================================================
 import { supabase, $, $$, esc, toast, confirmar, abrirModal, mensajeError, exigirRol, copiar, TIPOS } from '../comun.js';
 import {
-  pintarHoja, pintarHojaMovil, pintarCelular, pintarFondo, repintarElemento, colocar, posMovil, leerVideo, miniaturaVideo, MODOS_FONDO
+  pintarHoja, pintarHojaMovil, pintarCelular, pintarFondo, repintarElemento, colocar, posMovil, leerVideo, miniaturaVideo, MODOS_FONDO, EFECTOS_TEXTO
 } from './lienzo.js';
 import {
   FUENTES, COLORES, DEGRADADOS, cssDegradado, PATRONES, estiloFondo, FORMAS, EMOJIS, PLANTILLAS,
@@ -19,12 +23,24 @@ import { guardarArchivo, medidas, pintarMisArchivos } from './archivos.js';
 import { configJuego, infoJuego, UNIDAD, TIEMPOS_JUEGO } from './juego-hoja.js';
 import { elegirActividad, TIPOS_JUEGO_CATALOGO, ACTIVIDADES } from '../catalogo.js';
 import { abrirEditor } from '../editor-juegos.js';
-import { problemas, revisar, necesitaUnirse, esRegistro, agruparAntes } from './revision.js';
+import { problemas, revisar, necesitaUnirse, esRegistro, agruparAntes, registroAntes, registroDeRuleta } from './revision.js';
+import { plantillaIncluida, PLANTILLA_BLANCO, CATEGORIAS } from '../cultos/plantillas.js';
+import { datosPlantillas } from '../cultos/datos.js';
+import { colorBase, FONDOS, parametros, montarFondoAnimado } from '../cultos/fondos.js';
+import { datosCanciones } from '../cultos/datos.js';
+import { OPCIONES_DEFECTO, ordenNormal, ubicarResaltados, lineasDeContenido, palabras, etiquetas } from '../cultos/letra.js';
+import { hojasDeCancion, plantillaDeCancion, plantillaDe, registrarMisPlantillas, misPlantillas, prepararFuente, pintarPantalla, existePlantilla } from '../cultos/diapositivas.js';
+import { PLANTILLAS as PLANTILLAS_CULTO, PLANTILLA_DEFECTO } from '../cultos/plantillas.js';
+import { montarPanelLetra } from '../cultos/panel-letra.js';
+import { abrirBarraResaltar, cerrarBarraResaltar } from '../cultos/resaltar.js';
+import { buscarObjetos, SVG as SVG_OBJ, ANIMACIONES, ANIMACIONES_TEXTO, EMOJIS_LLUVIA, VELOCIDADES } from '../cultos/objetos.js';
 
 const raiz = $('#raiz');
 const params = new URLSearchParams(location.search);
 const ID = params.get('id');
-const VOLVER = params.get('volver') === 'admin' ? 'admin.html#proyectos' : 'profesor.html#proyectos';
+const MODO_PL = params.has('plantilla');   // editor de una plantilla de culto
+const MODO_CAN = params.has('cancion');    // editor de una canción
+const VOLVER = (params.get('volver') === 'admin' ? 'admin.html' : 'profesor.html') + (MODO_PL ? '#cultos/plantillas' : MODO_CAN ? '#cultos/canciones' : '#proyectos');
 const MAX_VIDEO_MB = 20;
 
 const TIPOS_HOJA = [
@@ -36,11 +52,18 @@ const TIPOS_HOJA = [
 const ICO_HOJA = { ...Object.fromEntries(TIPOS_HOJA.map(t => [t.k, t.ico])), juego: '🎮' };   // las hojas de juego se agregan con "+ Más"
 const DISPONIBLES = TIPOS_HOJA.map(t => t.k);
 const RECURSOS = [
-  ['archivos', '📁', 'Mis archivos'], ['texto', '🔤', 'Texto'], ['fondo', '🎨', 'Fondo'], ['imagen', '🖼', 'Imagen'], ['iconos', '⭐', 'Iconos'],
+  ['archivos', '📁', 'Mis archivos'], ['texto', '🔤', 'Texto'], ['fondo', '🎨', 'Fondo'], ['imagen', '🖼', 'Imagen'], ['objetos', '✨', 'Objetos'], ['iconos', '⭐', 'Iconos'],
   ['emojis', '😀', 'Emojis'], ['formas', '🔷', 'Formas'], ['video', '🎬', 'Video'], ['plantillas', '🧩', 'Plantillas']
 ];
-const NOMBRE_EL = { texto: 'Texto', imagen: 'Imagen', icono: 'Icono', emoji: 'Emoji', forma: 'Forma', video: 'Video', zona: 'Área de respuestas' };
-const ICO_EL = { texto: '🔤', imagen: '🖼', icono: '⭐', forma: '🔷', video: '🎬', zona: '📊' };
+const NOMBRE_EL = { texto: 'Texto', imagen: 'Imagen', icono: 'Icono', emoji: 'Emoji', forma: 'Forma', video: 'Video', zona: 'Área de respuestas', objeto: 'Ilustración', lluvia: 'Lluvia de emojis' };
+const ICO_EL = { texto: '🔤', imagen: '🖼', icono: '⭐', forma: '🔷', video: '🎬', zona: '📊', objeto: '✝️', lluvia: '🌧' };
+// Plantilla de culto: id guardado (null si todavía es una prediseñada sin guardar), base y categoría
+let plantilla = { id: null, base: null, categoria: 'Mis plantillas' };
+let verPl = 'portada';       // vista de la plantilla: 'portada' o 'letra'
+let animarEd = false;        // ver las animaciones en el editor
+const NOMBRE_EN = { portada: 'Solo portada', letra: 'Solo con letra' };
+// Canción: los datos, el panel de la letra, la pestaña izquierda y la estrofa elegida
+let cancion = null, panelLetra = null, tabIzq = 'letra', bloqueSel = -1, verPlantillas = false;
 
 let perfil, proyecto, hojas = [], actual = 0, selId = null, vista = 'web', recurso = null, editandoTexto = null;
 let lienzo = null;          // .lienzo que se edita: el 16:9 en Web o el del celular ajustado a mano
@@ -74,10 +97,10 @@ function geo(el) {
   m.pos = m.pos || {};
   return (m.pos[el.id] = m.pos[el.id] || { ...posMovil(hoja(), el) });
 }
-const ctxHoja = () => ({ hoja: hoja() });
+const ctxHoja = () => ({ hoja: hoja(), ver: MODO_PL ? verPl : null, animar: animarEd });
 
 const hist = { pila: [], pos: -1 };
-function foto() { return JSON.stringify({ nombre: proyecto.nombre, hojas }); }
+function foto() { return MODO_CAN ? JSON.stringify(filaCancion()) : JSON.stringify({ nombre: proyecto.nombre, hojas }); }
 function registrar() {
   const f = foto();
   if (hist.pila[hist.pos]?.f === f) return false;
@@ -94,6 +117,14 @@ function moverHist(d) {
   hist.pos = p;
   const { f, actual: a, selId: s } = hist.pila[p];
   const o = JSON.parse(f);
+  if (MODO_CAN) {
+    Object.assign(cancion, o);
+    reconstruir();
+    $('[data-nombre]').value = cancion.titulo;
+    panelLetra?.refrescar();
+    pintarTodo(); pintarBotonesHist(); programarGuardado();
+    return;
+  }
   proyecto.nombre = o.nombre; hojas = o.hojas;
   actual = Math.min(a, hojas.length - 1);
   selId = hoja().diseno.elementos.some(e => e.id === s) ? s : null;
@@ -110,6 +141,7 @@ function pintarBotonesHist() {
 
 // Confirma un cambio: historial + autoguardado + repintado
 function confirmarCambio({ repintar = 'hoja' } = {}) {
+  if (MODO_CAN) sincronizarDetalles();
   if (!registrar()) return;
   programarGuardado();
   if (repintar === 'hoja') { pintarLienzo(); pintarMini(actual); pintarPropiedades(); }
@@ -129,6 +161,8 @@ function estado(tipo, txt) {
 function programarGuardado() {
   if (conflicto) return;
   sucio = true;
+  if (MODO_PL && !plantilla.id) { estado('pendiente', 'Sin guardar'); return; }
+  if (MODO_CAN && !cancion.titulo.trim()) { estado('pendiente', '✏️ Escribe el título'); return; }
   estado('pendiente', 'Sin guardar…');
   clearTimeout(tGuardar);
   tGuardar = setTimeout(guardar, 1000);
@@ -138,9 +172,29 @@ async function guardar() {
   tGuardar = null;
   if (conflicto || !sucio) return;
   if (guardando) { tGuardar = setTimeout(guardar, 400); return; }
+  if (MODO_PL && !plantilla.id) return;
   guardando = true; sucio = false;
   estado('guardando', 'Guardando…');
   try {
+    if (MODO_CAN) {
+      if (!cancion.titulo.trim()) { sucio = true; estado('pendiente', '✏️ Escribe el título'); return; }
+      if (cancion.id) await datosCanciones.guardar(cancion.id, filaCancion());
+      else {
+        const nueva = await datosCanciones.crear({ ...filaCancion(), profesor_id: perfil.id });
+        cancion.id = nueva.id;
+        const u = new URLSearchParams(location.search);
+        u.set('cancion', nueva.id);
+        history.replaceState(null, '', '?' + u.toString());
+      }
+      if (!sucio) estado('ok', 'Guardado ✓');
+      return;
+    }
+    if (MODO_PL) {
+      const r = await datosPlantillas.guardar(plantilla.id, filaPlantilla());
+      base = r.updated_at;
+      if (!sucio) estado('ok', 'Guardado ✓');
+      return;
+    }
     const r = await rpc('proyecto_guardar', {
       p_proyecto: ID, p_nombre: proyecto.nombre, p_tema: proyecto.tema || {}, p_base: base,
       p_hojas: hojas.map(h => ({ id: h.id, tipo: h.tipo, diseno: h.diseno, config: h.config || {} }))
@@ -316,9 +370,11 @@ function irAHoja(i) {
 
 function agregarElemento(el) {
   terminarEdicionTexto();
+  if (MODO_CAN && !hoja()?.info) return toast('Primero pega la letra: los detalles se agregan a una pantalla de la canción', 'error');
   if (!editableAqui()) cambiarVista('web');
   el.id = uid();
   el.rot = el.rot || 0;
+  if (MODO_PL && el.tipo === 'texto' && !el.en) el.en = verPl;   // un texto nuevo es de la vista que se está editando
   hoja().diseno.elementos.push(el);
   selId = el.id;
   confirmarCambio();
@@ -331,6 +387,7 @@ function agregarTexto(nivel, fuente) {
 }
 // ¿El fondo es oscuro? (para elegir el color de un texto nuevo)
 function oscuro(f) {
+  if (f?.tipo === 'animado') f = { tipo: 'color', valor: colorBase(f) };
   let c = f?.valor;
   if (f?.tipo === 'degradado') c = DEGRADADOS[f.valor]?.[1];
   else if (f?.tipo === 'patron') c = colorValido(f.color, PATRONES[f.valor]?.base);
@@ -451,6 +508,8 @@ function refrescarFondo() {
 
 // ======================= ESTRUCTURA =======================
 function montar() {
+  if (MODO_PL) return montarPlantilla();
+  if (MODO_CAN) return montarCancion();
   document.title = `${proyecto.nombre} · Proyecto`;
   document.body.className = 'editor-proyectos';
   raiz.innerHTML = `<div class="ed">
@@ -496,6 +555,101 @@ function montar() {
   conectarSoltarArchivos();
   pintarTodo();
   registrar();
+}
+
+// ---------- Plantilla de culto ----------
+function montarPlantilla() {
+  document.title = `${proyecto.nombre} · Plantilla de culto`;
+  document.body.className = 'editor-proyectos';
+  raiz.innerHTML = `<div class="ed ed-plantilla">
+    <header class="ed-top">
+      <a class="btn btn-sm btn-outline" href="${VOLVER}" title="Volver a las plantillas">←<span class="ocultar-movil"> Plantillas</span></a>
+      <input class="ed-nombre" data-nombre maxlength="80" aria-label="Nombre de la plantilla">
+      <span class="ed-estado ok" data-estado></span>
+      <span class="grow"></span>
+      <button class="btn btn-sm btn-ghost btn-icon ocultar-movil" data-deshacer title="Deshacer (Ctrl+Z)" aria-label="Deshacer">↶</button>
+      <button class="btn btn-sm btn-ghost btn-icon ocultar-movil" data-rehacer title="Rehacer (Ctrl+Y)" aria-label="Rehacer">↷</button>
+      <div class="pestanas ed-vistas"><button data-ver-pl="portada" title="Títulos y avisos">🏷<span class="ocultar-movil"> Portada</span></button><button data-ver-pl="letra" title="Así se verán las canciones">🎵<span class="ocultar-movil"> Con letra</span></button></div>
+      <button class="btn btn-sm btn-outline" data-animar title="Ver las animaciones (al editar están quietas)">▶<span class="ocultar-movil"> Animar</span></button>
+      <button class="btn btn-primary btn-sm" data-guardar-como title="Guarda una copia en tus plantillas">💾<span class="ocultar-movil"> Guardar como mi plantilla</span></button>
+    </header>
+    <aside class="ed-izq" data-izq></aside>
+    <main class="ed-centro"><div class="escenario" data-escenario></div></main>
+    <aside class="ed-der" data-der></aside>
+    <nav class="ed-tabs">
+      <button data-tab="izq"><span>➕</span>Agregar</button>
+      <button data-tab="der"><span>🎛</span>Propiedades</button>
+      <button data-deshacer2><span>↶</span>Deshacer</button>
+    </nav>
+  </div>`;
+  const nom = $('[data-nombre]');
+  nom.value = proyecto.nombre;
+  nom.oninput = () => { proyecto.nombre = nom.value.trim() || proyecto.nombre; document.title = `${proyecto.nombre} · Plantilla de culto`; programarGuardado(); };
+  nom.onchange = () => { nom.value = proyecto.nombre; registrar(); };
+  nom.onkeydown = (e) => { if (e.key === 'Enter') nom.blur(); };
+  $('[data-deshacer]').onclick = () => moverHist(-1);
+  $('[data-rehacer]').onclick = () => moverHist(1);
+  $('[data-deshacer2]').onclick = () => moverHist(-1);
+  $$('[data-ver-pl]').forEach(b => b.onclick = () => cambiarVerPl(b.dataset.verPl));
+  $('[data-animar]').onclick = () => { animarEd = !animarEd; $('[data-animar]').classList.toggle('activo', animarEd); if (animarEd) { selId = null; } pintarLienzo(); pintarPropiedades(); };
+  $('[data-guardar-como]').onclick = guardarComo;
+  $('[data-estado]').onclick = () => { if (!conflicto && sucio) guardar(); };
+  $$('[data-tab]').forEach(b => b.onclick = () => alternarPanelMovil(b.dataset.tab));
+  estado(plantilla.id ? 'ok' : 'pendiente', plantilla.id ? 'Guardado ✓' : 'Prediseñada');
+  if (!plantilla.id) $('[data-estado]').title = 'Tus cambios se guardan con “Guardar como mi plantilla”';
+  conectarLienzo();
+  conectarTeclado();
+  conectarSoltarArchivos();
+  cambiarVerPl(verPl);
+  pintarIzquierda();
+  registrar();
+}
+function cambiarVerPl(v) {
+  terminarEdicionTexto();
+  verPl = v;
+  const el = elSel();
+  if (el && el.en && el.en !== v) selId = null;   // lo elegido no se ve en esta vista
+  $$('[data-ver-pl]').forEach(b => b.classList.toggle('activo', b.dataset.verPl === v));
+  pintarLienzo(); pintarPropiedades();
+}
+const filaPlantilla = () => ({ nombre: proyecto.nombre.slice(0, 80), categoria: plantilla.categoria, base: plantilla.base,
+  diseno: { fondo: hoja().diseno.fondo, elementos: hoja().diseno.elementos } });
+// Guarda la plantilla como una nueva en "Mis plantillas" (la primera vez, o una copia si ya era mía)
+async function guardarComo() {
+  terminarEdicionTexto();
+  const yaMia = !!plantilla.id;
+  const r = await new Promise(ok => {
+    let respondido = false;
+    const cats = [...new Set(['Mis plantillas', ...CATEGORIAS, plantilla.categoria])];
+    const m = abrirModal(`<h3>💾 Guardar como mi plantilla</h3>
+      <p class="hint">${yaMia ? 'Se guarda una copia nueva; esta plantilla queda como estaba.' : 'Queda en tus plantillas con todos tus cambios. La prediseñada no cambia.'}</p>
+      <form><label class="lbl">Nombre</label><input class="input" name="nombre" maxlength="80" required value="${esc(proyecto.nombre + (yaMia ? ' (copia)' : ''))}">
+      <label class="lbl">Categoría</label><select class="input" name="cat">${cats.map(c => `<option ${c === plantilla.categoria ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>
+      <div class="modal-pie"><button type="button" class="btn btn-outline" data-no>Cancelar</button><button class="btn btn-primary">Guardar</button></div></form>`,
+      { alCerrar: () => { if (!respondido) ok(null); } });
+    $('[data-no]', m.el).onclick = () => m.cerrar();
+    $('form', m.el).onsubmit = (e) => {
+      e.preventDefault();
+      const nombre = $('[name=nombre]', m.el).value.trim();
+      if (!nombre) return;
+      respondido = true; ok({ nombre, categoria: $('[name=cat]', m.el).value }); m.cerrar();
+    };
+  });
+  if (!r) return;
+  estado('guardando', 'Guardando…');
+  try {
+    const nueva = await datosPlantillas.crear({ ...filaPlantilla(), nombre: r.nombre, categoria: r.categoria, profesor_id: perfil.id });
+    plantilla = { id: nueva.id, base: nueva.base, categoria: nueva.categoria };
+    proyecto.nombre = nueva.nombre;
+    $('[data-nombre]').value = nueva.nombre;
+    base = nueva.updated_at; sucio = false;
+    const u = new URLSearchParams(location.search);
+    u.set('plantilla', nueva.id); u.delete('base');
+    history.replaceState(null, '', '?' + u.toString());
+    estado('ok', 'Guardado ✓');
+    toast(yaMia ? 'Copia guardada en tus plantillas' : 'Guardada en tus plantillas');
+    pintarPropiedades();
+  } catch (e) { estado('error', '⚠️ No se guardó'); toast(mensajeError(e), 'error'); }
 }
 
 // ---------- Sesión en vivo ----------
@@ -596,7 +750,7 @@ async function iniciarVivo() {
     if (sucio) return toast('Primero hay que guardar el proyecto. Revisa tu conexión.', 'error');
   }
   let s;
-  try { s = await rpc('proyecto_iniciar_sesion', { p_proyecto: ID }); }
+  try { s = await rpc('proyecto_iniciar_sesion', { p_proyecto: ID }); if (s.fotos_viejas?.length) borrarFotos(s.fotos_viejas); }
   catch (e) { return toast(mensajeError(e), 'error'); }
   const vivo = crearVivo(s, { alError: (m) => toast('Se perdió la conexión con la sesión: ' + m, 'error') });
   await vivo.iniciar();
@@ -636,7 +790,7 @@ function pintarLienzo() {
   if (!enCelular()) {
     escn.innerHTML = '<div class="marco" data-marco></div>';
     const marco = $('[data-marco]');
-    lienzo = pintarHoja(marco, hoja(), { modo: 'editor' });
+    lienzo = pintarHoja(marco, hoja(), { modo: 'editor', ...(MODO_PL ? { ver: verPl } : {}), animar: animarEd, marcar: MODO_CAN });
     const capa = document.createElement('div');
     capa.className = 'capa-sel';
     marco.appendChild(capa);
@@ -736,6 +890,11 @@ function conectarLienzo() {
   let op = null;   // operación en curso: mover, redimensionar o girar
   escn.addEventListener('pointerdown', (e) => {
     if (!lienzo || !editableAqui() || e.button > 0) return;
+    // canción: en la letra se eligen palabras (para resaltarlas), no se mueve nada
+    if (MODO_CAN && e.target.closest('.pe[data-vinculo="letra"]') && lienzo.contains(e.target)) {
+      if (selId) { selId = null; pintarSeleccion(); pintarPropiedades(); }
+      return;
+    }
     // fuera de la hoja (zona gris): solo quita la selección
     if (!lienzo.contains(e.target) && !e.target.closest('.capa-sel')) {
       if (selId && !e.target.closest('.cel-aviso')) { terminarEdicionTexto(); selId = null; pintarSeleccion(); pintarPropiedades(); }
@@ -746,11 +905,11 @@ function conectarLienzo() {
     const activo = document.activeElement;
     if (activo && activo !== document.body && !lienzo.contains(activo)) activo.blur();
     const asa = e.target.closest('[data-h]');
-    let nodo = e.target.closest('.pe');
+    let nodo = e.target.closest('.pe:not(.bloq)');
     terminarEdicionTexto();
     // Alt+clic: elige el elemento que está debajo del elegido
     if (nodo && !asa && e.altKey) {
-      const pila = [...new Set(document.elementsFromPoint(e.clientX, e.clientY).map(n => n.closest('.pe')).filter(n => n && lienzo.contains(n)))];
+      const pila = [...new Set(document.elementsFromPoint(e.clientX, e.clientY).map(n => n.closest('.pe:not(.bloq)')).filter(n => n && lienzo.contains(n)))];
       const i = pila.findIndex(n => n.dataset.id === selId);
       nodo = pila[(i + 1) % pila.length] || nodo;
     }
@@ -807,7 +966,7 @@ function conectarLienzo() {
   escn.addEventListener('pointerup', fin);
   escn.addEventListener('pointercancel', fin);
   escn.addEventListener('dblclick', (e) => {
-    const nodo = e.target.closest('.pe-texto');
+    const nodo = e.target.closest('.pe-texto:not(.bloq)');
     if (nodo && lienzo?.contains(nodo) && editableAqui()) editarTexto(nodo.dataset.id);
   });
 }
@@ -820,7 +979,7 @@ function redimensionar(op, g, dx, dy, shift) {
   const ldx = dx * cos + dy * sin, ldy = -dx * sin + dy * cos;   // movimiento en los ejes del elemento
   const w0 = ini.w * ux, h0 = ini.h * uy;
   let w = Math.max(12, w0 + sx * ldx), hh = Math.max(12, h0 + sy * ldy);
-  const fija = ['emoji', 'icono', 'imagen'].includes(el.tipo) !== shift;   // Shift invierte la proporción fija
+  const fija = ['emoji', 'icono', 'imagen', 'objeto'].includes(el.tipo) !== shift;   // Shift invierte la proporción fija
   if (fija && sx && sy) { const k = Math.max(w / w0, hh / h0); w = w0 * k; hh = h0 * k; }
   const lx = sx * (w - w0) / 2, ly = sy * (hh - h0) / 2;
   const cx = (ini.x + ini.w / 2) * ux + lx * cos - ly * sin;
@@ -838,14 +997,17 @@ function guias(v, h) {
 }
 
 // ---------- Texto: el enunciado de las preguntas vive en la configuración de la hoja ----------
-const textoDe = (el) => el.vinculo === 'enunciado' ? (hoja().tipo === 'completar' ? hoja().config.frase || '' : hoja().config.enunciado || '') : el.texto || '';
+const textoDe = (el) => el.vinculo === 'enunciado' ? (hoja().tipo === 'completar' ? hoja().config.frase || '' : hoja().config.enunciado || '')
+  : el.vinculo === 'letra' ? 'Aquí va la letra (o el versículo)' : el.vinculo === 'pie' ? 'Título · Estrofa' : el.texto || '';
 function ponerTexto(el, t) {
+  if (el.vinculo === 'letra' || el.vinculo === 'pie') return;   // lo pone la canción
   if (el.vinculo !== 'enunciado') { el.texto = t; return; }
   if (hoja().tipo === 'completar') hoja().config.frase = t; else hoja().config.enunciado = t;
 }
 
 function editarTexto(id) {
   const el = hoja().diseno.elementos.find(e => e.id === id);
+  if (el?.vinculo === 'letra' || el?.vinculo === 'pie') return toast('Aquí va la letra de cada canción: cambia su fuente, color y tamaño en el panel de la derecha');
   const nodo = lienzo?.querySelector(`.pe[data-id="${CSS.escape(id)}"] .pe-txt`);
   if (!el || !nodo) return;
   selId = id; pintarSeleccion();
@@ -981,6 +1143,8 @@ function moverCapa(hacia) {
 // ======================= TIRA DE HOJAS =======================
 function pintarTira() {
   const tira = $('[data-tira]');
+  if (!tira) return;   // la plantilla de culto tiene una sola hoja
+  if (MODO_CAN) return pintarTiraCancion(tira);
   tira.innerHTML = hojas.map((h, i) => `<div class="mini-hoja ${i === actual ? 'activa' : ''}" draggable="true" data-i="${i}" role="button" tabindex="0"
       aria-label="Hoja ${i + 1}"><span class="num">${i + 1}${h.tipo !== 'contenido' ? ' ' + (ICO_HOJA[h.tipo] || '') : ''}</span><span class="mini-aviso" data-aviso hidden>⚠</span>
       <span class="mini-acc"><button data-dup-h title="Duplicar hoja" aria-label="Duplicar la hoja ${i + 1}">⧉</button><button data-del-h title="Eliminar hoja (Supr)" aria-label="Eliminar la hoja ${i + 1}">🗑</button></span>
@@ -1025,6 +1189,7 @@ function pintarTira() {
 }
 // ⚠ en las miniaturas de las hojas a las que les falta algo (el detalle, al pasar el mouse)
 function pintarAvisos() {
+  if (MODO_CAN) return;   // las pantallas de una canción tienen su propio aviso (texto muy largo)
   $$('.mini-hoja').forEach(m => {
     const av = problemas(hojas, +m.dataset.i), b = $('[data-aviso]', m);
     if (!b) return;
@@ -1068,6 +1233,15 @@ function menuHoja(i, x, y) {
 // ======================= PANEL IZQUIERDO: HOJAS Y RECURSOS =======================
 function pintarIzquierda() {
   const p = $('[data-izq]');
+  if (MODO_CAN) return pintarIzquierdaCancion(p);
+  if (!recurso && MODO_PL) {
+    p.innerHTML = `<h4>Recursos</h4>
+      <div class="recursos">${RECURSOS.filter(r => r[0] !== 'plantillas').map(([k, ico, txt]) => `<button class="recurso" data-rec="${k}"><span>${ico}</span>${txt}</button>`).join('')}</div>
+      <p class="hint" style="margin-top:14px;">Todo se puede mover, cambiar y borrar. En <b>🏷 Portada</b> van los títulos y avisos; en <b>🎵 Con letra</b>, cómo se verán las canciones (la zona punteada es la letra).</p>
+      <p class="hint">También puedes <b>pegar</b> (Ctrl+V) o <b>arrastrar</b> una imagen sobre la plantilla.</p>`;
+    $$('[data-rec]', p).forEach(b => b.onclick = () => { recurso = b.dataset.rec; pintarIzquierda(); });
+    return;
+  }
   if (!recurso) {
     p.innerHTML = `<h4>Agregar hoja</h4>
       <div class="tipos-hoja">${TIPOS_HOJA.map(t => {
@@ -1124,7 +1298,14 @@ const PANELES = {
 
   fondo(c) {
     const f = hoja().diseno.fondo || {};
-    c.innerHTML = `<h4>Color</h4><div class="muestras">${COLORES.map(k => `<button class="muestra ${f.tipo === 'color' && f.valor === k ? 'sel' : ''}" data-color="${k}" style="background:${k}" aria-label="Color ${k}"></button>`).join('')}</div>
+    const pa = f.tipo === 'animado' ? parametros(f) : null;
+    c.innerHTML = `<h4>✨ Animados</h4><div class="fondos-anim" data-anim></div>
+      ${pa ? `<p class="hint" style="margin:8px 0 4px;">Colores de “${esc(FONDOS[f.valor]?.nombre || '')}”</p>
+        <div class="colores-fondo"><span class="small muted">Fondo</span>${pa.base.map((k, i) => `<input type="color" data-fa="base:${i}" value="${k}" aria-label="Fondo ${i + 1}">`).join('')}</div>
+        <div class="colores-fondo" style="margin-top:4px;"><span class="small muted">Luces</span>${pa.colores.map((k, i) => `<input type="color" data-fa="colores:${i}" value="${k}" aria-label="Luz ${i + 1}">`).join('')}</div>
+        <button class="btn btn-sm btn-ghost" data-fa-reset>↺ Colores originales</button>
+        <p class="hint">Se mueven solos; se detienen cuando no se ven y si el equipo pide menos movimiento.</p>` : ''}
+      <h4>Color</h4><div class="muestras">${COLORES.map(k => `<button class="muestra ${f.tipo === 'color' && f.valor === k ? 'sel' : ''}" data-color="${k}" style="background:${k}" aria-label="Color ${k}"></button>`).join('')}</div>
       <div class="prop-fila" style="margin-top:8px;"><label>Otro color</label><input type="color" data-color-libre value="${f.tipo === 'color' ? colorValido(f.valor) : '#FFFFFF'}"></div>
       <h4>Degradados</h4><div class="muestras">${Object.keys(DEGRADADOS).map(k => `<button class="muestra ${f.tipo === 'degradado' && f.valor === k ? 'sel' : ''}" data-deg="${k}" style="background:${cssDegradado(k)}" aria-label="Degradado ${k}"></button>`).join('')}</div>
       <h4>Patrones</h4><div class="muestras anchas">${Object.entries(PATRONES).map(([k, p]) => `<button class="muestra ${f.tipo === 'patron' && f.valor === k ? 'sel' : ''}" data-pat="${k}"><span class="etq">${esc(p.nombre)}</span></button>`).join('')}</div>
@@ -1136,6 +1317,23 @@ const PANELES = {
       <button class="btn btn-block btn-sm" style="margin-top:14px;" data-todas>Aplicar este fondo a todas las hojas</button>`;
     $$('[data-pat]', c).forEach(b => Object.assign(b.style, estiloFondo({ tipo: 'patron', valor: b.dataset.pat })));
     const poner = (nuevo) => { hoja().diseno.fondo = nuevo; confirmarCambio(); PANELES.fondo(c); };
+    const anim = $('[data-anim]', c);
+    for (const [k, F] of Object.entries(FONDOS)) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.title = F.nombre; b.className = f.tipo === 'animado' && f.valor === k ? 'sel' : '';
+      b.innerHTML = `<div class="fondo-capa"></div><span>${esc(F.nombre)}</span>`;
+      montarFondoAnimado($('.fondo-capa', b), { tipo: 'animado', valor: k }, { calidad: 'baja' });
+      b.onclick = () => poner({ tipo: 'animado', valor: k });
+      anim.appendChild(b);
+    }
+    $$('[data-fa]', c).forEach(inp => {
+      const [lista, i] = inp.dataset.fa.split(':');
+      const aplicar = () => { const fa = hoja().diseno.fondo; const q = parametros(fa); fa.p = { ...(fa.p || {}), base: q.base, colores: q.colores }; fa.p[lista][Number(i)] = inp.value; };
+      inp.oninput = () => { aplicar(); refrescarFondo(); };
+      inp.onchange = () => { aplicar(); confirmarCambio({ repintar: 'mini' }); };
+    });
+    const fr = $('[data-fa-reset]', c);
+    if (fr) fr.onclick = () => { delete hoja().diseno.fondo.p; confirmarCambio(); PANELES.fondo(c); };
     $$('[data-color]', c).forEach(b => b.onclick = () => poner({ tipo: 'color', valor: b.dataset.color }));
     const libre = $('[data-color-libre]', c);
     libre.oninput = () => { hoja().diseno.fondo = { tipo: 'color', valor: libre.value }; refrescarFondo(); };
@@ -1155,6 +1353,69 @@ const PANELES = {
       hojas.forEach(h => { h.diseno.fondo = clonar(fondo); });
       confirmarCambio({ repintar: 'todo' });
     };
+  },
+
+  objetos(c) {
+    let cat = 'ilustracion', q = '';
+    const lluvia = new Set(['🔥', '🙌', '✨']);
+    c.innerHTML = `<div class="pestanas" style="margin-bottom:8px;"><button data-oc="ilustracion" class="activo">Ilustraciones</button><button data-oc="emoji">Emojis</button><button data-oc="frase">Frases</button></div>
+      <input class="input" data-buscar placeholder="🔍 Buscar (cruz, fuego, búsqueda…)">
+      <div class="obj-grid" data-lista></div>
+      <p class="hint" style="margin-top:8px;">Al insertarlo se puede mover y cambiar de tamaño; su animación y velocidad se eligen a la derecha.</p>
+      <h4>🌧 Lluvia de emojis</h4><p class="hint" style="margin:0 0 6px;">Elige de 3 a 5: suben desde abajo por toda la pantalla.</p>
+      <div class="lluvia-chips" data-lluvia></div>
+      <button class="btn btn-sm btn-block" data-lluvia-agregar style="margin-top:6px;">➕ Agregar lluvia</button>
+      <h4>✍️ Texto animado</h4>
+      <div class="stack"><button class="btn btn-sm btn-block btn-outline" data-ta="aparecer">Aparecer</button><button class="btn btn-sm btn-block btn-outline" data-ta="escribir">Máquina de escribir</button>
+        <button class="btn btn-sm btn-block btn-outline" data-ta="marquesina">Marquesina</button><button class="btn btn-sm btn-block btn-outline" data-ta="chat">💬 Burbujas de chat (una por una)</button></div>`;
+    const lista = $('[data-lista]', c);
+    const pintar = () => {
+      const items = buscarObjetos(cat, q);
+      lista.innerHTML = items.map((o, i) => {
+        const a = o.el?.anim && o.el.anim !== 'ninguna' ? `class="pe-anim a-${o.el.anim}" style="--t:${o.el.dur || 3}s"` : '';
+        if (o.cat === 'frase') return `<button type="button" class="frase" data-o="${i}" title="${esc(o.nombre)}" style="font-family:'${esc(o.el.fuente || 'Nunito')}'">${esc(o.el.texto)}</button>`;
+        if (o.cat === 'emoji') return `<button type="button" data-o="${i}" title="${esc(o.nombre)}"><span ${a}>${esc(o.el.emoji)}</span></button>`;
+        if (o.grupo || o.el?.tipo === 'busqueda') return `<button type="button" data-o="${i}" title="${esc(o.nombre)}" style="font-size:11px; font-weight:800;">🔍 ${esc(o.nombre)}</button>`;
+        return `<button type="button" data-o="${i}" title="${esc(o.nombre)}"><span ${a}>${SVG_OBJ[o.el.obj].svg}</span></button>`;   // dibujos fijos de objetos.js
+      }).join('') || '<div class="empty small" style="grid-column:1/-1;">Nada coincide.</div>';
+      $$('[data-o]', lista).forEach(b => b.onclick = () => {
+        const o = items[Number(b.dataset.o)];
+        if (o.grupo) { o.grupo.forEach(e => agregarElemento(clonar(e))); return; }
+        const el = clonar(o.el);
+        if (o.cat === 'frase') agregarElemento({ ...el, x: r1(50 - el.w / 2), y: r1(50 - el.h / 2) });
+        else agregarElemento({ ...el, ...tamProporcional(o.prop || 1, el.tipo === 'busqueda' ? 56 : 16) });
+        cerrarPanelMovil();
+      });
+    };
+    $$('[data-oc]', c).forEach(b => b.onclick = () => { cat = b.dataset.oc; $$('[data-oc]', c).forEach(x => x.classList.toggle('activo', x === b)); pintar(); });
+    $('[data-buscar]', c).oninput = (e) => { q = e.target.value; pintar(); };
+    const pintarLluvia = () => {
+      $('[data-lluvia]', c).innerHTML = EMOJIS_LLUVIA.map(e => `<button type="button" class="${lluvia.has(e) ? 'sel' : ''}" data-ll="${e}" aria-pressed="${lluvia.has(e)}">${e}</button>`).join('');
+      $$('[data-ll]', c).forEach(b => b.onclick = () => {
+        const e = b.dataset.ll;
+        if (lluvia.has(e)) { if (lluvia.size > 1) lluvia.delete(e); } else if (lluvia.size < 5) lluvia.add(e); else toast('Hasta 5 emojis', 'error');
+        pintarLluvia();
+      });
+    };
+    pintarLluvia();
+    $('[data-lluvia-agregar]', c).onclick = () => {
+      if (lluvia.size < 3) return toast('Elige al menos 3 emojis', 'error');
+      agregarElemento({ tipo: 'lluvia', emojis: [...lluvia], cantidad: 10, tam: 5, x: 0, y: 0, w: 100, h: 100 });
+      cerrarPanelMovil();
+    };
+    const color = () => oscuro(hoja().diseno.fondo) ? '#FFFFFF' : '#2D2A45';
+    $$('[data-ta]', c).forEach(b => b.onclick = () => {
+      const t = b.dataset.ta;
+      if (t === 'chat') {
+        [['¿Vienes el domingo? 👀', '#FFFFFF', '#1E1B4B', 14], ['¡Claro! 🙌', '#22C55E', '#FFFFFF', 52], ['Trae a un amigo 😎', '#FFFFFF', '#1E1B4B', 14]].forEach(([texto, caja, col, x], i) =>
+          agregarElemento({ tipo: 'texto', texto, x, y: 14 + i * 24, w: 34, h: 16, tam: 3, fuente: 'Montserrat', peso: 700, color: col, fondoCaja: caja, alinear: 'center', anim: 'chat', dur: 9, retraso: i * 1.2 }));
+        return;
+      }
+      const base = { tipo: 'texto', x: 10, y: 40, w: 80, h: 18, tam: 5, fuente: 'Montserrat', peso: 800, color: color(), alinear: 'center', anim: t };
+      if (t === 'marquesina') agregarElemento({ ...base, texto: 'BIENVENIDOS ✦ DIOS TE BENDIGA ✦', x: -5, y: 80, w: 110, h: 10, tam: 3.4, fondoCaja: '#FACC15', color: '#111111', fuente: 'Anton', peso: 0 });
+      else agregarElemento({ ...base, texto: t === 'escribir' ? 'Hoy Dios tiene algo para ti' : '¡Bienvenidos!' });
+    });
+    pintar();
   },
 
   imagen(c) {
@@ -1369,6 +1630,7 @@ function pintarPropiedades() {
   if (h.id !== hojaAntes) { pestanaDer = 'tipo'; hojaAntes = h.id; selAntes = null; }
   if (selId && selId !== selAntes) pestanaDer = 'diseno';
   selAntes = selId;
+  if (MODO_CAN) return el ? pintarPropsElemento(p, el) : pintarPropsCancion(p);
   if (!interactiva(h.tipo)) return el ? pintarPropsElemento(p, el) : pintarPropsHoja(p);
   const nombre = esPregunta(h.tipo) ? '❓ Pregunta' : { agrupar: '👥 Agrupar', unirse: '📲 Unirse', ruleta: '🎡 Ruleta', juego: '🎮 Juego' }[h.tipo];
   p.innerHTML = `<div class="der-tabs" role="tablist">
@@ -1418,9 +1680,13 @@ function pintarPropsElemento(p, el) {
   const g = geoVer(el);
   let esp = '';
   if (el.tipo === 'texto') {
-    const vinc = el.vinculo === 'enunciado';
-    esp = `<label class="lbl" style="margin-top:0;">${vinc ? (hoja().tipo === 'completar' ? 'Frase (usa ___ para cada espacio)' : 'Enunciado de la pregunta') : 'Texto'}</label>
-      <textarea class="input" data-prop-texto style="min-height:70px;">${esc(textoDe(el))}</textarea>
+    const vinc = el.vinculo === 'enunciado', deCancion = el.vinculo === 'letra' || el.vinculo === 'pie';
+    const ef = el.efecto || {};
+    esp = (deCancion ? `<p class="hint" style="margin-top:0;">${el.vinculo === 'letra'
+        ? '🎵 <b>Zona de la letra.</b> Aquí se acomoda la letra de cada canción (o el versículo) con el tamaño más grande que quepa: el tamaño de aquí es el máximo.'
+        : '🎵 <b>Pie.</b> Aquí sale el título de la canción y la estrofa.'}</p>`
+      : `<label class="lbl" style="margin-top:0;">${vinc ? (hoja().tipo === 'completar' ? 'Frase (usa ___ para cada espacio)' : 'Enunciado de la pregunta') : 'Texto'}</label>
+      <textarea class="input" data-prop-texto style="min-height:70px;">${esc(textoDe(el))}</textarea>`) + `
       <label class="lbl">Fuente</label><select class="input" data-p="fuente">${FUENTES.map(f => `<option ${f === el.fuente ? 'selected' : ''} style="font-family:'${esc(f)}'">${esc(f)}</option>`).join('')}</select>
       <div style="margin-top:10px;">${fila('Tamaño', `<input type="range" min="1" max="16" step="0.1" data-p="tam" data-num value="${el.tam ?? 4}"><b data-ver="tam">${r1(el.tam ?? 4)}</b>`)}
       ${fila('Color', `<input type="color" data-p="color" value="${colorValido(el.color, '#2D2A45')}">
@@ -1431,7 +1697,14 @@ function pintarPropsElemento(p, el) {
         <button class="btn btn-sm btn-outline ${el.negrita ? 'activo' : ''}" data-alt="negrita" title="Negrita"><b>N</b></button>
         <button class="btn btn-sm btn-outline ${el.cursiva ? 'activo' : ''}" data-alt="cursiva" title="Cursiva"><i>K</i></button>
         <button class="btn btn-sm btn-outline ${el.sombra ? 'activo' : ''}" data-alt="sombra" title="Sombra">S</button>
-      </div>`;
+        <button class="btn btn-sm btn-outline ${el.mayus ? 'activo' : ''}" data-alt="mayus" title="Todo en mayúsculas">AA</button>
+      </div>
+      ${fila('Grosor', `<select class="input" data-p="peso" data-num>${[[0, el.negrita ? 'Negrita' : 'Normal'], [300, 'Fina'], [400, 'Normal'], [500, 'Media'], [700, 'Negrita'], [800, 'Extra'], [900, 'Gruesa']]
+        .map(([v, t]) => `<option value="${v}" ${Number(el.peso || 0) === v ? 'selected' : ''}>${t}</option>`).join('')}</select>`)}
+      ${fila('Espaciado', `<input type="range" min="-0.05" max="0.6" step="0.01" data-p="espaciado" data-num value="${el.espaciado || 0}">`)}
+      ${fila('Interlínea', `<input type="range" min="0.8" max="2" step="0.05" data-p="interlineado" data-num value="${el.interlineado || 1.15}">`)}
+      ${fila('Efecto', `<select class="input" data-efecto><option value="">Ninguno</option>${Object.entries(EFECTOS_TEXTO).map(([k, t]) => `<option value="${k}" ${ef.tipo === k ? 'selected' : ''}>${t}</option>`).join('')}</select>`)}
+      ${ef.tipo ? fila('Color', `<input type="color" data-ef="color" value="${colorValido(ef.color, '#FFFFFF').slice(0, 7)}">${ef.tipo === 'degradado' ? `<input type="color" data-ef="color2" value="${colorValido(ef.color2, '#F0ABFC').slice(0, 7)}">` : ''}`) : ''}`;
   } else if (el.tipo === 'imagen') {
     const aj = el.ajuste === 'contain' ? 'contain' : el.ajuste === 'fill' ? 'fill' : 'cover';
     esp = `<div class="grupo-btn" style="margin-bottom:8px;">${[['cover', 'Rellenar'], ['contain', 'Ver completa'], ['fill', 'Estirar']].map(([k, t]) => `<button class="btn btn-sm btn-outline ${aj === k ? 'activo' : ''}" data-ajuste="${k}">${t}</button>`).join('')}</div>
@@ -1455,6 +1728,18 @@ function pintarPropsElemento(p, el) {
     esp = `<p class="small" style="font-weight:700; margin-bottom:8px;">${el.fuente === 'youtube' ? '▶ YouTube' : el.fuente === 'vimeo' ? '▶ Vimeo' : '🎞 Archivo de video'}</p>
       ${mini ? `<img src="${esc(mini)}" alt="" style="border-radius:10px; margin-bottom:8px;">` : ''}
       <p class="hint" style="margin-bottom:8px;">Se reproduce al presentar. Pulsa ▶ Presentar para probarlo.</p>`;
+  } else if (el.tipo === 'lluvia') {
+    esp = `<label class="lbl" style="margin-top:0;">Emojis (de 3 a 5)</label><input class="input" data-lluvia-emojis value="${esc((el.emojis || []).join(' '))}" placeholder="🔥 🙌 ✨">
+      <div style="margin-top:8px;">${fila('Cantidad', `<input type="range" min="3" max="24" step="1" data-p="cantidad" data-num value="${el.cantidad || 10}">`)}
+      ${fila('Tamaño', `<input type="range" min="2" max="12" step="0.5" data-p="tam" data-num value="${el.tam || 5}">`)}
+      ${fila('Velocidad', `<select class="input" data-p="vel"><option value="">Normal</option><option value="lenta" ${el.vel === 'lenta' ? 'selected' : ''}>Lenta</option><option value="rapida" ${el.vel === 'rapida' ? 'selected' : ''}>Rápida</option></select>`)}</div>
+      <p class="hint">Pulsa ✨ Animar (o ▶ Presentar) para verla subir.</p>`;
+  } else if (el.tipo === 'busqueda') {
+    esp = `<label class="lbl" style="margin-top:0;">Texto que se escribe solo</label><input class="input" data-busq maxlength="120" value="${esc(el.texto || '')}">
+      <div style="margin-top:8px;">${fila('Escribe en', `<input type="range" min="1" max="10" step="0.5" data-p="dur" data-num value="${el.dur || 3}"><b data-ver="dur">${el.dur || 3}</b> s`)}
+      ${fila('Empieza a los', `<input type="range" min="0" max="10" step="0.5" data-p="retraso" data-num value="${el.retraso || 0}"><b data-ver="retraso">${el.retraso || 0}</b> s`)}</div>`;
+  } else if (el.tipo === 'objeto') {
+    esp = `<p class="small" style="font-weight:700; margin-bottom:8px;">✨ ${esc(SVG_OBJ[el.obj]?.nombre || 'Ilustración')}</p>`;
   } else if (el.tipo === 'zona') {
     esp = hoja().tipo === 'ruleta'
       ? `<p class="hint" style="margin:0 0 8px;">Aquí gira la ruleta, con el elegido y el historial. Muévela o cambia su tamaño; los nombres y opciones están en el panel de la hoja.</p>`
@@ -1464,6 +1749,13 @@ function pintarPropsElemento(p, el) {
   p.innerHTML = `<div class="panel-cab"><b>${esc(NOMBRE_EL[el.tipo] || 'Elemento')}</b>${enCel ? '<span class="badge">📱 celular</span>' : ''}<span class="grow"></span>
       <button class="btn btn-sm btn-ghost btn-icon" data-cerrar-sel title="Quitar selección (Esc)" aria-label="Quitar selección">✕</button></div>
     ${esp}
+    ${['lluvia', 'busqueda', 'zona'].includes(el.tipo) || el.vinculo ? '' : `<h4>Animación</h4>
+      ${fila('Efecto', `<select class="input" data-anim>${Object.entries(ANIMACIONES).map(([k, t]) => `<option value="${k === 'ninguna' ? '' : k}" ${(el.anim || '') === (k === 'ninguna' ? '' : k) ? 'selected' : ''}>${t}</option>`).join('')}
+        ${el.tipo === 'texto' ? `<optgroup label="Texto">${Object.entries(ANIMACIONES_TEXTO).map(([k, t]) => `<option value="${k}" ${el.anim === k ? 'selected' : ''}>${t}</option>`).join('')}</optgroup>` : ''}</select>`)}
+      ${el.anim ? `${fila('Velocidad', `<div class="grupo-btn">${[['lenta', 'Lenta'], ['', 'Normal'], ['rapida', 'Rápida']].map(([k, t]) => `<button type="button" class="btn btn-sm btn-outline ${(el.vel || '') === k ? 'activo' : ''}" data-vel="${k}">${t}</button>`).join('')}</div>`)}
+        ${fila('Empieza a los', `<input type="range" min="0" max="10" step="0.2" data-p="retraso" data-num value="${el.retraso || 0}"><b data-ver="retraso">${el.retraso || 0}</b> s`)}
+        <p class="hint">Al editar está quieto: pulsa ✨ Animar para verlo.</p>` : ''}`}
+    ${MODO_PL && !el.vinculo ? fila('Se ve en', `<select class="input" data-en><option value="">Portada y letra</option>${Object.entries(NOMBRE_EN).map(([k, t]) => `<option value="${k}" ${el.en === k ? 'selected' : ''}>${t}</option>`).join('')}</select>`) : ''}
     <h4>Posición${enCel ? ' en el celular' : ''}</h4>
     <div class="prop-num">${[['x', 'X'], ['y', 'Y'], ['w', 'Ancho'], ['h', 'Alto']].map(([k, t]) => `<div><label>${t} %</label><input type="number" step="0.5" data-p="${k}" data-geo data-num value="${r1(g[k])}"></div>`).join('')}</div>
     <div style="margin-top:10px;">${fila('Giro', `<input type="range" min="-180" max="180" step="1" data-p="rot" data-geo data-num value="${g.rot || 0}"><b data-ver="rot">${g.rot || 0}°</b>`)}
@@ -1496,6 +1788,32 @@ function pintarPropsElemento(p, el) {
   }
   $$('[data-alinear]', p).forEach(b => b.onclick = () => { el.alinear = b.dataset.alinear; confirmarCambio(); });
   $$('[data-alt]', p).forEach(b => b.onclick = () => { el[b.dataset.alt] = !el[b.dataset.alt]; confirmarCambio(); });
+  const selEf = $('[data-efecto]', p);
+  if (selEf) selEf.onchange = () => {
+    if (!selEf.value) delete el.efecto;
+    else el.efecto = { color: selEf.value === 'contorno' ? '#1F1147' : selEf.value === 'solida' ? '#7C2D92' : '#FFFFFF', color2: '#F0ABFC', ...(el.efecto || {}), tipo: selEf.value };
+    confirmarCambio();
+  };
+  $$('[data-ef]', p).forEach(inp => {
+    inp.oninput = () => { el.efecto[inp.dataset.ef] = inp.value; if (lienzo) repintarElemento(lienzo, el, 'editor', ctxHoja()); };
+    inp.onchange = () => confirmarCambio({ repintar: 'mini' });
+  });
+  const selAnim = $('[data-anim]', p);
+  if (selAnim) selAnim.onchange = () => { if (selAnim.value) { el.anim = selAnim.value; delete el.dur; } else { delete el.anim; delete el.dur; delete el.vel; delete el.retraso; } confirmarCambio(); };
+  $$('[data-vel]', p).forEach(b => b.onclick = () => { if (b.dataset.vel) el.vel = b.dataset.vel; else delete el.vel; confirmarCambio(); });
+  const ll = $('[data-lluvia-emojis]', p);
+  if (ll) ll.onchange = () => {
+    const lista = [...new Intl.Segmenter('es', { granularity: 'grapheme' }).segment(ll.value)].map(x => x.segment).filter(x => x.trim()).slice(0, 5);
+    if (lista.length) { el.emojis = lista; confirmarCambio(); } else toast('Escribe al menos un emoji', 'error');
+  };
+  const bq = $('[data-busq]', p);
+  if (bq) { bq.oninput = () => { el.texto = bq.value; if (lienzo) repintarElemento(lienzo, el, 'editor', ctxHoja()); }; bq.onchange = () => confirmarCambio({ repintar: 'mini' }); }
+  const selEn = $('[data-en]', p);
+  if (selEn) selEn.onchange = () => {
+    if (selEn.value) el.en = selEn.value; else delete el.en;
+    if (el.en && el.en !== verPl) { selId = null; cambiarVerPl(el.en); selId = el.id; }
+    confirmarCambio();
+  };
   $$('[data-ajuste]', p).forEach(b => b.onclick = () => { el.ajuste = b.dataset.ajuste; confirmarCambio(); });
   const caja = $('[data-fondo-caja]', p);
   if (caja) caja.onchange = () => { if (caja.checked) el.fondoCaja = '#FFFFFF'; else delete el.fondoCaja; confirmarCambio(); };
@@ -1645,6 +1963,16 @@ function seccionAgrupar(p) {
   $('[data-nombres]', s).onchange = (e) => { c.nombres = e.target.value.split('\n').map(x => x.trim()).filter(Boolean).slice(0, 60); confirmarCambio({ repintar: 'nada' }); };
 }
 
+// Ruleta de participantes: de qué hoja Unirse/Agrupar salen (la más cercana antes; si hay varias, se elige)
+function bloqueRegistro(c) {
+  const r = registroAntes(hojas, actual), usada = registroDeRuleta(hojas, actual);
+  if (!r.length) return `<p class="hint">⚠ Para sortear entre participantes, primero tiene que haber una hoja 📲 Unirse o 👥 Agrupar antes.</p>
+    <button class="btn btn-sm" data-unirse-antes>➕ Agregar hoja Unirse antes</button>`;
+  const etq = (x) => `${x.nombre.split(':')[0]} · ${x.tipo === 'agrupar' ? 'Agrupar' : 'Unirse'}`;
+  return `<p class="hint" data-usa-registro>🙋 Usará los participantes de la <b>${esc(etq(usada).replace(/^Hoja/, 'hoja'))}</b>. En vivo se llena sola con sus nombres o alias;
+      los expulsados no entran y los que se unen tarde se agregan.</p>
+    ${r.length > 1 ? fila('Participantes de', `<select class="input" data-hoja-registro>${r.map(x => `<option value="${x.id}" ${x.id === usada.id ? 'selected' : ''}>${esc(etq(x))}</option>`).join('')}</select>`) : ''}`;
+}
 function seccionRuleta(p) {
   const h = hoja(), c = h.config;
   const agrupar = hojas.slice(0, actual).map((x, i) => ({ x, i })).filter(({ x }) => x.tipo === 'agrupar');
@@ -1665,7 +1993,7 @@ function seccionRuleta(p) {
       <textarea class="input" data-lista style="min-height:120px;" placeholder="Ana&#10;Bruno&#10;Carla">${esc((c.lista || []).join('\n'))}</textarea>
       <p class="hint" data-cuantos></p>` : ''}
     ${bloqueGrupos(c, origen === 'grupos')}${origen === 'grupos' && agrupar.length ? '<p class="hint">En vivo, la ruleta muestra los grupos con sus nombres y colores.</p>' : ''}
-    ${origen === 'participantes' ? '<p class="hint">En vivo, la ruleta muestra a los participantes que se unieron con el PIN.</p>' : ''}
+    ${origen === 'participantes' ? bloqueRegistro(c) : ''}
     <label class="lbl">¿Puede repetir?</label>
     <label class="check" style="display:flex; margin-bottom:4px;"><input type="radio" name="repetir" value="no" ${c.repetir ? '' : 'checked'}> No: el elegido sale de la ruleta</label>
     <label class="check" style="display:flex;"><input type="radio" name="repetir" value="si" ${c.repetir ? 'checked' : ''}> Sí: puede volver a salir</label>
@@ -1695,6 +2023,10 @@ function seccionRuleta(p) {
     lista.onchange = () => { c.lista = leer(); confirmarCambio({ repintar: 'nada' }); };
   }
   conectarGrupos(s, c);
+  const selReg = $('[data-hoja-registro]', s);
+  if (selReg) selReg.onchange = () => { c.hoja_registro = selReg.value; confirmarCambio(); };
+  const unirAntes = $('[data-unirse-antes]', s);
+  if (unirAntes) unirAntes.onclick = () => { ponerRegistroAntes('unirse', actual); toast('Hoja 📲 Unirse agregada antes'); };
   $$('input[name=repetir]', s).forEach(r => r.onchange = () => { c.repetir = r.value === 'si'; confirmarCambio(); });
   $$('[data-paleta]', s).forEach(b => b.onclick = () => { c.paleta = b.dataset.paleta; confirmarCambio(); });
   const dur = $('[data-dur]', s);
@@ -1867,6 +2199,7 @@ async function importarDeQuizzes() {
 }
 
 function pintarPropsHoja(p, { conTipo = true } = {}) {
+  if (MODO_PL) return pintarPropsPlantilla(p);
   const h = hoja();
   const preg = interactiva(h.tipo);
   const cel = h.config?.celular || 'mirar';
@@ -1898,6 +2231,331 @@ function pintarPropsHoja(p, { conTipo = true } = {}) {
   $$('[data-elegir]', p).forEach(b => b.onclick = () => { if (!editableAqui()) cambiarVista('web'); selId = b.dataset.elegir; pintarSeleccion(); pintarPropiedades(); });
 }
 
+// Panel de la plantilla de culto (sin nada elegido)
+function pintarPropsPlantilla(p) {
+  const h = hoja(), els = h.diseno.elementos;
+  const cats = [...new Set(['Mis plantillas', ...CATEGORIAS, plantilla.categoria])];
+  const zona = els.find(e => e.vinculo === 'letra'), tienePie = els.some(e => e.vinculo === 'pie');
+  p.innerHTML = `<div class="panel-cab"><b>🎵 Plantilla de culto</b></div>
+    ${plantilla.id ? `<label class="lbl" style="margin-top:0;">Categoría</label><select class="input" data-cat>${cats.map(c => `<option ${c === plantilla.categoria ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>`
+      : '<p class="hint" style="margin-top:0;">Es una plantilla prediseñada: cámbiala como quieras y pulsa <b>💾 Guardar como mi plantilla</b>.</p>'}
+    <h4>Vista</h4>
+    <div class="grupo-btn"><button class="btn btn-sm btn-outline ${verPl === 'portada' ? 'activo' : ''}" data-vpl="portada">🏷 Portada</button><button class="btn btn-sm btn-outline ${verPl === 'letra' ? 'activo' : ''}" data-vpl="letra">🎵 Con letra</button></div>
+    <p class="hint">${verPl === 'portada' ? 'Títulos, avisos y versículos: lo que se ve antes de la letra.' : 'Así se verá cada pantalla de las canciones. La letra se acomoda sola en la zona punteada, con el tamaño más grande que quepa.'}</p>
+    ${zona ? '' : '<button class="btn btn-sm btn-primary btn-block" data-zona>➕ Agregar zona de letra</button>'}
+    ${tienePie ? '' : '<button class="btn btn-sm btn-block" data-pie style="margin-top:6px;">➕ Agregar pie (título · estrofa)</button>'}
+    <h4>Fondo</h4>
+    <div class="muestras">${COLORES.slice(0, 10).map(k => `<button class="muestra" data-color="${k}" style="background:${k}" aria-label="Color ${k}"></button>`).join('')}</div>
+    <button class="btn btn-sm btn-block" data-mas-fondos style="margin-top:8px;">🎨 Más fondos e imagen</button>
+    <h4>Elementos (${els.length})</h4>
+    <div class="capas">${els.slice().reverse().map(e => `<button data-elegir="${e.id}" class="${e.en && e.en !== verPl ? 'otra-vista' : ''}">${e.tipo === 'emoji' ? esc(e.emoji || '😀') : ICO_EL[e.tipo] || '•'}
+      <span>${esc(e.tipo === 'texto' ? textoDe(e).slice(0, 40) || '(texto vacío)' : NOMBRE_EL[e.tipo] || e.tipo)}${e.en ? ` · ${e.en === 'portada' ? '🏷' : '🎵'}` : ''}</span></button>`).join('')}</div>
+    <div class="atajos"><b>Atajos:</b><br><kbd>Doble clic</kbd> editar texto · <kbd>Supr</kbd> eliminar<br><kbd>Ctrl</kbd>+<kbd>D</kbd> duplicar · <kbd>Ctrl</kbd>+<kbd>Z</kbd>/<kbd>Y</kbd> deshacer/rehacer<br>
+      <kbd>Alt</kbd>+clic elige lo que está debajo</div>`;
+  const cat = $('[data-cat]', p);
+  if (cat) cat.onchange = () => { plantilla.categoria = cat.value; programarGuardado(); };
+  $$('[data-vpl]', p).forEach(b => b.onclick = () => cambiarVerPl(b.dataset.vpl));
+  const bz = $('[data-zona]', p);
+  if (bz) bz.onclick = () => { verPl = 'letra'; agregarElemento({ tipo: 'texto', vinculo: 'letra', en: 'letra', texto: '', x: 7, y: 11, w: 86, h: 72, tam: 5.4, fuente: 'Montserrat', peso: 800,
+    color: oscuro(h.diseno.fondo) ? '#FFFFFF' : '#1E293B', alinear: 'center', interlineado: 1.28 }); cambiarVerPl('letra'); };
+  const bp = $('[data-pie]', p);
+  if (bp) bp.onclick = () => { agregarElemento({ tipo: 'texto', vinculo: 'pie', en: 'letra', texto: '', x: 10, y: 89, w: 80, h: 5, tam: 1.2, fuente: 'Montserrat', peso: 500,
+    espaciado: 0.35, mayus: true, opacidad: 0.55, color: oscuro(h.diseno.fondo) ? '#FFFFFF' : '#1E293B', alinear: 'center' }); cambiarVerPl('letra'); };
+  $$('[data-color]', p).forEach(b => b.onclick = () => { h.diseno.fondo = { tipo: 'color', valor: b.dataset.color }; confirmarCambio(); if (recurso === 'fondo') pintarIzquierda(); });
+  $('[data-mas-fondos]', p).onclick = () => { recurso = 'fondo'; pintarIzquierda(); if (esMovil()) alternarPanelMovil('izq'); };
+  $$('[data-elegir]', p).forEach(b => b.onclick = () => {
+    const e = els.find(x => x.id === b.dataset.elegir);
+    if (e?.en && e.en !== verPl) cambiarVerPl(e.en);
+    selId = b.dataset.elegir; pintarSeleccion(); pintarPropiedades();
+  });
+}
+
+// ======================= CANCIÓN =======================
+// Los datos que se guardan (y que guarda el historial para deshacer)
+const filaCancion = () => ({
+  titulo: cancion.titulo.trim().slice(0, 150), autor: cancion.autor || '', tono: cancion.tono || '', etiquetas: cancion.etiquetas || [],
+  bloques: cancion.bloques, orden_canto: cancion.orden_canto?.length ? ordenNormal(cancion.orden_canto) : null, opciones: cancion.opciones,
+  compartida: !!cancion.compartida, resaltados: cancion.resaltados || [], detalles: cancion.detalles || {}
+});
+const fondoPlantilla = () => JSON.stringify(plantillaDe(plantillaDeCancion(cancion)).diseno?.fondo || plantillaDe(plantillaDeCancion(cancion)).fondo);
+// Pantalla de muestra cuando todavía no hay letra
+function hojaVacia() {
+  const h = hojasDeCancion({ ...cancion, bloques: [{ tipo: 'estrofa', texto: 'Pega la letra en 🎵 Letra' }], orden_canto: null, resaltados: [], detalles: {} })[0];
+  return { ...h, id: 'vacia', info: null, textos: { ...h.textos, pie: '' } };
+}
+// Vuelve a armar las pantallas desde la canción (después de cambiar la letra, el orden, la plantilla o un resaltado)
+function reconstruir() {
+  const clave = hojas[actual]?.id;
+  hojas = hojasDeCancion(cancion);
+  if (!hojas.length) hojas = [hojaVacia()];
+  const i = hojas.findIndex(h => h.id === clave);
+  actual = i >= 0 ? i : Math.min(actual, hojas.length - 1);
+  if (selId && !hoja().diseno.elementos.some(e => e.id === selId && !e.bloqueado)) selId = null;
+}
+// Los detalles de cada pantalla (lo que no es de la plantilla) vuelven a la canción
+function sincronizarDetalles() {
+  const base = fondoPlantilla(), det = {};
+  for (const h of hojas) {
+    if (!h.info) continue;
+    const el = h.diseno.elementos.filter(e => !e.bloqueado);
+    const fondo = JSON.stringify(h.diseno.fondo) !== base ? h.diseno.fondo : null;
+    if (el.length || fondo) det[h.id] = { el, ...(fondo ? { fondo } : {}) };
+  }
+  // los de pantallas que ahora no salen (p. ej. se quitó un coro del orden) se guardan por si vuelven
+  for (const [k, v] of Object.entries(cancion.detalles || {})) if (!hojas.some(h => h.id === k)) det[k] = v;
+  cancion.detalles = det;
+}
+let tHist = null;
+// Un cambio de la canción: rearma las pantallas, repinta y guarda
+function cambioCancion({ letra = false, panel = false, demorarHistorial = false } = {}) {
+  sincronizarDetalles();
+  if (letra) {
+    const { validos, perdidos } = ubicarResaltados(cancion.bloques, cancion.resaltados);
+    cancion.resaltados = validos;
+    if (perdidos.length) toast(`Se quitó el resaltado de ${perdidos.map(r => `«${r.texto}»`).join(', ')}: ya no está en la letra`, 'error');
+  }
+  reconstruir();
+  pintarLienzo(); pintarTira(); pintarPropiedades();
+  if (panel) panelLetra?.refrescar();
+  clearTimeout(tHist);
+  if (demorarHistorial) tHist = setTimeout(registrar, 700); else registrar();
+  programarGuardado();
+}
+async function abrirCancion() {
+  try { registrarMisPlantillas(await datosPlantillas.listar()); } catch (e) { console.warn('No se pudieron cargar tus plantillas', e); }
+  const id = params.get('cancion');
+  if (id && id !== 'nueva') {
+    cancion = await datosCanciones.obtener(id);
+    if (!cancion) throw new Error('Esa canción ya no existe.');
+    if (!cancion.mia) throw new Error('Esta canción es de otro profesor: cópiala a tus canciones para cambiarla.');
+  } else cancion = { id: null, titulo: '', autor: '', tono: '', etiquetas: [], bloques: [], orden_canto: null, opciones: {}, compartida: false };
+  let pl = cancion.opciones?.plantilla;
+  if (!pl || !existePlantilla(pl)) { try { pl = localStorage.getItem('cultos.plantilla'); } catch { pl = null; } }
+  cancion.opciones = { ...OPCIONES_DEFECTO, ...(cancion.opciones || {}), plantilla: pl && existePlantilla(pl) ? pl : PLANTILLA_DEFECTO };
+  cancion.resaltados = Array.isArray(cancion.resaltados) ? cancion.resaltados : [];
+  cancion.detalles = cancion.detalles && typeof cancion.detalles === 'object' ? cancion.detalles : {};
+  cancion.etiquetas = cancion.etiquetas || [];
+  proyecto = { nombre: cancion.titulo || 'Canción nueva', tema: {} };
+  await prepararFuente(plantillaDeCancion(cancion));
+  reconstruir();
+  if (!cancion.bloques.length) tabIzq = 'letra';
+  montar();
+}
+function montarCancion() {
+  document.title = `${cancion.titulo || 'Canción nueva'} · Canción`;
+  document.body.className = 'editor-proyectos';
+  raiz.innerHTML = `<div class="ed ed-cancion">
+    <header class="ed-top">
+      <a class="btn btn-sm btn-outline" href="${VOLVER}" title="Volver a las canciones">←<span class="ocultar-movil"> Canciones</span></a>
+      <input class="ed-nombre" data-nombre maxlength="150" placeholder="Título de la canción" aria-label="Título de la canción">
+      <span class="ed-estado ok" data-estado></span>
+      <span class="grow"></span>
+      <button class="btn btn-sm btn-ghost btn-icon ocultar-movil" data-deshacer title="Deshacer (Ctrl+Z)" aria-label="Deshacer">↶</button>
+      <button class="btn btn-sm btn-ghost btn-icon ocultar-movil" data-rehacer title="Rehacer (Ctrl+Y)" aria-label="Rehacer">↷</button>
+      <button class="btn btn-sm btn-outline" data-animar title="Ver los efectos (al editar están quietos)">✨<span class="ocultar-movil"> Animar</span></button>
+      <button class="btn btn-primary btn-sm" data-presentar title="Ver la canción a pantalla completa, como en la proyección">▶<span class="ocultar-movil"> Ver proyección</span></button>
+    </header>
+    <aside class="ed-izq" data-izq></aside>
+    <main class="ed-centro">
+      <div class="escenario" data-escenario></div>
+      <div class="tira" data-tira></div>
+    </main>
+    <aside class="ed-der" data-der></aside>
+    <nav class="ed-tabs">
+      <button data-tab="izq" data-tab-izq="letra"><span>🎵</span>Letra</button>
+      <button data-tab="izq" data-tab-izq="recursos"><span>➕</span>Recursos</button>
+      <button data-tab="der"><span>🎛</span>Propiedades</button>
+    </nav>
+  </div>`;
+  const nom = $('[data-nombre]');
+  nom.value = cancion.titulo;
+  nom.oninput = () => { cancion.titulo = nom.value; proyecto.nombre = nom.value; panelLetra?.ponerTitulo(nom.value); document.title = `${nom.value || 'Canción nueva'} · Canción`; cambioCancion({ demorarHistorial: true }); };
+  $('[data-deshacer]').onclick = () => moverHist(-1);
+  $('[data-rehacer]').onclick = () => moverHist(1);
+  $('[data-animar]').onclick = () => { animarEd = !animarEd; $('[data-animar]').classList.toggle('activo', animarEd); cerrarBarraResaltar(); pintarLienzo(); };
+  $('[data-presentar]').onclick = () => { if (!hoja().info) return toast('Primero pega la letra', 'error'); cerrarBarraResaltar(); presentar(hojas, { inicio: actual, alSalir: (i) => irAHoja(i) }); };
+  $('[data-estado]').onclick = () => { if (!conflicto && sucio) guardar(); };
+  // en el celular: Letra y Recursos son dos pestañas de abajo que abren el mismo panel
+  $$('[data-tab]').forEach(b => b.onclick = () => {
+    if (b.dataset.tabIzq) {
+      const ed = $('.ed');
+      if (ed.dataset.movil === 'izq' && tabIzq === b.dataset.tabIzq) { alternarPanelMovil('izq'); }
+      else { tabIzq = b.dataset.tabIzq; pintarIzquierda(); if (ed.dataset.movil !== 'izq') alternarPanelMovil('izq'); }
+      $$('[data-tab-izq]').forEach(x => x.classList.toggle('activo', ed.dataset.movil === 'izq' && x.dataset.tabIzq === tabIzq));
+      return;
+    }
+    alternarPanelMovil(b.dataset.tab);
+  });
+  estado(cancion.id ? 'ok' : 'pendiente', cancion.id ? 'Guardado ✓' : cancion.titulo ? '' : '✏️ Escribe el título');
+  conectarLienzo();
+  conectarTeclado();
+  conectarSoltarArchivos();
+  conectarResaltar();
+  pintarTodo();
+  registrar();
+  if (!cancion.titulo) nom.focus();
+}
+
+// ---------- Izquierda: 🎵 Letra / ➕ Recursos ----------
+function pintarIzquierdaCancion(p) {
+  if (tabIzq === 'letra' && panelLetra && p.querySelector('[data-panel-letra]')) return;   // no se rearma mientras se escribe
+  p.innerHTML = `<div class="izq-tabs" role="tablist"><button role="tab" data-ti="letra" class="${tabIzq === 'letra' ? 'activo' : ''}">🎵 Letra</button>
+    <button role="tab" data-ti="recursos" class="${tabIzq === 'recursos' ? 'activo' : ''}">➕ Recursos</button></div><div data-izq-cuerpo></div>`;
+  $$('[data-ti]', p).forEach(b => b.onclick = () => { tabIzq = b.dataset.ti; if (tabIzq === 'letra') panelLetra = null; pintarIzquierda(); });
+  const c = $('[data-izq-cuerpo]', p);
+  if (tabIzq === 'letra') {
+    c.dataset.panelLetra = '';
+    panelLetra = montarPanelLetra(c, {
+      cancion, perfil,
+      alCambiar: (tipo, o = {}) => {
+        if (tipo === 'datos') {
+          if (o.campo === 'titulo') { $('[data-nombre]').value = cancion.titulo; proyecto.nombre = cancion.titulo; }
+          cambioCancion({ demorarHistorial: true });
+        } else cambioCancion({ letra: tipo === 'letra' });
+      },
+      alElegirBloque: (i) => {
+        bloqueSel = i;
+        const k = hojas.findIndex(h => h.info?.bloque === i);
+        if (k >= 0) { actual = k; selId = null; pintarLienzo(); pintarPropiedades(); }
+        pintarTira();
+        $(`.mini-hoja[data-i="${actual}"]`)?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+      }
+    });
+    return;
+  }
+  panelLetra = null;
+  if (!recurso) {
+    c.innerHTML = `<div class="recursos">${RECURSOS.filter(r => r[0] !== 'plantillas').map(([k, ico, txt]) => `<button class="recurso" data-rec="${k}"><span>${ico}</span>${txt}</button>`).join('')}</div>
+      <p class="hint" style="margin-top:12px;">Lo que agregues sale <b>solo en la pantalla que estás viendo</b> (por ejemplo 🔥 en el coro final). Luego puedes copiarlo a las demás pantallas de esa estrofa.</p>`;
+    $$('[data-rec]', c).forEach(b => b.onclick = () => { recurso = b.dataset.rec; pintarIzquierda(); });
+    return;
+  }
+  const [, ico, txt] = RECURSOS.find(r => r[0] === recurso);
+  c.innerHTML = `<div class="panel-cab"><button class="btn btn-sm btn-ghost btn-icon" data-atras aria-label="Volver a recursos">←</button><b>${ico} ${txt}</b></div><div data-cuerpo></div>`;
+  $('[data-atras]', c).onclick = () => { recurso = null; pintarIzquierda(); };
+  PANELES[recurso]($('[data-cuerpo]', c));
+}
+
+// ---------- Tira de pantallas ----------
+function pintarTiraCancion(tira) {
+  tira.innerHTML = hojas.map((h, i) => `<div class="mini-hoja ${i === actual ? 'activa' : ''} ${bloqueSel >= 0 && h.info?.bloque === bloqueSel ? 'del-bloque' : ''}" data-i="${i}" role="button" tabindex="0"
+      aria-label="Pantalla ${i + 1}${h.info ? ' · ' + esc(h.info.nombre) : ''}"><span class="num">${i + 1}${h.info ? ' · ' + esc(h.info.codigo) : ''}</span>
+      <span class="mini-aviso" ${h.chico ? '' : 'hidden'} title="Mucho texto: corta la estrofa o usa menos líneas por pantalla">⚠</span><div data-mini></div></div>`).join('');
+  hojas.forEach((_, i) => pintarMini(i));
+  $$('.mini-hoja', tira).forEach(m => {
+    const i = +m.dataset.i;
+    m.onclick = () => { cerrarBarraResaltar(); irAHoja(i); };
+    m.onkeydown = (e) => { if (e.target === m && e.key === 'Enter') irAHoja(i); };
+  });
+}
+
+// ---------- Derecha: plantilla de la canción y la pantalla ----------
+function pintarPropsCancion(p) {
+  const h = hoja(), d = h.info;
+  const pl = plantillaDe(plantillaDeCancion(cancion));
+  const det = h.diseno.elementos.filter(e => !e.bloqueado);
+  const fondoPropio = d && JSON.stringify(h.diseno.fondo) !== fondoPlantilla();
+  const hermanas = d ? hojas.filter(x => x.info?.bloque === d.bloque && x !== h).length : 0;
+  p.innerHTML = `<details class="pl-plantilla" data-det-pl ${verPlantillas ? 'open' : ''}><summary class="panel-cab" style="cursor:pointer;"><b>🎨 Plantilla: ${esc(pl.nombre)}</b><span class="grow"></span><span class="small muted">Cambiar ▾</span></summary>
+      <div class="pl-plantillas" data-pls></div>
+      <p class="hint"><a href="${VOLVER.replace('#cultos/canciones', '#cultos/plantillas')}">🎨 Ver y editar plantillas</a></p></details>
+    <div class="panel-cab" style="margin-top:8px;"><b>${d ? `Pantalla ${actual + 1} de ${hojas.length}` : 'Sin pantallas'}</b><span class="grow"></span>${d ? `<span class="badge">${esc(d.codigo)} · ${esc(d.nombre)}</span>` : ''}</div>
+    ${d ? `<p class="hint" style="margin-top:0;">✨ <b>Para resaltar</b>, selecciona una o varias palabras de la letra en la pantalla.</p>
+    <h4>Detalles de esta pantalla (${det.length})</h4>
+    <div class="capas">${det.slice().reverse().map(e => `<button data-elegir="${e.id}">${e.tipo === 'emoji' ? esc(e.emoji || '😀') : ICO_EL[e.tipo] || '•'}
+      <span>${esc(e.tipo === 'texto' ? (e.texto || '').slice(0, 40) || '(texto vacío)' : NOMBRE_EL[e.tipo] || e.tipo)}</span></button>`).join('') || '<p class="hint">Agrega objetos, emojis, imágenes o un texto desde <b>➕ Recursos</b>: solo saldrán en esta pantalla.</p>'}</div>
+    ${det.length || fondoPropio ? `${hermanas ? `<button class="btn btn-sm btn-block" data-copiar-det style="margin-top:8px;">📋 Copiar estos detalles a las demás pantallas de ${esc(d.codigo)} (${hermanas})</button>` : ''}
+      <button class="btn btn-sm btn-block btn-ghost" data-quitar-det style="margin-top:4px;">🗑 Quitar los detalles de esta pantalla</button>` : ''}
+    ${fondoPropio ? '<button class="btn btn-sm btn-block" data-fondo-pl style="margin-top:4px;">↺ Volver al fondo de la plantilla</button>' : ''}` : '<p class="hint">Pega la letra en <b>🎵 Letra</b> y aquí verás cada pantalla.</p>'}`;
+  const detPl = $('[data-det-pl]', p);
+  const pintarPls = async () => {
+    const cont = $('[data-pls]', p);
+    if (!detPl.open || cont.childElementCount) return;
+    const lineas = d ? d.fuente : [{ t: 'Te alabaré con todo mi ser' }, { t: 'tu amor me sostiene' }];
+    const lista = [...misPlantillas(), ...PLANTILLAS_CULTO];
+    cont.innerHTML = '<div class="center" style="grid-column:1/-1; padding:12px;"><div class="spinner"></div></div>';
+    await Promise.all(lista.map(x => prepararFuente(x.id)));   // se mide con la fuente real de cada plantilla
+    if (!cont.isConnected) return;
+    cont.innerHTML = lista.map(x => `<button type="button" data-pl="${esc(x.id)}" class="${x.id === pl.id ? 'sel' : ''}" title="${esc(x.nombre)}"><div data-mini></div><span>${x.mia ? '⭐ ' : ''}${esc(x.nombre)}</span></button>`).join('');
+    lista.forEach(x => {
+      const b = $(`[data-pl="${CSS.escape(x.id)}"]`, cont);
+      pintarPantalla($('[data-mini]', b), x.id, lineas, { resaltados: cancion.resaltados });
+      b.onclick = async () => {
+        cancion.opciones.plantilla = x.id;
+        try { localStorage.setItem('cultos.plantilla', x.id); } catch { /* sin almacenamiento */ }
+        await prepararFuente(x.id);
+        cambioCancion();
+      };
+    });
+  };
+  detPl.ontoggle = () => { verPlantillas = detPl.open; pintarPls(); };
+  pintarPls();
+  $$('[data-elegir]', p).forEach(b => b.onclick = () => { selId = b.dataset.elegir; pintarSeleccion(); pintarPropiedades(); });
+  const cp = $('[data-copiar-det]', p);
+  if (cp) cp.onclick = () => {
+    for (const x of hojas) {
+      if (x === h || x.info?.bloque !== d.bloque) continue;
+      x.diseno.elementos = [...x.diseno.elementos.filter(e => e.bloqueado), ...det.map(e => ({ ...clonar(e), id: uid() }))];
+      x.diseno.fondo = clonar(h.diseno.fondo);
+    }
+    confirmarCambio({ repintar: 'todo' });
+    toast(`Detalles copiados a ${hermanas} ${hermanas === 1 ? 'pantalla' : 'pantallas'} de ${d.codigo}`);
+  };
+  const qd = $('[data-quitar-det]', p);
+  if (qd) qd.onclick = () => { h.diseno.elementos = h.diseno.elementos.filter(e => e.bloqueado); h.diseno.fondo = JSON.parse(fondoPlantilla()); selId = null; confirmarCambio({ repintar: 'todo' }); };
+  const fp = $('[data-fondo-pl]', p);
+  if (fp) fp.onclick = () => { h.diseno.fondo = JSON.parse(fondoPlantilla()); confirmarCambio(); };
+}
+
+// ---------- ✨ Resaltar: elegir palabras en la letra ----------
+function conectarResaltar() {
+  const escn = $('[data-escenario]');
+  const revisar = () => {
+    const sel = getSelection();
+    const zona = lienzo?.querySelector('.pe[data-vinculo="letra"]');
+    if (!zona || !sel || sel.isCollapsed || !sel.rangeCount || !zona.contains(sel.anchorNode)) return;
+    const ws = [...zona.querySelectorAll('.w[data-w]')].filter(w => sel.containsNode(w, true));
+    if (!ws.length) return;
+    const grupos = [];
+    for (const w of ws) {
+      const k = w.dataset.b + ':' + w.dataset.l;
+      let g = grupos.find(x => x.k === k);
+      if (!g) grupos.push(g = { k, b: +w.dataset.b, l: +w.dataset.l, w: [] });
+      g.w.push(+w.dataset.w);
+    }
+    const anclas = grupos.map(g => {
+      const p = Math.min(...g.w), n = Math.max(...g.w) - p + 1;
+      return { b: g.b, l: g.l, p, n, texto: palabras(lineasDeContenido(cancion.bloques[g.b]?.texto)[g.l]).slice(p, p + n).join(' ') };
+    }).filter(a => a.texto);
+    if (anclas.length) abrirResaltar(anclas, null, sel.getRangeAt(0).getBoundingClientRect());
+  };
+  escn.addEventListener('pointerup', () => setTimeout(revisar, 10));
+  let tSel;
+  document.addEventListener('selectionchange', () => { if (matchMedia('(pointer: coarse)').matches) { clearTimeout(tSel); tSel = setTimeout(revisar, 600); } });
+  // tocar una palabra ya resaltada abre sus opciones
+  escn.addEventListener('click', (e) => {
+    const rs = e.target.closest('.pe[data-vinculo="letra"] .rs');
+    if (!rs || !getSelection()?.isCollapsed) return;
+    const r = cancion.resaltados.find(x => x.id === rs.dataset.rs);
+    if (r) abrirResaltar([r], r, rs.getBoundingClientRect());
+  });
+}
+function abrirResaltar(anclas, actualR, rect) {
+  let ids = actualR ? [actualR.id] : [];
+  const z = plantillaDe(plantillaDeCancion(cancion)).diseno?.elementos?.find(e => e.vinculo === 'letra') || plantillaDe(plantillaDeCancion(cancion)).elementos?.find(e => e.vinculo === 'letra');
+  abrirBarraResaltar({
+    cont: $('.ed-centro'), rect, actual: actualR, fuentePlantilla: z?.fuente || 'Nunito',
+    texto: anclas.map(a => a.texto).join(' / '),
+    alCambiar: (estilo, todas) => {
+      if (!ids.length) ids = anclas.map(a => { const r = { id: uid(), b: a.b, l: a.l, p: a.p, n: a.n, texto: a.texto, todas, estilo }; cancion.resaltados.push(r); return r.id; });
+      else ids.forEach(id => { const r = cancion.resaltados.find(x => x.id === id); if (r) { r.estilo = estilo; r.todas = todas; } });
+      getSelection()?.removeAllRanges();
+      cambioCancion();
+    },
+    alQuitar: () => { cancion.resaltados = cancion.resaltados.filter(r => !ids.includes(r.id)); cambioCancion(); }
+  });
+}
+
 // ======================= ARRANQUE =======================
 function pantallaError(msg) {
   document.body.className = 'centrado';
@@ -1905,8 +2563,34 @@ function pantallaError(msg) {
     <p class="muted" style="font-weight:700; margin-bottom:14px;">${esc(msg)}</p><a class="btn btn-primary btn-block" href="${VOLVER}">Volver a mis proyectos</a></div>`;
 }
 
+// Abre una plantilla de culto: una mía (?plantilla=<id>) o una prediseñada / en blanco sin guardar (?plantilla=nueva&base=…)
+async function abrirPlantilla() {
+  const id = params.get('plantilla');
+  let fila;
+  if (id && id !== 'nueva') {
+    fila = await datosPlantillas.obtener(id);
+    if (!fila) throw new Error('Esa plantilla ya no existe.');
+    plantilla = { id: fila.id, base: fila.base, categoria: fila.categoria };
+    base = fila.updated_at;
+  } else {
+    const b = params.get('base');
+    const pre = b === 'blanco' ? PLANTILLA_BLANCO : plantillaIncluida(b) || PLANTILLA_BLANCO;
+    fila = { nombre: pre.nombre, categoria: pre.id === 'blanco' ? 'Mis plantillas' : pre.categoria, diseno: { fondo: pre.fondo, elementos: pre.elementos } };
+    plantilla = { id: null, base: pre.id === 'blanco' ? null : pre.id, categoria: fila.categoria };
+  }
+  const d = clonar(fila.diseno || {});
+  proyecto = { nombre: fila.nombre, tema: {} };
+  hojas = [{ id: uid(), tipo: 'contenido', config: {}, diseno: { fondo: d.fondo || { tipo: 'color', valor: '#111827' },
+    elementos: (d.elementos || []).map(e => ({ ...e, id: plantilla.id ? e.id || uid() : uid() })) } }];
+  montar();
+}
+
 perfil = await exigirRol(['profesor', 'admin']);
-if (perfil) {
+if (perfil && MODO_CAN) {
+  try { await abrirCancion(); } catch (e) { console.error(e); pantallaError(mensajeError(e)); }
+} else if (perfil && MODO_PL) {
+  try { await abrirPlantilla(); } catch (e) { console.error(e); pantallaError(mensajeError(e)); }
+} else if (perfil) {
   if (!ID) location.href = VOLVER;
   else {
     try {

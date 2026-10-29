@@ -101,7 +101,7 @@ export function textoUsos(usos) {
       const k = u.id + '|' + u.nombre;
       if (!proy.has(k)) proy.set(k, { nombre: u.nombre, hojas: [] });
       proy.get(k).hojas.push(u.hoja);
-    } else otros.push(`${u.donde === 'juego' ? 'Juego' : 'Quiz'} “${u.nombre}”`);
+    } else otros.push(`${{ juego: 'Juego', plantilla: 'Plantilla de culto', cancion: 'Canción' }[u.donde] || 'Quiz'} “${u.nombre}”`);
   }
   return [...[...proy.values()].map(p => `${p.nombre} (${p.hojas.length === 1 ? 'hoja' : 'hojas'} ${p.hojas.join(', ')})`), ...otros];
 }
@@ -125,7 +125,7 @@ export async function eliminarArchivo(a, { antesDeUsos } = {}) {
   const lugares = textoUsos(usos);
   const msg = lugares.length
     ? `Se usa en: ${lugares.join(' · ')}. Si lo borras, dejará de verse allí.`
-    : `“${a.nombre}” no se usa en ningún proyecto, juego ni pregunta. Se borrará para siempre.`;
+    : `“${a.nombre}” no se usa en ningún proyecto, juego, plantilla ni pregunta. Se borrará para siempre.`;
   if (!await confirmar(msg, { titulo: lugares.length ? '⚠️ Este archivo está en uso' : '¿Eliminar el archivo?', boton: 'Eliminar' })) return;
   try { await borrar([a]); toast('Archivo eliminado'); }
   catch (e) { toast(mensajeError(e), 'error'); }
@@ -139,11 +139,11 @@ export async function limpiarNoUsados({ antesDeUsos } = {}) {
   catch (e) { $('[data-c]', m.el).innerHTML = `<p class="err">${esc(mensajeError(e))}</p>`; return; }
   const c = $('[data-c]', m.el);
   if (!libres.length) {
-    c.innerHTML = '<div class="empty"><span class="big">✨</span>¡Todo en orden! Todos tus archivos se usan en algún proyecto, juego o pregunta.</div><div class="modal-pie"><button class="btn btn-primary" data-ok>Cerrar</button></div>';
+    c.innerHTML = '<div class="empty"><span class="big">✨</span>¡Todo en orden! Todos tus archivos se usan en algún proyecto, juego, plantilla o pregunta.</div><div class="modal-pie"><button class="btn btn-primary" data-ok>Cerrar</button></div>';
     $('[data-ok]', c).onclick = () => m.cerrar();
     return;
   }
-  c.innerHTML = `<p class="hint" style="margin-bottom:10px;">Estos archivos no se usan en ningún proyecto, juego ni pregunta. Marca los que quieras borrar.</p>
+  c.innerHTML = `<p class="hint" style="margin-bottom:10px;">Estos archivos no se usan en ningún proyecto, juego, plantilla ni pregunta. Marca los que quieras borrar.</p>
     <label class="check" style="display:flex; margin-bottom:8px;"><input type="checkbox" data-todos checked> <b>Elegir todos (${libres.length})</b></label>
     <div class="arch-limpiar">${libres.map(a => `<label class="arch-lim" title="${esc(a.nombre)}"><input type="checkbox" data-id="${a.id}" checked>
       ${miniatura(a)}<span>${esc(a.nombre)}<small>${fmtMB(a.tamano)} · ${fmtFecha(a.created_at)}</small></span></label>`).join('')}</div>
