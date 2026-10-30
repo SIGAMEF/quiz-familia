@@ -11,7 +11,7 @@ import { pintarPantalla, pintarPortada, prepararFuente, registrarMisPlantillas, 
 import { PLANTILLAS, CATEGORIAS } from './plantillas.js';
 import { FONDOS } from './fondos.js';
 import { pintarCultos, pintarEditorCulto } from './cultos.js';
-import { pintarConsola } from './consola.js';
+import { pintarConsola, proyectarSuelto } from './consola.js';
 import { pintarLectorBiblia } from './lector-biblia.js';
 import { datosCanciones, datosPlantillas } from './datos.js';
 
@@ -66,6 +66,7 @@ async function pintarPlantillas(cuerpo, { plantillas }) {
         <div class="row cu-acciones">
           <button class="btn btn-sm btn-primary" data-editar>✏️ ${p.mia ? 'Editar' : 'Personalizar'}</button>
           <button class="btn btn-sm" data-usar ${p.id === enUso ? 'disabled' : ''}>Usar en canciones</button>
+          <button class="btn btn-sm" data-proyectar title="Proyectar esta plantilla">▶</button>
           ${p.mia ? '<button class="btn btn-sm btn-ghost" data-borrar title="Eliminar" aria-label="Eliminar plantilla">🗑</button>' : ''}</div></div>`).join('')
       || '<div class="card empty" style="grid-column:1/-1;"><span class="big">🎨</span>No hay plantillas en esta categoría.</div>';
     for (const p of lista) {
@@ -73,6 +74,8 @@ async function pintarPlantillas(cuerpo, { plantillas }) {
       pintarPortada($('[data-mini]', t), p.id);
       $('[data-ver]', t).onclick = () => verPlantilla(lista, lista.indexOf(p));
       $('[data-editar]', t).onclick = () => p.mia ? editarMia(p.idBase) : editarCopia(p.id);
+      $('[data-proyectar]', t).onclick = () => proyectarSuelto({ nombre: p.nombre, plantilla_base: p.id, volver: 'cultos/plantillas',
+        items: [{ id: 'diseno', tipo: 'diseno', plantilla: p.id }] });
       $('[data-usar]', t).onclick = () => { ponerPlantillaVista(p.id); toast(`Las canciones se verán con “${p.nombre}”`); pintar(); };
       $('[data-borrar]', t)?.addEventListener('click', async () => {
         if (!await confirmar(`“${p.nombre}” se borrará. Las imágenes que usa quedan en Mis archivos.`, { titulo: '¿Eliminar la plantilla?', boton: 'Eliminar' })) return;

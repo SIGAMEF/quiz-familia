@@ -49,6 +49,8 @@ export const PRESETS = [
   ['degradado', '🎨 Degradado', { modo: 'degradado', color: '#22D3EE', color2: '#F472B6' }],
   ['boton', '🔘 Botón', { modo: 'boton', fondo: '#7C3AED', color: '#FFFFFF' }]
 ];
+// Movimiento de las palabras "botón" al proyectar (entran con un salto y luego…)
+export const MOVIMIENTOS_BOTON = { flotar: '🎈 Flotar', latir: '💓 Latir', rebote: '🏀 Rebotar', brillo: '✨ Brillo', quieto: '⏸ Quieto' };
 // Colores de las palabras "botón" (Biblia y versículos)
 export const COLORES_BOTON = ['#7C3AED', '#EC4899', '#0EA5E9', '#16A34A', '#F59E0B', '#EF4444', '#111827'];
 
@@ -66,7 +68,9 @@ function estilar(span, e, animar) {
   if (e.peso) span.style.fontWeight = String(Math.round(num(e.peso, 400, 100, 900) / 100) * 100);
   if (e.modo === 'color') span.style.color = colorValido(e.color, '#FFFFFF');
   if (e.modo === 'boton') {
-    // la palabra dentro de una cápsula de color, como un botón
+    // la palabra dentro de una cápsula de color, como un botón, y en movimiento al proyectar
+    span.classList.add('rs-boton', 'rs-mov-' + (MOVIMIENTOS_BOTON[e.mov] ? e.mov : 'flotar'));
+    if (animar) span.classList.add('rs-anim');
     Object.assign(span.style, { backgroundColor: colorValido(e.fondo, '#7C3AED'), color: colorValido(e.color, '#FFFFFF'), padding: '0 .32em',
       borderRadius: '.42em', boxShadow: '0 .07em 0 rgba(0,0,0,.28)', textShadow: 'none', boxDecorationBreak: 'clone', webkitBoxDecorationBreak: 'clone' });
   }

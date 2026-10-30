@@ -644,6 +644,19 @@ body.ritmo-pag { background: linear-gradient(160deg, #8B7EF7, #6C5CE7); min-heig
 .rs { white-space: nowrap; }
 .rs .l { display: inline-block; }
 .rs-latido, .rs-rebote, .rs-retumbar { display: inline-block; }
+/* palabras "botón": cápsula de color que entra con un salto y luego se mueve (solo al proyectar) */
+.rs-boton { display: inline-block; position: relative; overflow: hidden; vertical-align: baseline; }
+.rs-anim.rs-boton { animation: rs-boton-entra .7s cubic-bezier(.2, 1.6, .4, 1) both; }
+.rs-anim.rs-mov-flotar { animation: rs-boton-entra .7s cubic-bezier(.2, 1.6, .4, 1) both, rs-boton-flotar 2.8s ease-in-out .7s infinite; }
+.rs-anim.rs-mov-latir { animation: rs-boton-entra .7s cubic-bezier(.2, 1.6, .4, 1) both, pe-latir 1.5s ease-in-out .7s infinite; }
+.rs-anim.rs-mov-rebote { animation: rs-boton-entra .7s cubic-bezier(.2, 1.6, .4, 1) both, rs-boton-rebote 1.6s ease-in-out .7s infinite; }
+.rs-anim.rs-mov-brillo::after { content: ''; position: absolute; inset: 0; pointer-events: none; transform: translateX(-130%);
+  background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,.6) 50%, transparent 70%); animation: rs-boton-brillo 2.6s ease-in-out .8s infinite; }
+@keyframes rs-boton-entra { from { opacity: 0; transform: scale(.2) rotate(-10deg); } to { opacity: 1; transform: none; } }
+@keyframes rs-boton-flotar { 0%, 100% { transform: translateY(0) rotate(-1.5deg); } 50% { transform: translateY(-.14em) rotate(1.5deg); } }
+@keyframes rs-boton-rebote { 0%, 100% { transform: translateY(0); } 30% { transform: translateY(-.28em); } 50% { transform: translateY(0) scale(1.06, .94); } 65% { transform: translateY(-.06em); } }
+@keyframes rs-boton-brillo { 0% { transform: translateX(-130%); } 55%, 100% { transform: translateX(130%); } }
+@media (prefers-reduced-motion: reduce) { .rs-anim.rs-boton, .rs-anim.rs-boton::after { animation: none !important; } }
 .rs-neon { text-shadow: 0 0 .08em #fff, 0 0 .25em currentColor, 0 0 .6em currentColor; }
 .rs-contorno { -webkit-text-stroke: .045em var(--m, #FDE047); color: transparent !important; paint-order: stroke fill; }
 .rs-contorno .l { color: transparent !important; }

@@ -22,6 +22,18 @@ import { datosCanciones, datosCultos } from './datos.js';
 export const canalCulto = (id) => 'culto-' + id;
 export const urlPantalla = (id) => `${urlBase()}culto-pantalla.html?c=${encodeURIComponent(id)}`;
 
+// Proyección suelta (sin culto): una canción, una plantilla o versículos de la Biblia.
+// Se guarda en esta pestaña (sessionStorage) y se abre la consola con #cultos/proyectar-suelto.
+// datos: { nombre, plantilla_base, items, volver } (volver: la ruta a la que se regresa al finalizar)
+const CLAVE_SUELTO = 'cultos.proyeccion-suelta';
+export function proyectarSuelto(datos) {
+  try { sessionStorage.setItem(CLAVE_SUELTO, JSON.stringify({ ...datos, id: 'suelto' })); }
+  catch { return toast('No se pudo preparar la proyección en este navegador.', 'error'); }
+  abrirPantalla('suelto');
+  location.hash = 'cultos/proyectar-suelto';
+}
+function leerSuelto() { try { return JSON.parse(sessionStorage.getItem(CLAVE_SUELTO) || 'null'); } catch { return null; } }
+
 // Abre (o trae al frente) la ventana de la pantalla. Debe llamarse dentro de un clic.
 export function abrirPantalla(id) {
   const w = window.open(urlPantalla(id), 'culto-pantalla-' + id, 'popup=yes,width=1024,height=600');
@@ -34,7 +46,7 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
   cuerpo.innerHTML = '<div class="center" style="padding:40px;"><div class="spinner"></div></div>';
   let culto, canciones;
   try {
-    const [c, lista] = await Promise.all([datos.obtener(id), datosCanc.listar()]);
+    const [c, lista] = await Promise.all([id === 'suelto' ? leerSuelto() : datos.obtener(id), datosCanc.listar()]);
     culto = c; canciones = new Map(lista.map(x => [x.id, x]));
   } catch (e) { cuerpo.innerHTML = `<div class="card empty"><span class="big">⚠️</span>${esc(mensajeError(e))}</div>`; return; }
   if (!culto) { cuerpo.innerHTML = '<div class="card empty"><span class="big">🔎</span>Este culto ya no existe.<br><a href="#cultos">← Volver a los cultos</a></div>'; return; }
@@ -45,16 +57,19 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
     .filter(e => e.hojas.length);
   const logo = hojaLogo(culto);
   // pos: lo que está en pantalla; ver: el elemento que se mira en el centro
-  // al abrir se ve el logo; con "Siguiente" (o un clic en una pantalla) empieza el culto
-  const est = { i: 0, j: 0, modo: 'logo', inicio: null, ver: 0, conectada: false, enAire: false };
+  // al abrir se ve el logo; con "Siguiente" (o un clic en una pantalla) empieza el culto.
+  // Una proyección suelta (canción, plantilla o Biblia) empieza directo en la primera pantalla.
+  const suelto = culto.id === 'suelto';
+  const volver = suelto ? (culto.volver || 'cultos') : 'cultos';
+  const est = { i: 0, j: 0, modo: suelto && elementos.length ? 'normal' : 'logo', inicio: null, ver: 0, conectada: false, enAire: suelto };
 
   cuerpo.innerHTML = `<div class="cu-consola">
     <div class="row cu-con-cab">
-      <a class="btn btn-sm btn-ghost" href="#cultos/culto-${esc(culto.id)}">← Editar</a>
+      <a class="btn btn-sm btn-ghost" href="#${suelto ? esc(volver) : 'cultos/culto-' + esc(culto.id)}">${suelto ? '← Volver' : '← Editar'}</a>
       <h2 class="grow" title="${esc(culto.nombre)}">${esc(culto.nombre)}</h2>
       <span class="badge gray" data-conexion>🖥 Pantalla sin abrir</span>
       <span class="badge green" data-remota hidden></span>
-      <button class="btn btn-sm" data-remoto>📱 Control remoto</button>
+      ${suelto ? '' : '<button class="btn btn-sm" data-remoto>📱 Control remoto</button>'}
       <button class="btn btn-sm btn-primary" data-abrir>🖥 Abrir pantalla</button></div>
     <div class="cu-con">
       <aside class="cu-con-lista" data-lista aria-label="Elementos del culto"></aside>
@@ -242,7 +257,7 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
     guardarVivo({ t: 'fin', id: null });
     callar();
     toast('Proyección finalizada');
-    location.hash = 'cultos';
+    location.hash = volver;
   };
 
   function tecla(e) {
@@ -266,7 +281,7 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
   }
 
   // ---------- 📱 Control remoto y pantalla en otro equipo ----------
-  $('[data-remoto]', cuerpo).onclick = async () => {
+  $('[data-remoto]', cuerpo)?.addEventListener('click', async () => {
     let acc;
     try { acc = await datos.accesos(culto.id, 'ver'); }
     catch (e) { return toast(mensajeError(e), 'error'); }
@@ -306,7 +321,7 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
     $('[data-cerrar-acc]', m.el).onclick = () => cambiar('cerrar');
     $('[data-ok]', m.el).onclick = () => m.cerrar();
     pintarCajas();
-  };
+  });
 
   // ---------- 🔊 Sonido (pad suave, en este equipo) ----------
   const panelSonido = $('[data-panel-sonido]', cuerpo);

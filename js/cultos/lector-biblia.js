@@ -4,15 +4,20 @@
 //   colores por grupo (Pentateuco, Evangelios, Cartas…). Libro → capítulos en botones → lectura.
 // - Lectura: cada versículo en su fila con el número como botón; palabras clave (Dios, Jesús, amor…)
 //   como cápsulas suaves; tamaño de letra, letra con o sin serifa y tema claro / papel / oscuro.
-// - Tocar versículos los elige: colorearlos, volver palabras "botón" (cápsulas de color), copiar o
-//   agregarlos a un culto (con sus palabras botón, que también se ven al proyectar).
+// - Tocar versículos los elige: colorearlos, volver palabras "botón" (cápsulas de color), copiar,
+//   🖥 proyectarlos con la plantilla que se elija (como una canción; las palabras botón se mueven)
+//   o agregarlos a un culto. También se proyecta el capítulo completo.
 // - Versiones: las de js/cultos/biblia.js (RV1909 incluida, YouVersion con la clave guardada, importadas).
 // Lo que se marca (colores y palabras botón) queda en este navegador.
 // ============================================================
 import { $, $$, esc, toast, mensajeError, abrirModal, copiar } from '../comun.js';
 import { LIBROS, GRUPOS, leerReferencia, citaDe, versiones, VERSION_DEFECTO, versosDelCapitulo, versoDe, buscarPalabra, textoDe } from './biblia.js';
-import { COLORES_BOTON } from './resaltar.js';
-import { nuevoIdElemento } from './elementos.js';
+import { COLORES_BOTON, MOVIMIENTOS_BOTON } from './resaltar.js';
+import { nuevoIdElemento, hojasDeElemento } from './elementos.js';
+import { pintarHoja } from '../proyectos/lienzo.js';
+import { prepararFuente, misPlantillas, plantillaDe } from './diapositivas.js';
+import { PLANTILLAS } from './plantillas.js';
+import { proyectarSuelto } from './consola.js';
 import { datosCultos } from './datos.js';
 
 const FUENTES = 'https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Bricolage+Grotesque:wght@500;700;800&display=swap';
@@ -176,7 +181,8 @@ export async function pintarLectorBiblia(cont) {
     const l = LIBROS[pref.libro];
     const ant = anteriorCap(), sig = siguienteCap();
     vista.innerHTML = `<article class="bb-lectura" style="--c:${l.color}">
-      <header class="bb-cab-cap"><span>${esc(l.grupo)} · ${esc(corto())}</span><h2>${esc(l.nombre)}</h2><div class="bb-num-cap">${pref.cap}</div></header>
+      <header class="bb-cab-cap"><span>${esc(l.grupo)} · ${esc(corto())}</span><h2>${esc(l.nombre)}</h2><div class="bb-num-cap">${pref.cap}</div>
+        <div><button class="bb-proy-cap" data-proy-cap>🖥 Proyectar el capítulo</button></div></header>
       <div class="bb-versos" data-versos>${est.versos.map(v => `<div class="bb-verso" data-v="${v.n}"></div>`).join('')}</div>
       <footer class="bb-pie-cap">
         ${ant ? `<button data-mover="-1">← ${esc(LIBROS[ant.libro].corto)} ${ant.cap}</button>` : '<span></span>'}
@@ -185,6 +191,11 @@ export async function pintarLectorBiblia(cont) {
     est.versos.forEach(pintarVerso);
     $$('[data-mover]', vista).forEach(b => b.onclick = () => { const p = b.dataset.mover === '1' ? siguienteCap() : anteriorCap(); abrirCapitulo(p.libro, p.cap); scrollTo({ top: 0, behavior: 'smooth' }); });
     $('[data-capitulos]', vista).onclick = () => { est.vista = 'capitulos'; limpiarSel(); pintar(); };
+    $('[data-proy-cap]', vista).onclick = () => {
+      const todos = est.versos.filter(v => v.t);
+      if (todos.length < est.versos.length) return toast('Espera a que termine de cargar el capítulo', 'error');
+      proyectar(todos, `${LIBROS[pref.libro].nombre === 'Salmos' ? 'Salmo' : LIBROS[pref.libro].nombre} ${pref.cap}`);
+    };
   }
   const pintarVersos = () => est.versos.forEach(pintarVerso);
   function pintarVerso(v) {
@@ -243,7 +254,8 @@ export async function pintarLectorBiblia(cont) {
         <div class="bb-colores">${Object.entries(COLORES_MARCA).map(([k, c]) => `<button data-color="${k}" style="--c:${c}" title="Colorear"></button>`).join('')}<button data-color="" title="Quitar el color">⌫</button></div>
         <button class="bb-btn ${est.modoBoton ? 'on' : ''}" data-modo-boton>🔘 Palabras botón</button>
         <button class="bb-btn" data-copiar>📋 Copiar</button>
-        <button class="bb-btn bb-prim" data-culto>➕ Al culto</button></div>
+        <button class="bb-btn" data-culto>➕ Al culto</button>
+        <button class="bb-btn bb-prim" data-proyectar>🖥 Proyectar</button></div>
       ${est.modoBoton ? `<div class="bb-accion-fila bb-pista"><span>Toca palabras de los versículos elegidos.</span><div class="bb-colores">${COLORES_BOTON.map(c => `<button data-cb="${c}" class="${c === est.colorBoton ? 'on' : ''}" style="--c:${c}"></button>`).join('')}</div></div>` : ''}`;
     $('[data-x]', a).onclick = () => { limpiarSel(); pintarVersos(); pintarAccion(); };
     $$('[data-color]', a).forEach(b => b.onclick = () => {
@@ -263,6 +275,68 @@ export async function pintarLectorBiblia(cont) {
       toast('Versículos copiados');
     };
     $('[data-culto]', a).onclick = () => alCulto(lista, cita);
+    $('[data-proyectar]', a).onclick = () => proyectar(lista, cita);
+  }
+
+  // El elemento "versículo" (como en un culto) con las palabras botón marcadas
+  function itemDe(lista, cita, extra = {}) {
+    const porVersion = marcas[pref.version] || {};
+    const resaltados = [];
+    lista.forEach((v, l) => {
+      const bs = porVersion[`${pref.libro}.${pref.cap}.${v.n}`]?.b || {};
+      const w = v.t.split(' ').filter(Boolean);
+      for (const [p, color] of Object.entries(bs)) {
+        resaltados.push({ id: nuevoIdElemento(), b: 0, l, p: Number(p) + 1, n: 1, texto: w[p] || '', estilo: { modo: 'boton', fondo: color, color: '#FFFFFF' } });
+      }
+    });
+    return { id: nuevoIdElemento(), tipo: 'versiculo', plantilla: '', numeros: true, version: pref.version,
+      ref: { libro: pref.libro, cap: pref.cap, versos: lista.map(v => v.n) }, cita: `${cita} · ${corto()}`,
+      texto: lista.map(v => `${v.n} ${v.t}`).join('\n'), ...(resaltados.length ? { resaltados } : {}), ...extra };
+  }
+
+  // 🖥 Proyectar: elegir la plantilla (viendo el versículo en cada una), versículos por pantalla y movimiento
+  async function proyectar(lista, cita) {
+    const op = { plantilla: leer('biblia.plantilla', 'palabra'), porVerso: leer('biblia.porVerso', true), mov: leer('biblia.mov', 'flotar') };
+    const todas = [...misPlantillas(), ...PLANTILLAS];
+    if (!todas.some(p => p.id === op.plantilla)) op.plantilla = 'palabra';
+    const item = () => itemDe(lista, cita, { porVerso: op.porVerso, mov: op.mov });
+    const culto = () => ({ id: 'suelto', nombre: cita, plantilla_base: op.plantilla, items: [item()] });
+    const m = abrirModal(`<h3>🖥 Proyectar ${esc(cita)}</h3>
+      <div class="bb-proy">
+        <div><div class="bb-proy-grande" data-grande></div><p class="hint" data-n style="margin:6px 0 0;"></p>
+          <label class="check" style="margin-top:8px;"><input type="checkbox" data-por-verso ${op.porVerso ? 'checked' : ''}> Un versículo por pantalla</label>
+          <label class="lbl">Movimiento de las palabras botón</label>
+          <select class="input" data-mov>${Object.entries(MOVIMIENTOS_BOTON).map(([k, t]) => `<option value="${k}" ${k === op.mov ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></div>
+        <div><b class="small">Plantilla</b><div class="bb-proy-pls" data-pls></div></div>
+      </div>
+      <div class="modal-pie"><button class="btn btn-outline" data-no>Cancelar</button><button class="btn btn-primary" data-si>▶ Proyectar</button></div>`, { ancho: true });
+    const grande = async () => {
+      await prepararFuente(op.plantilla);
+      if (!m.el.isConnected) return;
+      const hojas = hojasDeElemento(item(), culto());
+      if (hojas[0]) pintarHoja($('[data-grande]', m.el), hojas[0], { modo: 'ver' });
+      $('[data-n]', m.el).textContent = `${plantillaDe(op.plantilla).nombre} · saldrá en ${hojas.length} ${hojas.length === 1 ? 'pantalla' : 'pantallas'}.`;
+    };
+    const pls = $('[data-pls]', m.el);
+    pls.innerHTML = todas.map(p => `<button class="bb-proy-pl ${p.id === op.plantilla ? 'on' : ''}" data-pl="${esc(p.id)}" title="${esc(p.nombre)}"><div data-m></div><span>${p.mia ? '⭐ ' : ''}${esc(p.nombre)}</span></button>`).join('');
+    $$('[data-pl]', pls).forEach(b => b.onclick = () => { op.plantilla = b.dataset.pl; poner('biblia.plantilla', op.plantilla); $$('[data-pl]', pls).forEach(x => x.classList.toggle('on', x === b)); grande(); });
+    $('[data-por-verso]', m.el).onchange = (e) => { op.porVerso = e.target.checked; poner('biblia.porVerso', op.porVerso); grande(); };
+    $('[data-mov]', m.el).onchange = (e) => { op.mov = e.target.value; poner('biblia.mov', op.mov); grande(); };
+    $('[data-no]', m.el).onclick = () => m.cerrar();
+    $('[data-si]', m.el).onclick = () => {
+      const k = culto();
+      m.cerrar();
+      proyectarSuelto({ nombre: k.nombre, plantilla_base: k.plantilla_base, items: k.items, volver: 'cultos/biblia' });
+    };
+    grande();
+    // las miniaturas: la primera pantalla de estos versículos en cada plantilla (con la letra real de cada una)
+    for (const p of todas) {
+      await prepararFuente(p.id);
+      const b = $(`[data-pl="${CSS.escape(p.id)}"] [data-m]`, pls);
+      if (!b || !m.el.isConnected) return;
+      const h = hojasDeElemento(item(), { ...culto(), plantilla_base: p.id })[0];
+      if (h) pintarHoja(b, h, { modo: 'miniatura' });
+    }
   }
 
   // Agrega los versículos elegidos (con sus palabras botón) al final de un culto
@@ -276,18 +350,7 @@ export async function pintarLectorBiblia(cont) {
       <div class="bb-cultos">${cultos.map(k => `<button data-k="${k.id}"><b>${esc(k.nombre)}</b><small>${esc(k.fecha || 'Sin fecha')} · ${(k.items || []).length} elementos</small></button>`).join('')}</div>`;
     $$('[data-k]', c).forEach(b => b.onclick = async () => {
       const k = cultos.find(x => x.id === b.dataset.k);
-      const porVersion = marcas[pref.version] || {};
-      const resaltados = [];
-      lista.forEach((v, l) => {
-        const bs = porVersion[`${pref.libro}.${pref.cap}.${v.n}`]?.b || {};
-        const w = v.t.split(' ').filter(Boolean);
-        for (const [p, color] of Object.entries(bs)) {
-          resaltados.push({ id: nuevoIdElemento(), b: 0, l, p: Number(p) + 1, n: 1, texto: w[p] || '', estilo: { modo: 'boton', fondo: color, color: '#FFFFFF' } });
-        }
-      });
-      const it = { id: nuevoIdElemento(), tipo: 'versiculo', plantilla: '', numeros: true, version: pref.version,
-        ref: { libro: pref.libro, cap: pref.cap, versos: lista.map(v => v.n) }, cita: `${cita} · ${corto()}`,
-        texto: lista.map(v => `${v.n} ${v.t}`).join('\n'), ...(resaltados.length ? { resaltados } : {}) };
+      const it = itemDe(lista, cita);
       try {
         await datosCultos.guardar(k.id, { items: [...(k.items || []), it] });
         m.cerrar();

@@ -424,6 +424,16 @@ body.le.oscuro { --le-fondo: #14121F; --le-tinta: #F4F2FF; --le-suave: #A9A3C7; 
 .bb-cultos button:hover { border-color: var(--primary); }
 .bb-cultos small { color: var(--muted); font-weight: 700; }
 
+.bb-proy-cap { margin-top: 12px; border: none; border-radius: 12px; padding: 8px 14px; font-weight: 800; color: #fff; background: linear-gradient(135deg, var(--c), color-mix(in srgb, var(--c) 50%, #EC4899)); }
+.bb-proy { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.bb-proy-grande .lienzo { border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.2); }
+.bb-proy-pls { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; max-height: 52vh; overflow-y: auto; padding: 3px; margin-top: 6px; }
+.bb-proy-pl { padding: 0; border: 3px solid transparent; border-radius: 10px; background: none; cursor: pointer; text-align: left; font: inherit; min-width: 0; }
+.bb-proy-pl .lienzo { border-radius: 7px; }
+.bb-proy-pl > span { display: block; font-size: 11.5px; font-weight: 800; color: var(--muted); padding: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bb-proy-pl.on { border-color: var(--primary); }
+@media (max-width: 760px) { .bb-proy { grid-template-columns: minmax(0, 1fr); } .bb-proy-pls { max-height: 34vh; } }
+
 @media (max-width: 640px) {
   .bb { padding: 12px 12px 20px; border-radius: 18px; margin: 0 -4px; }
   .bb-portada { grid-template-columns: minmax(0, 1fr); }

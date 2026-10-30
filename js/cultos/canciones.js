@@ -10,6 +10,16 @@ import { PLANTILLA_DEFECTO } from './plantillas.js';
 import { pintarHoja } from '../proyectos/lienzo.js';
 import { htmlLetraCoristas } from './resaltar.js';
 import { datosCanciones } from './datos.js';
+import { proyectarSuelto } from './consola.js';
+
+// ▶ Proyectar una canción sola (sin culto): primero su título y luego la letra, con su plantilla
+export function proyectarCancion(c) {
+  const pl = plantillaDeCancion(c);
+  proyectarSuelto({ nombre: c.titulo, plantilla_base: pl, volver: 'cultos/canciones', items: [
+    { id: 'titulo', tipo: 'texto', nombre: c.titulo, titulo: [c.autor, c.tono ? 'Tono ' + c.tono : ''].filter(Boolean).join(' · '), texto: c.titulo, plantilla: pl },
+    { id: 'letra', tipo: 'cancion', cancion: c.id, plantilla: 'cancion' }
+  ] });
+}
 
 // Preferencias de esta computadora (no importan si se pierden)
 const pref = {
@@ -67,6 +77,7 @@ export async function pintarBiblioteca(cont, { perfil, datos = datosCanciones })
       const abrir = () => c.mia ? abrirEditor(c.id) : verCancion(c, { perfil, datos, alCopiar: () => pintarBiblioteca(cont, { perfil, datos }) });
       $('[data-abrir]', t).onclick = abrir;
       $('[data-editar]', t).onclick = abrir;
+      $('[data-proyectar]', t).onclick = () => proyectarCancion(c);
       $('[data-copiar]', t)?.addEventListener('click', () => copiarCancion(c, { perfil, datos }).then(ok => ok && pintarBiblioteca(cont, { perfil, datos })));
       $('[data-duplicar]', t)?.addEventListener('click', () => copiarCancion(c, { perfil, datos, sufijo: ' (copia)' }).then(ok => ok && pintarBiblioteca(cont, { perfil, datos })));
       $('[data-ver]', t)?.addEventListener('click', () => verCancion(c, { perfil, datos }));
@@ -98,6 +109,7 @@ function htmlTarjeta(c) {
       ${(c.etiquetas || []).map(t => `<span class="badge gray">${esc(t)}</span>`).join('')}</div>
     <div class="row cu-acciones">
       <button class="btn btn-sm ${c.mia ? 'btn-primary' : ''}" data-editar>${c.mia ? '✏️ Editar' : '👁 Ver'}</button>
+      <button class="btn btn-sm" data-proyectar title="Proyectar esta canción">▶</button>
       ${c.mia ? '' : '<button class="btn btn-sm btn-primary" data-copiar>📋 Copiar a mis canciones</button>'}
       ${mas}</div></div>`;
 }

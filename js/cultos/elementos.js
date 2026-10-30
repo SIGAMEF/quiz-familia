@@ -38,7 +38,7 @@ export function plantillaDeElemento(it, culto, cancion = null) {
 export function tituloDeElemento(it, canciones = new Map()) {
   if (it.tipo === 'cancion') return canciones.get(it.cancion)?.titulo || 'Canción no encontrada';
   if (it.tipo === 'versiculo') return it.cita || 'Versículo';
-  if (it.tipo === 'texto') return it.titulo || primeraLinea(it.texto) || 'Texto';
+  if (it.tipo === 'texto') return it.nombre || it.titulo || primeraLinea(it.texto) || 'Texto';
   if (it.tipo === 'anuncio') return it.nombre || (it.url ? 'Imagen' : 'Anuncio');
   if (it.tipo === 'video') return it.nombre || 'Video';
   if (it.tipo === 'regresiva') return `${fmtReloj(segundosDe(it))} · ${it.texto || 'Cuenta regresiva'}`;
@@ -82,8 +82,9 @@ export function partesDeVersiculo(texto, { max = 200, lineas = 4 } = {}) {
   return out;
 }
 // Resaltados de un versículo ({ l, p, n, texto, estilo }) para una pantalla: cada parte pasa a ser la línea k
-function resaltadosDePartes(partes, resaltados) {
+function resaltadosDePartes(partes, resaltados, mov) {
   if (!resaltados?.length) return null;
+  if (mov) resaltados = resaltados.map(r => r.estilo?.modo === 'boton' ? { ...r, estilo: { ...r.estilo, mov } } : r);
   const out = [];
   partes.forEach((x, k) => {
     const w = x.t.split(' ').filter(Boolean);
@@ -160,10 +161,11 @@ export function hojasDeElemento(it, culto, canciones = new Map()) {
     return hojas.map(h => ({ ...h, id: `${it.id}-${h.id}`, etiqueta: h.info?.nombre || 'Letra' }));
   }
   if (it.tipo === 'versiculo') {
-    const trozos = partesDeVersiculo(it.texto);
+    // porVerso: un versículo por pantalla (como se proyecta desde la Biblia)
+    const trozos = partesDeVersiculo(it.texto, it.porVerso ? { lineas: 1, max: 260 } : undefined);
     const pie = String(it.cita || '').trim();
     if (!trozos.length) return con([hojaDeLetra(pid, [pie || 'Escribe el versículo'], '')], 'Cita');
-    return con(trozos.map(t => hojaDeLetra(pid, t.map(x => x.t), pie, resaltadosDePartes(t, it.resaltados))), (h, i) => trozos.length > 1 ? `Parte ${i + 1}` : 'Versículo');
+    return con(trozos.map(t => hojaDeLetra(pid, t.map(x => x.t), pie, resaltadosDePartes(t, it.resaltados, it.mov))), (h, i) => trozos.length > 1 ? `Parte ${i + 1}` : 'Versículo');
   }
   if (it.tipo === 'texto') {
     const titulo = String(it.titulo || '').trim();
