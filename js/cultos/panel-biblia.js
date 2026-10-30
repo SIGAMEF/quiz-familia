@@ -5,6 +5,7 @@
 // El texto se puede corregir o reemplazar (por ejemplo, pegando otra versión).
 // ============================================================
 import { $, $$, esc, toast, mensajeError, debounce, abrirModal } from '../comun.js';
+import { COLORES_BOTON } from './resaltar.js';
 import { LIBROS, leerReferencia, citaDe, versiones, VERSION_DEFECTO, textoDe, versosDelCapitulo, buscarPalabra, importarVersion, borrarVersion,
   conectarYouVersion, desconectarYouVersion, youversionConectado } from './biblia.js';
 
@@ -26,6 +27,8 @@ export async function formVersiculo(form, it, { previa, selPlantilla }) {
     <label class="check"><input type="checkbox" data-numeros ${it.numeros ? 'checked' : ''}> Mostrar el número de cada versículo</label>
     <label class="lbl">Texto <span class="small muted">(puedes corregirlo o pegar el de otra versión)</span></label>
     <textarea class="input cu-el-area" data-campo="texto" placeholder="Escribe la referencia arriba o pega aquí el texto: un versículo por línea">${esc(it.texto || '')}</textarea>
+    <div class="cu-vb"><div class="row between" style="gap:8px;"><b class="small">🔘 Palabras botón <span class="muted">· toca una palabra para resaltarla al proyectar</span></b>
+      <span class="cu-vb-colores" data-vb-colores></span></div><div class="cu-vb-texto" data-vb></div></div>
     <label class="lbl">Cita <span class="small muted">(sale abajo, en cada pantalla)</span></label>
     <input class="input" data-campo="cita" maxlength="80" placeholder="Juan 3:16-18" value="${esc(it.cita || '')}">
     <p class="hint" data-sugerir-yv style="margin:4px 0 0;">¿Necesitas la <b>RVR1960</b>? Conéctala con YouVersion (bible.com) en “Más versiones” abajo.</p>
@@ -76,6 +79,8 @@ export async function formVersiculo(form, it, { previa, selPlantilla }) {
       it.texto = t.versos.map(v => (it.numeros ? v.n + ' ' : '') + v.t).join('\n');
       it.cita = it.vcorto ? `${t.cita} · ${it.vcorto}` : t.cita;
       sel('campo="texto"').value = it.texto;
+      it.resaltados = [];
+      pintarBotones();
       $('[data-campo="cita"]', form).value = it.cita;
       estado(`✔ ${t.versos.length} ${t.versos.length === 1 ? 'versículo' : 'versículos'} · ${it.vcorto || ''}`);
       previa();
@@ -163,6 +168,34 @@ export async function formVersiculo(form, it, { previa, selPlantilla }) {
     } catch (e) { estado(mensajeError(e), true); }
   }
   pintarYV();
+
+  // ---------- palabras botón (resaltados { l, p, n, texto, estilo: { modo: 'boton' } }) ----------
+  let colorBoton = COLORES_BOTON[0];
+  function pintarBotones() {
+    const lineas = String(it.texto || '').split('\n');
+    const rs = Array.isArray(it.resaltados) ? it.resaltados : [];
+    sel('vb-colores').innerHTML = COLORES_BOTON.map(c => `<button type="button" data-vbc="${c}" class="${c === colorBoton ? 'on' : ''}" style="--c:${c}" aria-label="Color ${c}"></button>`).join('');
+    $$('[data-vbc]', form).forEach(b => b.onclick = () => { colorBoton = b.dataset.vbc; pintarBotones(); });
+    sel('vb').innerHTML = lineas.some(l => l.trim()) ? lineas.map((l, li) => `<div>${l.split(' ').filter(Boolean).map((w, p) => {
+      const r = rs.find(x => x.l === li && x.p === p);
+      return `<button type="button" class="cu-vb-w ${r ? 'on' : ''}" data-l="${li}" data-p="${p}" ${r ? `style="--c:${esc(r.estilo?.fondo || colorBoton)}"` : ''}>${esc(w)}</button>`;
+    }).join(' ')}</div>`).join('') : '<span class="small muted">Aquí aparecerán las palabras del texto.</span>';
+    $$('[data-p]', sel('vb')).forEach(b => b.onclick = () => {
+      const l = Number(b.dataset.l), p = Number(b.dataset.p);
+      it.resaltados = (it.resaltados || []).filter(x => !(x.l === l && x.p === p));
+      if (!b.classList.contains('on') || b.style.getPropertyValue('--c') !== colorBoton) {
+        it.resaltados.push({ id: Math.random().toString(36).slice(2, 10), b: 0, l, p, n: 1, texto: b.textContent, estilo: { modo: 'boton', fondo: colorBoton, color: '#FFFFFF' } });
+      }
+      pintarBotones(); previa();
+    });
+  }
+  // si se escribe en el texto, las palabras botón que ya no coinciden se quitan
+  sel('campo="texto"').addEventListener('input', debounce(() => {
+    const lineas = String(it.texto || '').split('\n');
+    it.resaltados = (it.resaltados || []).filter(r => (lineas[r.l] || '').split(' ').filter(Boolean)[r.p] === r.texto);
+    pintarBotones();
+  }, 300));
+  pintarBotones();
 
   await pintarVersiones();
   await pintarSelectores();

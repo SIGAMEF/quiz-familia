@@ -28,7 +28,19 @@ const L = [
 ];
 const CAPITULOS = [50, 40, 27, 36, 34, 24, 21, 4, 31, 24, 22, 25, 29, 36, 10, 13, 10, 42, 150, 31, 12, 8, 66, 52, 5, 48, 12, 14, 3, 9, 1, 4, 7, 3, 3, 3, 2, 14, 4,
   28, 16, 24, 21, 28, 16, 16, 13, 6, 6, 4, 4, 5, 3, 6, 4, 3, 1, 13, 5, 5, 3, 5, 1, 1, 1, 22];
-export const LIBROS = L.map(([nombre], i) => ({ i, nombre, capitulos: CAPITULOS[i], nuevo: i >= 39 }));
+const CORTOS = ['Gn', 'Éx', 'Lv', 'Nm', 'Dt', 'Jos', 'Jue', 'Rt', '1 S', '2 S', '1 R', '2 R', '1 Cr', '2 Cr', 'Esd', 'Neh', 'Est', 'Job', 'Sal', 'Pr',
+  'Ec', 'Cnt', 'Is', 'Jer', 'Lm', 'Ez', 'Dn', 'Os', 'Jl', 'Am', 'Abd', 'Jon', 'Mi', 'Nah', 'Hab', 'Sof', 'Hag', 'Zac', 'Mal',
+  'Mt', 'Mr', 'Lc', 'Jn', 'Hch', 'Ro', '1 Co', '2 Co', 'Gá', 'Ef', 'Fil', 'Col', '1 Ts', '2 Ts', '1 Ti', '2 Ti', 'Tit', 'Flm', 'He',
+  'Stg', '1 P', '2 P', '1 Jn', '2 Jn', '3 Jn', 'Jud', 'Ap'];
+// Grupos de libros (para la portada de la Biblia): [nombre, desde, hasta, color]
+export const GRUPOS = [
+  ['Pentateuco', 0, 4, '#F59E0B'], ['Históricos', 5, 16, '#F97316'], ['Poéticos', 17, 21, '#EC4899'],
+  ['Profetas mayores', 22, 26, '#A855F7'], ['Profetas menores', 27, 38, '#6366F1'],
+  ['Evangelios', 39, 42, '#0EA5E9'], ['Hechos', 43, 43, '#14B8A6'], ['Cartas de Pablo', 44, 56, '#22C55E'],
+  ['Cartas generales', 57, 64, '#65A30D'], ['Profecía', 65, 65, '#EF4444']
+];
+const grupoDe = (i) => GRUPOS.find(g => i >= g[1] && i <= g[2]);
+export const LIBROS = L.map(([nombre], i) => ({ i, nombre, corto: CORTOS[i], capitulos: CAPITULOS[i], nuevo: i >= 39, grupo: grupoDe(i)[0], color: grupoDe(i)[3] }));
 
 // "I Corintios", "Primera de Corintios", "1ra. Juan" → "1corintios"… (el número romano solo si va separado: "Isaías" no)
 const llave = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
@@ -216,6 +228,13 @@ async function libro(version, i) {
   return caps;
 }
 // (para YouVersion se usa la cuenta de versículos de la RV1909, que es la misma división)
+// Un versículo de cualquier versión (incluida, YouVersion o importada); '' si no existe
+export async function versoDe(version, i, cap, n) {
+  const yv = versionesYV().find(v => v.id === version);
+  if (yv) return versoYV(yv, i, cap, n);
+  return (await libro(version, i))[cap - 1]?.[n - 1] || '';
+}
+export const nombreVersion = async (id) => (await versiones()).find(v => v.id === id) || null;
 export async function versosDelCapitulo(version, i, cap) {
   return (await libro(versionesYV().some(v => v.id === version) ? VERSION_DEFECTO : version, i))[cap - 1] || [];
 }

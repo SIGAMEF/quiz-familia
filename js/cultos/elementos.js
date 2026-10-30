@@ -63,17 +63,38 @@ function partirLargo(linea, max) {
   return out;
 }
 // Versículos: cada línea es un versículo; se juntan hasta ~200 letras o 4 líneas por pantalla
-export function trozosDeVersiculo(texto, { max = 200, lineas = 4 } = {}) {
-  const versos = lineasDe(texto).filter(Boolean).flatMap(l => partirLargo(l, max));
+export function trozosDeVersiculo(texto, opciones) { return partesDeVersiculo(texto, opciones).map(t => t.map(x => x.t)); }
+// Lo mismo, pero cada parte recuerda su línea (l) y desde qué palabra empieza (p0), para ubicar las palabras "botón"
+export function partesDeVersiculo(texto, { max = 200, lineas = 4 } = {}) {
+  const versos = lineasDe(texto).flatMap((l, k) => {
+    if (!l) return [];
+    let p0 = 0;
+    return partirLargo(l, max).map(t => { const x = { t, l: k, p0 }; p0 += t.split(' ').filter(Boolean).length; return x; });
+  });
   const out = [];
   let act = [];
   for (const v of versos) {
-    const largo = act.reduce((t, x) => t + x.length, 0) + v.length;
+    const largo = act.reduce((t, x) => t + x.t.length, 0) + v.t.length;
     if (act.length && (largo > max || act.length >= lineas)) { out.push(act); act = []; }
     act.push(v);
   }
   if (act.length) out.push(act);
   return out;
+}
+// Resaltados de un versículo ({ l, p, n, texto, estilo }) para una pantalla: cada parte pasa a ser la línea k
+function resaltadosDePartes(partes, resaltados) {
+  if (!resaltados?.length) return null;
+  const out = [];
+  partes.forEach((x, k) => {
+    const w = x.t.split(' ').filter(Boolean);
+    for (const r of resaltados) {
+      if (r.l !== x.l || r.p < x.p0 || r.p >= x.p0 + w.length) continue;
+      const p = r.p - x.p0;
+      if (r.texto && w.slice(p, p + (r.n || 1)).join(' ').replace(/[^\p{L}\p{N}]/gu, '').toLowerCase() !== String(r.texto).replace(/[^\p{L}\p{N}]/gu, '').toLowerCase()) continue;
+      out.push({ ...r, b: 0, l: k, p, n: Math.min(r.n || 1, w.length - p) });
+    }
+  });
+  return out.length ? out : null;
 }
 // Texto libre: cada párrafo (separado por una línea en blanco) en pantallas de hasta 6 líneas
 export function trozosDeTexto(texto) {
@@ -83,10 +104,10 @@ export function trozosDeTexto(texto) {
 
 // ---------- Hojas ----------
 // Una pantalla de letra de la plantilla con estas líneas (ajustadas al cuadro) y un pie
-export function hojaDeLetra(id, lineas, pie = '') {
-  const fuente = lineas.map(t => ({ t }));
-  const a = ajustar(id, fuente);
-  return { ...hojaDePantalla(id, a.tam), ver: 'letra', textos: { fuente, pie, partir: a.partir, chico: a.chico } };
+export function hojaDeLetra(id, lineas, pie = '', resaltados = null) {
+  const fuente = lineas.map((t, l) => resaltados ? { t, b: 0, l } : { t });
+  const a = ajustar(id, fuente, resaltados);
+  return { ...hojaDePantalla(id, a.tam), ver: 'letra', textos: { fuente, pie, partir: a.partir, chico: a.chico }, ...(resaltados ? { resaltados } : {}) };
 }
 export const hojaDePortada = (id) => ({ ...hojaDePlantilla(plantillaDe(id)), ver: 'portada' });
 // Los elementos de una plantilla que se ven con letra, sin la zona de la letra ni el pie (para armar pantallas propias)
@@ -139,10 +160,10 @@ export function hojasDeElemento(it, culto, canciones = new Map()) {
     return hojas.map(h => ({ ...h, id: `${it.id}-${h.id}`, etiqueta: h.info?.nombre || 'Letra' }));
   }
   if (it.tipo === 'versiculo') {
-    const trozos = trozosDeVersiculo(it.texto);
+    const trozos = partesDeVersiculo(it.texto);
     const pie = String(it.cita || '').trim();
     if (!trozos.length) return con([hojaDeLetra(pid, [pie || 'Escribe el versículo'], '')], 'Cita');
-    return con(trozos.map(t => hojaDeLetra(pid, t, pie)), (h, i) => trozos.length > 1 ? `Parte ${i + 1}` : 'Versículo');
+    return con(trozos.map(t => hojaDeLetra(pid, t.map(x => x.t), pie, resaltadosDePartes(t, it.resaltados))), (h, i) => trozos.length > 1 ? `Parte ${i + 1}` : 'Versículo');
   }
   if (it.tipo === 'texto') {
     const titulo = String(it.titulo || '').trim();

@@ -176,7 +176,8 @@ cultos           (id, profesor_id, nombre, fecha, plantilla_base, items jsonb,  
 - **Fase 3** (`js/cultos/remoto.js`): 📱 control remoto (`culto-control.html?k=`) y pantalla en otro equipo (`culto-pantalla.html?p=`) por Realtime broadcast con códigos secretos de 32 caracteres; "Cambiar los enlaces" y "Cerrar accesos remotos". 📤 Publicar / Publicar cambios / Despublicar y la página de coristas (`letras.html?c=`), con caché en el celular, tamaño de letra, modo oscuro, pantalla encendida y **📡 Seguir proyección**.
 - **Sonido** (`js/cultos/sonido.js`): ambientes generados con WebAudio que suenan en la consola, siempre empiezan apagados, con volumen. Es uno para todo el culto (no uno por plantilla).
 - **Respaldo si Realtime falla:** la consola guarda lo que está en pantalla (`culto_vivo_poner`) solo si hay pantalla remota o coristas; la pantalla remota (cada 3 s) y los coristas (cada 5 s) preguntan con `culto_vivo(código, versión)` solo mientras Realtime no conecta ("sin cambios" si nada cambió). El control remoto necesita Realtime.
-- **Siguiente:** dar estilos a palabras de los versículos (como los resaltados de las canciones) desde la edición.
+- **📖 Biblia (4.ª pestaña, `js/cultos/lector-biblia.js`):** lector juvenil con buscador (cita o palabra), versículo para hoy, "seguir leyendo", los 66 libros en mosaicos de colores por grupo, capítulos en botones y lectura con un versículo por fila (número como botón), palabras clave en cápsulas, tamaño y tipo de letra, temas claro/papel/oscuro, flechas o deslizar para cambiar de capítulo. Al elegir versículos: colorearlos, volver palabras "botón", copiar o agregarlos a un culto. Colores y palabras botón quedan en el navegador.
+- **Palabras botón al proyectar:** estilo de resaltado `modo: 'boton'` (`js/cultos/resaltar.js`); los versículos de un culto guardan `resaltados` ({ l, p, n, texto }) y se editan tocando palabras en el formulario del versículo.
 
 Al cerrar cada fase:
 

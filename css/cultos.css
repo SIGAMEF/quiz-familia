@@ -1,7 +1,7 @@
 /* ============================================================
    Cultos: biblioteca y editor de canciones (las pantallas usan el lienzo de proyectos.css)
    ============================================================ */
-.cu-pestanas { max-width: 520px; }
+.cu-pestanas { max-width: 680px; }
 .cu-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .cu-chips .chip { padding: 5px 10px; font-size: 12.5px; border-radius: 20px; }
 .cu-barra .input { min-width: 200px; }
@@ -297,3 +297,143 @@ body.le.oscuro { --le-fondo: #14121F; --le-tinta: #F4F2FF; --le-suave: #A9A3C7; 
 .le-pie button:disabled { opacity: .4; }
 .le-toast { position: fixed; left: 50%; bottom: 80px; transform: translateX(-50%); background: #1E1B2E; color: #fff; padding: 10px 14px; border-radius: 12px; font-weight: 700; font-size: 14px; max-width: calc(100vw - 32px); z-index: 20; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
 .le-toast[hidden] { display: none; }
+
+/* palabras botón en el formulario del versículo */
+.cu-vb { margin-top: 10px; border: 2px solid var(--line); border-radius: 12px; padding: 8px 10px; }
+.cu-vb-colores { display: inline-flex; gap: 4px; }
+.cu-vb-colores button { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #fff; background: var(--c); box-shadow: 0 0 0 1px var(--line); cursor: pointer; padding: 0; }
+.cu-vb-colores button.on { box-shadow: 0 0 0 2px var(--ink); }
+.cu-vb-texto { max-height: 170px; overflow-y: auto; margin-top: 6px; line-height: 2; font-size: 14px; }
+.cu-vb-w { border: none; background: none; padding: 1px 3px; border-radius: 6px; cursor: pointer; font: inherit; color: var(--ink); }
+.cu-vb-w:hover { background: var(--primary-soft); }
+.cu-vb-w.on { background: var(--c); color: #fff; font-weight: 800; }
+
+/* ---------- 📖 Biblia (js/cultos/lector-biblia.js) ---------- */
+.bb { --bb-fondo: #FFFFFF; --bb-tinta: #1F1B33; --bb-suave: #6E6890; --bb-caja: #F5F3FF; --bb-linea: #ECE8FB; --bb-tam: 19px;
+  --bb-texto: 'Lora', Georgia, serif; --bb-titulo: 'Bricolage Grotesque', 'Baloo 2', sans-serif;
+  background: var(--bb-fondo); color: var(--bb-tinta); border-radius: 22px; padding: 16px 18px 24px; box-shadow: 0 6px 30px rgba(60,50,140,.08); position: relative; }
+.bb[data-tema="papel"] { --bb-fondo: #FBF5E9; --bb-tinta: #3B2F22; --bb-suave: #8A7660; --bb-caja: #F3E9D6; --bb-linea: #EADFC8; }
+.bb[data-tema="oscuro"] { --bb-fondo: #15131F; --bb-tinta: #F1EEFF; --bb-suave: #A49FC0; --bb-caja: #221F31; --bb-linea: #2D2942; }
+.bb[data-letra="sans"] { --bb-texto: 'Nunito', system-ui, sans-serif; }
+.bb button { font: inherit; cursor: pointer; }
+
+/* barra */
+.bb-barra { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.bb-buscar { flex: 1 1 260px; display: flex; align-items: center; gap: 8px; background: var(--bb-caja); border-radius: 16px; padding: 0 14px; border: 2px solid transparent; }
+.bb-buscar:focus-within { border-color: #8B5CF6; }
+.bb-buscar input { flex: 1; min-width: 0; border: none; background: none; padding: 12px 0; font: 600 15px 'Nunito', sans-serif; color: var(--bb-tinta); outline: none; }
+.bb-sel { border: none; background: var(--bb-caja); color: var(--bb-tinta); border-radius: 14px; padding: 11px 12px; font: 800 14px 'Nunito', sans-serif; }
+.bb-ajustes { display: flex; gap: 4px; }
+.bb-ajustes button { border: none; background: var(--bb-caja); color: var(--bb-tinta); min-width: 40px; height: 42px; border-radius: 12px; font-weight: 800; font-size: 14px; }
+.bb-ajustes button.on { background: linear-gradient(135deg, #8B5CF6, #EC4899); color: #fff; }
+.bb-migas { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 14px 0 6px; font-weight: 800; font-size: 13.5px; color: var(--bb-suave); }
+.bb-migas button { border: none; background: none; color: var(--c, #8B5CF6); font-weight: 800; padding: 2px 0; }
+.bb-migas i { font-style: normal; opacity: .5; }
+
+/* portada */
+.bb-portada { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; margin: 6px 0 16px; }
+.bb-hoy { position: relative; overflow: hidden; border-radius: 22px; padding: 20px 22px; color: #fff; background: linear-gradient(135deg, #7C3AED 0%, #DB2777 55%, #F59E0B 100%); display: flex; flex-direction: column; gap: 8px; }
+.bb-hoy::after { content: '✦'; position: absolute; right: 18px; top: 4px; font-size: 90px; opacity: .14; }
+.bb-hoy-rot { font: 800 12px 'Nunito', sans-serif; letter-spacing: .14em; text-transform: uppercase; opacity: .9; }
+.bb-hoy p { margin: 0; font: 600 clamp(18px, 2.4vw, 24px)/1.35 var(--bb-texto); }
+.bb-hoy b { font-family: var(--bb-titulo); font-size: 15px; opacity: .95; }
+.bb-hoy button { align-self: flex-start; border: none; background: rgba(255,255,255,.22); color: #fff; font-weight: 800; padding: 8px 14px; border-radius: 12px; backdrop-filter: blur(4px); }
+.bb-seguir { border: 2px dashed var(--bb-linea); background: var(--bb-caja); color: var(--bb-tinta); border-radius: 22px; padding: 16px 20px; display: flex; flex-direction: column; justify-content: center; gap: 4px; text-align: left; min-width: 170px; }
+.bb-seguir span { font-size: 12.5px; font-weight: 800; color: var(--bb-suave); }
+.bb-seguir b { font: 800 20px var(--bb-titulo); }
+.bb-testamentos { display: flex; gap: 6px; background: var(--bb-caja); border-radius: 16px; padding: 4px; margin-bottom: 6px; max-width: 520px; }
+.bb-testamentos button { flex: 1; border: none; background: none; color: var(--bb-suave); border-radius: 12px; padding: 9px 6px; font-weight: 800; font-size: 13.5px; }
+.bb-testamentos button.on { background: var(--bb-fondo); color: var(--bb-tinta); box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.bb-grupo { margin-top: 16px; }
+.bb-grupo h3 { margin: 0 0 8px; font: 800 13px 'Nunito', sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--c); display: flex; align-items: center; gap: 8px; }
+.bb-grupo h3::after { content: ''; flex: 1; height: 2px; border-radius: 2px; background: linear-gradient(90deg, var(--c), transparent); opacity: .35; }
+.bb-libros { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.bb-libro { border: none; border-radius: 16px; padding: 12px 8px 10px; background: color-mix(in srgb, var(--c) 14%, var(--bb-fondo)); color: var(--bb-tinta); display: flex; flex-direction: column; align-items: center; gap: 2px;
+  transition: transform .15s, box-shadow .15s; box-shadow: inset 0 -3px 0 color-mix(in srgb, var(--c) 35%, transparent); }
+.bb-libro b { font: 800 22px var(--bb-titulo); color: var(--c); line-height: 1.1; }
+.bb-libro span { font-size: 11.5px; font-weight: 700; color: var(--bb-suave); text-align: center; line-height: 1.15; }
+.bb-libro:hover, .bb-libro:focus-visible { transform: translateY(-2px); box-shadow: inset 0 -3px 0 var(--c), 0 6px 16px color-mix(in srgb, var(--c) 30%, transparent); }
+
+/* capítulos */
+.bb-cab-libro { border-radius: 22px; padding: 18px 22px; background: linear-gradient(135deg, var(--c), color-mix(in srgb, var(--c) 55%, #1F1B33)); color: #fff; margin: 6px 0 14px; }
+.bb-cab-libro span { font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; opacity: .85; }
+.bb-cab-libro h2 { margin: 2px 0; font: 800 clamp(28px, 4vw, 40px)/1.1 var(--bb-titulo); color: #fff; }
+.bb-cab-libro small { opacity: .85; font-weight: 700; }
+.bb-caps { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 8px; }
+.bb-caps button { aspect-ratio: 1; border: none; border-radius: 16px; background: color-mix(in srgb, var(--c) 12%, var(--bb-fondo)); color: var(--bb-tinta); font: 800 19px var(--bb-titulo); transition: transform .12s; }
+.bb-caps button:hover, .bb-caps button:focus-visible { transform: scale(1.06); background: var(--c); color: #fff; }
+.bb-caps button.on { background: var(--c); color: #fff; }
+
+/* lectura */
+.bb-lectura { max-width: 760px; margin: 0 auto; }
+.bb-cab-cap { text-align: center; padding: 10px 0 18px; }
+.bb-cab-cap span { font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--c); }
+.bb-cab-cap h2 { margin: 4px 0 0; font: 800 clamp(26px, 4vw, 36px)/1.1 var(--bb-titulo); color: var(--bb-tinta); }
+.bb-num-cap { display: inline-grid; place-items: center; margin-top: 10px; width: 74px; height: 74px; border-radius: 24px; font: 800 38px var(--bb-titulo); color: #fff;
+  background: linear-gradient(135deg, var(--c), color-mix(in srgb, var(--c) 50%, #EC4899)); box-shadow: 0 10px 24px color-mix(in srgb, var(--c) 40%, transparent); transform: rotate(-4deg); }
+.bb-versos { display: flex; flex-direction: column; gap: 2px; }
+.bb-verso { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 10px; align-items: start; padding: 8px 10px; border-radius: 14px; cursor: pointer;
+  background: color-mix(in srgb, var(--marca) 70%, transparent); transition: background .2s, box-shadow .2s; }
+.bb-verso:hover { background: color-mix(in srgb, var(--marca) 70%, var(--bb-caja)); }
+.bb-verso.sel { box-shadow: inset 0 0 0 2px var(--c); background: color-mix(in srgb, var(--c) 9%, color-mix(in srgb, var(--marca) 70%, transparent)); }
+.bb[data-tema="oscuro"] .bb-verso.marcado .bb-t { color: #1F1B33; }
+.bb-n { border: none; margin-top: .2em; height: 30px; min-width: 30px; border-radius: 10px; background: color-mix(in srgb, var(--c) 15%, var(--bb-fondo)); color: var(--c); font: 800 13px var(--bb-titulo); padding: 0 6px; }
+.bb-verso.sel .bb-n { background: var(--c); color: #fff; }
+.bb-t { font: 400 var(--bb-tam)/1.7 var(--bb-texto); color: var(--bb-tinta); overflow-wrap: anywhere; }
+.bb-w { border-radius: .35em; }
+.bb-clave { background: linear-gradient(transparent 58%, color-mix(in srgb, var(--c) 30%, transparent) 58%); font-weight: 600; padding: 0 .08em; }
+.bb-boton { background: var(--b); color: #fff; padding: .02em .38em; font-family: var(--bb-titulo); font-weight: 700; font-size: .92em; box-shadow: 0 .12em 0 rgba(0,0,0,.25); white-space: nowrap; display: inline-block; line-height: 1.35; }
+.bb-verso.sel .bb-w:not(.bb-boton) { text-decoration: underline dotted color-mix(in srgb, var(--c) 45%, transparent); text-underline-offset: .25em; }
+.bb-esqueleto { display: block; height: 1.1em; margin-top: .45em; border-radius: 8px; background: linear-gradient(90deg, var(--bb-caja), var(--bb-linea), var(--bb-caja)); background-size: 200% 100%; animation: bb-brillo 1.2s infinite linear; }
+@keyframes bb-brillo { to { background-position: -200% 0; } }
+.bb-falta { color: var(--bb-suave); font-size: 14px; font-family: 'Nunito', sans-serif; }
+.bb-pie-cap { display: flex; justify-content: space-between; gap: 8px; margin-top: 22px; }
+.bb-pie-cap button { border: none; border-radius: 14px; padding: 12px 16px; background: var(--bb-caja); color: var(--bb-tinta); font-weight: 800; }
+.bb-pie-cap button[data-capitulos] { background: none; color: var(--bb-suave); }
+
+/* búsqueda */
+.bb-cargando { text-align: center; padding: 30px 10px; color: var(--bb-suave); font-weight: 700; }
+.bb-progreso { height: 8px; border-radius: 8px; background: var(--bb-caja); overflow: hidden; max-width: 360px; margin: 10px auto 0; }
+.bb-progreso i { display: block; height: 100%; background: linear-gradient(90deg, #8B5CF6, #EC4899); transition: width .2s; }
+.bb-total { color: var(--bb-suave); font-weight: 700; font-size: 13.5px; }
+.bb-resultados { display: flex; flex-direction: column; gap: 6px; }
+.bb-resultados button { text-align: left; border: none; border-left: 4px solid var(--c); border-radius: 12px; background: var(--bb-caja); color: var(--bb-tinta); padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.bb-resultados b { font: 800 14px var(--bb-titulo); color: var(--c); }
+.bb-resultados span { font: 400 15px/1.5 var(--bb-texto); }
+.bb-resultados mark { background: #FDE68A; color: #1F1B33; border-radius: 4px; padding: 0 2px; }
+.bb-vacio { text-align: center; color: var(--bb-suave); font-weight: 700; padding: 24px; }
+
+/* barra de acciones de los versículos elegidos */
+.bb.con-accion { padding-bottom: 150px; }
+.bb-accion { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 50; width: min(720px, calc(100vw - 24px)); background: #1F1B33; color: #fff;
+  border-radius: 20px; padding: 10px 12px; box-shadow: 0 12px 34px rgba(0,0,0,.3); display: flex; flex-direction: column; gap: 8px; }
+.bb-accion[hidden] { display: none; }
+.bb-accion-cab { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.bb-accion-cab b { font: 800 15px var(--bb-titulo); }
+.bb-accion-cab button { border: none; background: rgba(255,255,255,.12); color: #fff; width: 32px; height: 32px; border-radius: 10px; }
+.bb-accion-fila { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.bb-colores { display: flex; gap: 6px; align-items: center; }
+.bb-colores button { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); background: var(--c, transparent); color: #fff; font-size: 13px; padding: 0; }
+.bb-colores button.on { box-shadow: 0 0 0 3px #fff; }
+.bb-btn { border: none; background: rgba(255,255,255,.12); color: #fff; border-radius: 12px; padding: 8px 12px; font-weight: 800; font-size: 13.5px; }
+.bb-btn.on { background: #fff; color: #1F1B33; }
+.bb-btn.bb-prim { background: linear-gradient(135deg, #8B5CF6, #EC4899); margin-left: auto; }
+.bb-pista { font-size: 13px; color: #CFC9EA; justify-content: space-between; }
+.bb-cultos { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; }
+.bb-cultos button { text-align: left; border: 2px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--card); display: flex; flex-direction: column; cursor: pointer; font: inherit; color: var(--ink); }
+.bb-cultos button:hover { border-color: var(--primary); }
+.bb-cultos small { color: var(--muted); font-weight: 700; }
+
+@media (max-width: 640px) {
+  .bb { padding: 12px 12px 20px; border-radius: 18px; margin: 0 -4px; }
+  .bb-portada { grid-template-columns: minmax(0, 1fr); }
+  .bb-ajustes { width: 100%; justify-content: space-between; }
+  .bb-ajustes button { flex: 1; }
+  .bb-sel { flex: 1; }
+  .bb-libros { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
+  .bb-libro b { font-size: 19px; }
+  .bb-verso { grid-template-columns: 32px minmax(0, 1fr); gap: 6px; padding: 6px 6px; }
+  .bb-n { min-width: 26px; height: 26px; font-size: 12px; }
+  .bb-btn { padding: 8px 10px; font-size: 13px; }
+  .bb-btn.bb-prim { margin-left: 0; }
+}

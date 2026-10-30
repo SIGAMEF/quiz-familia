@@ -1,6 +1,6 @@
 // ============================================================
 // Cultos: sección del panel del profesor y del admin (#cultos)
-// 3 pestañas: Cultos · Canciones · Plantillas.
+// 4 pestañas: Cultos · Canciones · Plantillas · Biblia.
 // Rutas: #cultos · #cultos/canciones · #cultos/plantillas (los enlaces viejos #cultos/cancion-<id> abren el editor nuevo)
 // #cultos/culto-<id> edita un culto y #cultos/proyectar-<id> abre la consola (js/cultos/cultos.js y consola.js).
 // Las plantillas se editan en el editor de Proyectos (proyectos.html?plantilla=…).
@@ -12,9 +12,10 @@ import { PLANTILLAS, CATEGORIAS } from './plantillas.js';
 import { FONDOS } from './fondos.js';
 import { pintarCultos, pintarEditorCulto } from './cultos.js';
 import { pintarConsola } from './consola.js';
+import { pintarLectorBiblia } from './lector-biblia.js';
 import { datosCanciones, datosPlantillas } from './datos.js';
 
-const PESTANAS = { cultos: '⛪ Cultos', canciones: '🎵 Canciones', plantillas: '🎨 Plantillas' };
+const PESTANAS = { cultos: '⛪ Cultos', canciones: '🎵 Canciones', plantillas: '🎨 Plantillas', biblia: '📖 Biblia' };
 
 export async function vistaCultos(contenido, { perfil, param = '', datos = datosCanciones, plantillas = datosPlantillas }) {
   // las plantillas propias se necesitan en todas las pestañas (vista previa de las canciones)
@@ -28,6 +29,7 @@ export async function vistaCultos(contenido, { perfil, param = '', datos = datos
   const cuerpo = $('[data-cuerpo]', contenido);
   if (pestana === 'canciones') return pintarBiblioteca(cuerpo, { perfil, datos });
   if (pestana === 'plantillas') return pintarPlantillas(cuerpo, { plantillas });
+  if (pestana === 'biblia') return pintarLectorBiblia(cuerpo);
   if (culto?.[1] === 'culto') return pintarEditorCulto(cuerpo, culto[2], { perfil, canciones: datos });
   if (culto?.[1] === 'proyectar') return pintarConsola(cuerpo, culto[2], { canciones: datos });
   return pintarCultos(cuerpo, { perfil, canciones: datos });
