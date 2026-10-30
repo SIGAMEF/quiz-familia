@@ -2,6 +2,7 @@
 // Cultos: sección del panel del profesor y del admin (#cultos)
 // 3 pestañas: Cultos · Canciones · Plantillas.
 // Rutas: #cultos · #cultos/canciones · #cultos/plantillas (los enlaces viejos #cultos/cancion-<id> abren el editor nuevo)
+// #cultos/culto-<id> edita un culto y #cultos/proyectar-<id> abre la consola (js/cultos/cultos.js y consola.js).
 // Las plantillas se editan en el editor de Proyectos (proyectos.html?plantilla=…).
 // ============================================================
 import { $, $$, esc, toast, confirmar, abrirModal, mensajeError } from '../comun.js';
@@ -9,6 +10,8 @@ import { pintarBiblioteca, plantillaVista, ponerPlantillaVista, urlEditorCancion
 import { pintarPantalla, pintarPortada, prepararFuente, registrarMisPlantillas, misPlantillas } from './diapositivas.js';
 import { PLANTILLAS, CATEGORIAS } from './plantillas.js';
 import { FONDOS } from './fondos.js';
+import { pintarCultos, pintarEditorCulto } from './cultos.js';
+import { pintarConsola } from './consola.js';
 import { datosCanciones, datosPlantillas } from './datos.js';
 
 const PESTANAS = { cultos: '⛪ Cultos', canciones: '🎵 Canciones', plantillas: '🎨 Plantillas' };
@@ -18,29 +21,16 @@ export async function vistaCultos(contenido, { perfil, param = '', datos = datos
   try { registrarMisPlantillas(await plantillas.listar()); } catch (e) { console.warn('No se pudieron cargar tus plantillas', e); }
   if (param.startsWith('cancion-')) { location.replace(urlEditorCancion(param.slice(8))); return; }
   const pestana = PESTANAS[param] ? param : 'cultos';
+  const culto = /^(culto|proyectar)-(.+)$/.exec(param);
   contenido.innerHTML = `<div class="pestanas cu-pestanas" role="tablist">${Object.entries(PESTANAS).map(([k, t]) =>
     `<button role="tab" data-pest="${k}" class="${k === pestana ? 'activo' : ''}" aria-selected="${k === pestana}">${t}</button>`).join('')}</div><div data-cuerpo></div>`;
   $$('[data-pest]', contenido).forEach(b => b.onclick = () => { location.hash = 'cultos/' + b.dataset.pest; });
   const cuerpo = $('[data-cuerpo]', contenido);
   if (pestana === 'canciones') return pintarBiblioteca(cuerpo, { perfil, datos });
   if (pestana === 'plantillas') return pintarPlantillas(cuerpo, { plantillas });
-  return pintarCultos(cuerpo, { datos });
-}
-
-// Fase 1: todavía no se arman cultos; se muestra la guía de 3 pasos
-async function pintarCultos(cuerpo, { datos }) {
-  let n = 0;
-  try { n = (await datos.listar()).filter(c => c.mia).length; } catch { /* la guía se muestra igual */ }
-  const pasos = [
-    { ok: n > 0, txt: 'Agrega canciones', det: n ? `Ya tienes ${n} ${n === 1 ? 'canción' : 'canciones'}.` : 'Pega la letra y se divide sola en pantallas.', ir: 'canciones', boton: n ? 'Ver canciones' : '➕ Agregar' },
-    { ok: false, txt: 'Crea un culto', det: 'Bienvenida, canciones, versículos, avisos y videos en orden. Muy pronto.' },
-    { ok: false, txt: 'Proyecta o comparte', det: 'Proyéctalo en el TV y controla desde el celular, o comparte las letras con los coristas. Muy pronto.' }
-  ];
-  cuerpo.innerHTML = `<div class="card"><h2>🚀 Así se prepara un culto</h2><p class="sub">Tres pasos. Por ahora ya puedes armar tu biblioteca de canciones y tus plantillas.</p>
-    ${pasos.map((p, i) => `<div class="row cu-paso-guia"><span class="badge ${p.ok ? 'green' : i === 0 ? '' : 'gray'}">${p.ok ? '✔' : i + 1}</span>
-      <span class="grow"><b>${esc(p.txt)}</b><br><span class="small muted">${esc(p.det)}</span></span>
-      ${p.ir ? `<button class="btn btn-sm btn-primary" data-ir-pest="${p.ir}">${esc(p.boton)}</button>` : '<span class="badge gray">Próximamente</span>'}</div>`).join('')}</div>`;
-  $$('[data-ir-pest]', cuerpo).forEach(b => b.onclick = () => { location.hash = 'cultos/' + b.dataset.irPest; });
+  if (culto?.[1] === 'culto') return pintarEditorCulto(cuerpo, culto[2], { perfil, canciones: datos });
+  if (culto?.[1] === 'proyectar') return pintarConsola(cuerpo, culto[2], { canciones: datos });
+  return pintarCultos(cuerpo, { perfil, canciones: datos });
 }
 
 // ---------- Plantillas ----------

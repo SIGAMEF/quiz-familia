@@ -168,6 +168,16 @@ cultos           (id, profesor_id, nombre, fecha, plantilla_base, items jsonb,  
 3. **Publicar para coristas + control remoto y pantalla en otro equipo** (Realtime).
 4. **Biblia RV1909** (referencias y búsqueda), sonidos y "Seguir proyección".
 
+**Estado (fases 2, 3 y 4 hechas; falta probarlas con datos reales):**
+
+- **Cultos** (`js/cultos/cultos.js`, tabla `cultos`): lista con el próximo arriba, editor con "+ Agregar aquí", arrastrar, duplicar, "Deshacer" y autoguardado. Elementos (`js/cultos/elementos.js`): canción, versículo, texto, anuncio/imagen, video, cuenta regresiva y **plantilla/diseño** (la portada de una plantilla prediseñada o mía; "✏️ Editar esta plantilla" abre el editor y, al guardar, el culto se actualiza solo por `BroadcastChannel('cultos-plantillas')`).
+- **Biblia** (`js/cultos/biblia.js`, `js/cultos/panel-biblia.js`): Reina-Valera 1909 completa (66 libros, 31 102 versículos) en `datos/biblia/rv1909/NN.json`, un archivo por libro, con caché del navegador. Referencias ("Jn 3:16-18", "1 Co 13:4-7"…), selectores de libro/capítulo/versículos y búsqueda por palabra. La **RVR1960 no se incluye** (derechos de Sociedades Bíblicas Unidas). Se trae de forma legal con la **API oficial de YouVersion** (bible.com, `https://api.youversion.com/v1`): el profesor pega la App Key gratuita de platform.youversion.com, se listan las Biblias en español que YouVersion habilita para esa clave (la RVR1960 se elige sola) y cada versículo se pide en texto plano. No se copian páginas de bible.com. También se puede importar un archivo JSON con permiso (queda en IndexedDB) o pegar el texto a mano.
+- **Proyectar** (`js/cultos/consola.js`, `culto-pantalla.html`): consola + pantalla por `BroadcastChannel` en el mismo equipo; ◀ ▶, negro, logo, limpiar, **⏹ Finalizar** y 🔊 sonido.
+- **Fase 3** (`js/cultos/remoto.js`): 📱 control remoto (`culto-control.html?k=`) y pantalla en otro equipo (`culto-pantalla.html?p=`) por Realtime broadcast con códigos secretos de 32 caracteres; "Cambiar los enlaces" y "Cerrar accesos remotos". 📤 Publicar / Publicar cambios / Despublicar y la página de coristas (`letras.html?c=`), con caché en el celular, tamaño de letra, modo oscuro, pantalla encendida y **📡 Seguir proyección**.
+- **Sonido** (`js/cultos/sonido.js`): ambientes generados con WebAudio que suenan en la consola, siempre empiezan apagados, con volumen. Es uno para todo el culto (no uno por plantilla).
+- **Respaldo si Realtime falla:** la consola guarda lo que está en pantalla (`culto_vivo_poner`) solo si hay pantalla remota o coristas; la pantalla remota (cada 3 s) y los coristas (cada 5 s) preguntan con `culto_vivo(código, versión)` solo mientras Realtime no conecta ("sin cambios" si nada cambió). El control remoto necesita Realtime.
+- **Siguiente:** dar estilos a palabras de los versículos (como los resaltados de las canciones) desde la edición.
+
 Al cerrar cada fase:
 
 - Pruebas SQL y E2E con Playwright: PC con consola + pantalla, celular con control y celular de corista.

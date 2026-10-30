@@ -68,3 +68,55 @@ export const datosPlantillas = {
     if (error) throw error;
   }
 };
+
+// Cultos (tabla cultos): cada profesor los suyos
+const COLS_CULTO = 'id, nombre, fecha, plantilla_base, items, publicado_en, codigo_coristas, codigo_control, codigo_pantalla, created_at, updated_at';
+export const datosCultos = {
+  async listar() {
+    const { data: { session } } = await supabase.auth.getSession();
+    const { data, error } = await supabase.from('cultos').select(COLS_CULTO)
+      .eq('profesor_id', session?.user?.id || '00000000-0000-0000-0000-000000000000')
+      .order('fecha', { ascending: false, nullsFirst: false }).order('updated_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+  async obtener(id) {
+    const { data, error } = await supabase.from('cultos').select(COLS_CULTO).eq('id', id).maybeSingle();
+    if (error) throw error;
+    return data;
+  },
+  async crear(fila) {
+    const { data, error } = await supabase.from('cultos').insert(fila).select(COLS_CULTO).single();
+    if (error) throw error;
+    return data;
+  },
+  async guardar(id, fila) {
+    const { data, error } = await supabase.from('cultos').update(fila).eq('id', id).select(COLS_CULTO).single();
+    if (error) throw sinPermiso(error);
+    return data;
+  },
+  async eliminar(id) {
+    const { error } = await supabase.from('cultos').delete().eq('id', id);
+    if (error) throw error;
+  },
+  // Fase 3: la copia para los coristas y los accesos remotos (sql/12_cultos.sql)
+  async publicar(id, items) {
+    const { data, error } = await supabase.rpc('culto_publicar', { p_culto: id, p_datos: items });
+    if (error) throw error;
+    return data;   // { codigo, publicado_en }
+  },
+  async despublicar(id) {
+    const { error } = await supabase.rpc('culto_despublicar', { p_culto: id });
+    if (error) throw error;
+  },
+  // lo que está en pantalla, para el respaldo por sondeo si Realtime falla
+  async vivoPoner(id, estado) {
+    const { error } = await supabase.rpc('culto_vivo_poner', { p_culto: id, p_estado: estado });
+    if (error) throw error;
+  },
+  async accesos(id, accion = 'ver') {
+    const { data, error } = await supabase.rpc('culto_accesos', { p_culto: id, p_accion: accion });
+    if (error) throw error;
+    return data;   // { control, pantalla }
+  }
+};

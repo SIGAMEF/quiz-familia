@@ -257,12 +257,12 @@ function crearElemento(el, modo, ctx) {
     const emb = urlEmbed(el);
     if (modo === 'ver' && emb) {
       const f = document.createElement('iframe');
-      f.src = emb; f.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media'; f.allowFullscreen = true;
+      f.src = el.auto ? emb + (emb.includes('?') ? '&' : '?') + 'autoplay=1' : emb; f.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media'; f.allowFullscreen = true;
       f.referrerPolicy = 'strict-origin-when-cross-origin'; f.title = 'Video';
       d.appendChild(f);
     } else if (modo === 'ver' && el.fuente === 'mp4' && urlSegura(el.url)) {
       const v = document.createElement('video');
-      v.src = el.url; v.controls = true; v.preload = 'metadata'; v.playsInline = true;
+      v.src = el.url; v.controls = true; v.preload = 'metadata'; v.playsInline = true; v.autoplay = !!el.auto;   // auto: en la proyección de un culto
       d.appendChild(v);
     } else {
       const mini = miniaturaVideo(el);

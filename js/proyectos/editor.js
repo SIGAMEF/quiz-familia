@@ -192,6 +192,7 @@ async function guardar() {
     if (MODO_PL) {
       const r = await datosPlantillas.guardar(plantilla.id, filaPlantilla());
       base = r.updated_at;
+      avisarPlantilla('cambio', r.id);
       if (!sucio) estado('ok', 'Guardado ✓');
       return;
     }
@@ -614,6 +615,10 @@ function cambiarVerPl(v) {
 }
 const filaPlantilla = () => ({ nombre: proyecto.nombre.slice(0, 80), categoria: plantilla.categoria, base: plantilla.base,
   diseno: { fondo: hoja().diseno.fondo, elementos: hoja().diseno.elementos } });
+// Avisa a las otras pestañas (el editor de un culto abierto) que una plantilla se guardó: { t: 'nueva' | 'cambio', id }
+function avisarPlantilla(t, id) {
+  try { const bc = new BroadcastChannel('cultos-plantillas'); bc.postMessage({ t, id }); bc.close(); } catch { /* navegador sin BroadcastChannel */ }
+}
 // Guarda la plantilla como una nueva en "Mis plantillas" (la primera vez, o una copia si ya era mía)
 async function guardarComo() {
   terminarEdicionTexto();
@@ -648,6 +653,7 @@ async function guardarComo() {
     history.replaceState(null, '', '?' + u.toString());
     estado('ok', 'Guardado ✓');
     toast(yaMia ? 'Copia guardada en tus plantillas' : 'Guardada en tus plantillas');
+    avisarPlantilla('nueva', nueva.id);
     pintarPropiedades();
   } catch (e) { estado('error', '⚠️ No se guardó'); toast(mensajeError(e), 'error'); }
 }

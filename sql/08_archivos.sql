@@ -103,6 +103,13 @@ begin
     v := v || x;
   exception when others then null;
   end;
+  begin   -- anuncios, videos y demás elementos de un culto (12_cultos.sql)
+    select coalesce(jsonb_agg(jsonb_build_object('donde', 'culto', 'id', k.id, 'propio', k.profesor_id = auth.uid(),
+             'nombre', case when k.profesor_id = auth.uid() or es_admin() then k.nombre else 'Un culto de otro profesor' end)), '[]'::jsonb) into x
+    from cultos k where strpos(k.items::text, p_ruta) > 0 or strpos(coalesce(k.publicado::text, ''), p_ruta) > 0;
+    v := v || x;
+  exception when others then null;
+  end;
   return v;
 end $$;
 

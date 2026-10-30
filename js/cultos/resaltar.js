@@ -133,17 +133,26 @@ export function pintarLetraRica(cajaTxt, fuente, resaltados, { animar = true, ma
   });
 }
 
-// La letra para los coristas: bloques con su nombre y los resaltados en negrita (sin animación)
-export function htmlLetraCoristas(cancion) {
+// La letra para los coristas como datos: [{ n: 'Coro', coro, l: [{ t: 'línea', r: [[desde, hasta]] }] }]
+// (r: las palabras resaltadas, que se ven en negrita). Es lo que se publica en letras.html.
+export function letraCoristas(cancion) {
   const bloques = cancion?.bloques || [], et = etiquetas(bloques);
-  return bloques.map((b, i) => {
-    const lineas = segmentosDeBloque(b.texto, 'marcar', { conFuente: true }).flat().map(x => {
-      const f = { t: x.t, b: i, l: x.l }, w = palabras(x.t), r = resaltadosDeLinea(f, cancion.resaltados);
-      return `<div>${w.map((p, j) => r.some(g => j >= g.desde && j < g.hasta) ? `<b>${esc(p)}</b>` : esc(p)).join(' ')}</div>`;
-    }).join('');
-    return `<div class="cu-letra-bloque ${b.tipo === 'coro' ? 'coro' : ''}"><b>${esc(et[i].nombre)}</b>${lineas}</div>`;
-  }).join('');
+  return bloques.map((b, i) => ({
+    n: et[i].nombre, coro: b.tipo === 'coro',
+    l: segmentosDeBloque(b.texto, 'marcar', { conFuente: true }).flat().map(x => {
+      const r = resaltadosDeLinea({ t: x.t, b: i, l: x.l }, cancion.resaltados).map(g => [g.desde, g.hasta]);
+      return r.length ? { t: x.t, r } : { t: x.t };
+    })
+  }));
 }
+// La misma letra en HTML (bloques con su nombre y los resaltados en negrita, sin animación)
+export function htmlDeLetra(bloques) {
+  return (bloques || []).map(b => `<div class="cu-letra-bloque ${b.coro ? 'coro' : ''}"><b>${esc(b.n)}</b>${(b.l || []).map(x => {
+    const w = palabras(x.t);
+    return `<div>${w.map((p, j) => (x.r || []).some(([d, h]) => j >= d && j < h) ? `<b>${esc(p)}</b>` : esc(p)).join(' ')}</div>`;
+  }).join('')}</div>`).join('');
+}
+export const htmlLetraCoristas = (cancion) => htmlDeLetra(letraCoristas(cancion));
 
 // ---------- Barra flotante "✨ Resaltar" ----------
 // cont: el escenario del editor; rect: dónde está la selección; texto: las palabras elegidas;

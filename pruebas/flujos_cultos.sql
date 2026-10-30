@@ -1,5 +1,5 @@
 -- =====================================================================
--- PRUEBAS — Cultos, fase 1 (biblioteca de canciones)
+-- PRUEBAS — Cultos, fases 1 a 3 (canciones, plantillas, cultos, publicar para coristas y accesos remotos)
 -- Ejecutar en el SQL Editor de Supabase DESPUÉS de 12 y 06.
 -- Todo ocurre dentro de una transacción que se deshace al final (rollback): no deja datos.
 -- Necesita un profesor activo; con un segundo profesor activo también prueba "Compartir con mi iglesia"
@@ -157,6 +157,138 @@ begin
   delete from public.plantillas_culto where id = pg_temp.id_de('t1');
   get diagnostics n = row_count;
   if n <> 1 then raise exception 'FALLO: el dueño no pudo borrar su plantilla'; end if;
+end $$;
+
+-- ---------- 3b. Cultos: crear, limpiar al guardar, privacidad y límites ----------
+do $$
+declare k record; n int; ok boolean := false;
+begin
+  perform pg_temp.como('prof1');
+  insert into public.cultos (profesor_id, nombre, fecha, plantilla_base, items)
+  values (pg_temp.id_de('prof1'), '  Culto dominical  ', current_date + 3, '  ',
+          jsonb_build_array(jsonb_build_object('id', 'a1', 'tipo', 'cancion', 'cancion', pg_temp.id_de('c1')),
+                            jsonb_build_object('id', 'a2', 'tipo', 'regresiva', 'minutos', 5, 'texto', 'El culto empieza en')))
+  returning * into k;
+  insert into t_ids values ('k1', k.id);
+  if k.nombre <> 'Culto dominical' then raise exception 'FALLO: el nombre del culto no se limpió (%)', k.nombre; end if;
+  if k.plantilla_base <> 'adoracion' then raise exception 'FALLO: la plantilla base vacía no tomó la de defecto (%)', k.plantilla_base; end if;
+  if jsonb_array_length(k.items) <> 2 then raise exception 'FALLO: no se guardaron los elementos del culto'; end if;
+
+  -- el dueño no se puede cambiar al editar
+  update public.cultos set nombre = 'Culto de jóvenes', profesor_id = pg_temp.id_de('otro') where id = k.id returning * into k;
+  if k.profesor_id <> pg_temp.id_de('prof1') then raise exception 'FALLO: se cambió el dueño del culto'; end if;
+  if k.nombre <> 'Culto de jóvenes' then raise exception 'FALLO: el dueño no pudo editar su culto'; end if;
+
+  -- items debe ser una lista
+  begin
+    update public.cultos set items = '{"a":1}'::jsonb where id = k.id;
+  exception when check_violation then ok := true;
+  end;
+  if not ok then raise exception 'FALLO: se aceptó un culto con items que no son una lista'; end if;
+  ok := false;
+  begin
+    insert into public.cultos (profesor_id, nombre) values (pg_temp.id_de('prof1'), '   ');
+  exception when check_violation then ok := true;
+  end;
+  if not ok then raise exception 'FALLO: se aceptó un culto sin nombre'; end if;
+
+  -- otro profesor no lo ve, no lo edita ni lo borra
+  perform pg_temp.como('otro');
+  if exists (select 1 from public.cultos where id = pg_temp.id_de('k1')) then raise exception 'FALLO: otro profesor ve un culto ajeno'; end if;
+  update public.cultos set nombre = 'Hackeado' where id = pg_temp.id_de('k1');
+  get diagnostics n = row_count;
+  if n <> 0 then raise exception 'FALLO: otro profesor editó el culto'; end if;
+  delete from public.cultos where id = pg_temp.id_de('k1');
+  get diagnostics n = row_count;
+  if n <> 0 then raise exception 'FALLO: otro profesor borró el culto'; end if;
+  begin
+    insert into public.cultos (profesor_id, nombre) values (pg_temp.id_de('prof1'), 'Culto ajeno');
+    raise exception 'FALLO: otro profesor creó un culto a nombre de prof1';
+  exception when insufficient_privilege then null;
+  end;
+
+  -- sin sesión no se ve
+  perform set_config('request.jwt.claims', '{"role":"anon"}', true);
+  perform set_config('request.jwt.claim.sub', '', true);
+  if exists (select 1 from public.cultos where id = pg_temp.id_de('k1')) then raise exception 'FALLO: sin sesión se ve un culto'; end if;
+
+  perform pg_temp.como('prof1');
+  delete from public.cultos where id = pg_temp.id_de('k1');
+  get diagnostics n = row_count;
+  if n <> 1 then raise exception 'FALLO: el dueño no pudo borrar su culto'; end if;
+end $$;
+
+-- ---------- 3c. Publicar para coristas y accesos remotos ----------
+do $$
+declare k uuid; r jsonb; cod text; acc jsonb; acc2 jsonb; ok boolean := false;
+begin
+  perform pg_temp.como('prof1');
+  insert into public.cultos (profesor_id, nombre, items, codigo_coristas, publicado)
+  values (pg_temp.id_de('prof1'), 'Culto para publicar', '[]', 'codigo-que-yo-invento-123456789', '[]') returning id into k;
+  if (select codigo_coristas from public.cultos where id = k) is not null then raise exception 'FALLO: se pudo crear un culto con un código escrito a mano'; end if;
+
+  r := public.culto_publicar(k, jsonb_build_array(jsonb_build_object('tipo', 'cancion', 'titulo', 'Santo', 'bloques', '[]'::jsonb)));
+  cod := r->>'codigo';
+  if length(cod) < 24 then raise exception 'FALLO: el código de coristas es corto (%)', cod; end if;
+  -- publicar cambios conserva el enlace
+  r := public.culto_publicar(k, '[]'::jsonb);
+  if r->>'codigo' <> cod then raise exception 'FALLO: publicar cambios cambió el enlace de coristas'; end if;
+  -- el código no se cambia escribiendo en la tabla
+  update public.cultos set codigo_coristas = 'abc', publicado = null where id = k;
+  if (select codigo_coristas from public.cultos where id = k) <> cod or (select publicado from public.cultos where id = k) is null then
+    raise exception 'FALLO: se pudo cambiar el código o lo publicado sin las funciones';
+  end if;
+
+  -- el corista sin sesión lo ve con el código; con otro código, no
+  perform set_config('request.jwt.claims', '{"role":"anon"}', true);
+  perform set_config('request.jwt.claim.sub', '', true);
+  if public.culto_letras(cod) is null then raise exception 'FALLO: el corista no ve el culto publicado'; end if;
+  if public.culto_letras('x') is not null or public.culto_letras(left(cod, 31) || 'z') is not null then raise exception 'FALLO: se ve un culto con un código equivocado'; end if;
+  begin
+    perform public.culto_publicar(k, '[]'::jsonb);
+  exception when others then ok := true;
+  end;
+  if not ok then raise exception 'FALLO: sin sesión se pudo publicar'; end if;
+
+  -- otro profesor no lo publica ni ve sus accesos
+  perform pg_temp.como('otro');
+  ok := false;
+  begin
+    perform public.culto_accesos(k, 'ver');
+  exception when others then ok := true;
+  end;
+  if not ok then raise exception 'FALLO: otro profesor vio los accesos remotos'; end if;
+
+  -- accesos: se crean, se mantienen, se regeneran y se cierran
+  perform pg_temp.como('prof1');
+  acc := public.culto_accesos(k, 'ver');
+  if length(acc->>'control') < 24 or length(acc->>'pantalla') < 24 or acc->>'control' = acc->>'pantalla' then raise exception 'FALLO: códigos remotos inválidos %', acc; end if;
+  if public.culto_accesos(k, 'ver') <> acc then raise exception 'FALLO: "ver" cambió los códigos remotos'; end if;
+  acc2 := public.culto_accesos(k, 'regenerar');
+  if acc2->>'control' = acc->>'control' then raise exception 'FALLO: regenerar no cambió el código de control'; end if;
+  acc2 := public.culto_accesos(k, 'cerrar');
+  if acc2->>'control' is not null or acc2->>'pantalla' is not null then raise exception 'FALLO: cerrar no quitó los accesos remotos'; end if;
+
+  -- respaldo del tiempo real: la pantalla remota lee la hoja; con la misma versión, "sin cambios"
+  acc := public.culto_accesos(k, 'ver');
+  perform public.culto_vivo_poner(k, '{"t":"mostrar","hoja":{"id":"a1-0"},"id":"a1"}'::jsonb);
+  perform set_config('request.jwt.claims', '{"role":"anon"}', true);
+  perform set_config('request.jwt.claim.sub', '', true);
+  r := public.culto_vivo(acc->>'pantalla', 0);
+  if r->'estado'->'hoja'->>'id' <> 'a1-0' then raise exception 'FALLO: la pantalla remota no lee lo que está en vivo (%)', r; end if;
+  if (public.culto_vivo(acc->>'pantalla', (r->>'version')::bigint)->>'sin_cambios') is null then raise exception 'FALLO: sin cambios no responde corto'; end if;
+  if public.culto_vivo(left(cod, 31) || 'z', 0) is not null then raise exception 'FALLO: culto_vivo respondió a un código equivocado'; end if;
+  r := public.culto_vivo(cod, 0);
+  if r->'estado'->>'id' <> 'a1' or r->'estado' ? 'hoja' then raise exception 'FALLO: el corista debe ver solo el elemento en pantalla (%)', r; end if;
+  if public.culto_vivo('x', 0) is not null then raise exception 'FALLO: culto_vivo con un código corto'; end if;
+  perform pg_temp.como('prof1');
+
+  -- despublicar apaga el enlace
+  perform public.culto_despublicar(k);
+  perform set_config('request.jwt.claims', '{"role":"anon"}', true);
+  if public.culto_letras(cod) is not null then raise exception 'FALLO: el enlace sigue funcionando después de despublicar'; end if;
+  perform pg_temp.como('prof1');
+  delete from public.cultos where id = k;
 end $$;
 
 -- ---------- 4. Sin sesión no se ve nada; el dueño la borra ----------

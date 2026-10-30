@@ -89,3 +89,211 @@ select.cu-sel { width: auto; padding: 4px 8px; display: inline-block; font-size:
   .cu-barra .input { min-width: 0; flex-basis: 100%; }
   .cu-barra .btn { width: 100%; }
 }
+
+/* ---------- Cultos: lista y editor (js/cultos/cultos.js) ---------- */
+.cu-proximo { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 18px; align-items: center; }
+.cu-proximo h2 { margin: 6px 0 2px; overflow-wrap: anywhere; }
+.cu-culto-datos { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.4fr); gap: 12px; }
+.cu-culto-datos .lbl { margin-top: 0; }
+.cu-items { display: flex; flex-direction: column; }
+.cu-item { display: flex; align-items: center; gap: 10px; background: var(--card); border: 2px solid var(--line); border-radius: 14px; padding: 8px 10px; transition: border-color .15s, opacity .15s; }
+.cu-item.malo { border-color: var(--red-strong); background: var(--red-bg); }
+.cu-item.arrastra { opacity: .45; }
+.cu-item.sobre { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(124,111,240,.2); }
+.cu-asa { cursor: grab; color: var(--muted); font-size: 18px; user-select: none; }
+.cu-item-n { font-family: 'Baloo 2'; font-size: 18px; color: var(--primary-dark); min-width: 22px; text-align: center; }
+.cu-item-mini { flex: 0 0 150px; padding: 0; border: none; background: none; cursor: pointer; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(60,50,140,.15); }
+.cu-item-info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.cu-item-info h4 { margin: 0; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cu-item-tipo { font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .3px; color: var(--muted); }
+.cu-item-acc { gap: 6px; flex-wrap: nowrap; }
+.cu-agregar { display: block; width: 100%; height: 16px; border: none; background: none; cursor: pointer; position: relative; padding: 0; color: transparent; font: inherit; }
+.cu-agregar::before { content: ''; position: absolute; left: 12px; right: 12px; top: 50%; border-top: 2px dashed transparent; }
+.cu-agregar span { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 12px; font-weight: 800; padding: 1px 10px; border-radius: 20px; white-space: nowrap; }
+.cu-agregar:hover::before, .cu-agregar:focus-visible::before { border-top-color: var(--primary); }
+.cu-agregar:hover span, .cu-agregar:focus-visible span { color: var(--primary-dark); background: var(--primary-light); }
+.cu-agregar-fin { margin-top: 12px; border-style: dashed; }
+.cu-deshacer { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 60; display: flex; gap: 12px; align-items: center; background: var(--ink); color: #fff; padding: 10px 12px 10px 16px; border-radius: 14px; box-shadow: 0 8px 26px rgba(0,0,0,.25); max-width: calc(100vw - 32px); font-weight: 700; font-size: 14px; }
+.cu-deshacer[hidden] { display: none; }
+.cu-deshacer span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+/* Agregar / editar un elemento */
+.cu-tipos-el { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 10px; }
+.cu-tipo-el { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 8px; border: 2px solid var(--line); border-radius: 14px; background: var(--card); cursor: pointer; font: inherit; font-weight: 800; color: var(--ink); }
+.cu-tipo-el span { font-size: 28px; }
+.cu-tipo-el:hover, .cu-tipo-el:focus-visible { border-color: var(--primary); background: var(--primary-soft); }
+.cu-el { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.cu-el-prev { position: sticky; top: 0; }
+.cu-el-prev .lienzo { border-radius: 10px; box-shadow: 0 2px 10px rgba(60,50,140,.15); }
+textarea.cu-el-area { min-height: 160px; }
+.cu-el-canciones { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; margin-top: 8px; border: 2px solid var(--line); border-radius: 12px; padding: 6px; }
+.cu-el-cancion { text-align: left; padding: 7px 10px; border: 2px solid transparent; border-radius: 10px; background: none; cursor: pointer; font: inherit; color: var(--ink); display: flex; flex-direction: column; }
+.cu-el-cancion small { color: var(--muted); font-weight: 600; }
+.cu-el-cancion:hover { background: var(--primary-soft); }
+.cu-el-cancion.sel { border-color: var(--primary); background: var(--primary-light); }
+.cu-el-img { display: block; max-width: 100%; max-height: 160px; border-radius: 10px; border: 2px solid var(--line); }
+
+/* Versículo (js/cultos/panel-biblia.js) y Plantilla / Diseño */
+.cu-biblia-sel { display: grid; grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+.cu-mas { margin-top: 10px; border: 2px solid var(--line); border-radius: 12px; padding: 8px 10px; }
+.cu-mas summary { cursor: pointer; font-weight: 800; font-size: 13.5px; color: var(--primary-dark); }
+.cu-biblia-res { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow-y: auto; margin-top: 8px; }
+.cu-biblia-r { text-align: left; padding: 6px 8px; border: none; border-radius: 8px; background: var(--primary-soft); cursor: pointer; font: inherit; font-size: 13px; color: var(--ink); }
+.cu-biblia-r:hover { background: var(--primary-light); }
+.cu-el-pls { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; max-height: 330px; overflow-y: auto; padding: 3px; }
+.cu-el-pl { padding: 0; border: 3px solid transparent; border-radius: 10px; background: none; cursor: pointer; text-align: left; font: inherit; min-width: 0; }
+.cu-el-pl .lienzo { border-radius: 7px; }
+.cu-el-pl > span { display: block; font-size: 12px; font-weight: 800; color: var(--muted); padding: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cu-el-pl.sel { border-color: var(--primary); }
+
+/* ---------- Consola del operador (js/cultos/consola.js) ---------- */
+.cu-con-cab { gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.cu-con-cab .badge[hidden] { display: none; }
+.cu-con-cab h2 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.cu-con { display: grid; grid-template-columns: minmax(170px, 230px) minmax(0, 1fr) minmax(220px, 340px); gap: 14px; align-items: start; }
+.cu-con-lista { display: flex; flex-direction: column; gap: 4px; max-height: 62vh; overflow-y: auto; }
+.cu-con-el { display: flex; gap: 8px; align-items: center; text-align: left; padding: 8px 10px; border: 2px solid var(--line); border-radius: 12px; background: var(--card); cursor: pointer; font: inherit; color: var(--ink); min-width: 0; }
+.cu-con-el b { display: block; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cu-con-el small { color: var(--muted); font-weight: 700; font-size: 11.5px; }
+.cu-con-el .grow { min-width: 0; }
+.cu-con-ico { font-size: 18px; }
+.cu-con-el.sel { border-color: var(--primary); background: var(--primary-soft); }
+.cu-con-el.aire { box-shadow: inset 4px 0 0 #E5484D; }
+.cu-con-pant { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; max-height: 62vh; overflow-y: auto; padding: 3px; }
+.cu-con-mini { padding: 0; border: 3px solid transparent; border-radius: 10px; background: none; cursor: pointer; text-align: left; font: inherit; min-width: 0; }
+.cu-con-mini .lienzo { border-radius: 7px; }
+.cu-con-mini > span { display: block; font-size: 12px; font-weight: 800; color: var(--muted); padding: 3px 2px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cu-con-mini:hover { border-color: var(--primary-light); }
+.cu-con-mini.aire { border-color: #E5484D; }
+.cu-con-mini.aire > span { color: #E5484D; }
+.cu-con-rot { font-weight: 800; font-size: 13px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cu-con-rot .small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.cu-punto { width: 10px; height: 10px; border-radius: 50%; background: #E5484D; box-shadow: 0 0 0 3px rgba(229,72,77,.25); flex: none; }
+.cu-con-grande .lienzo, .cu-con-sig .lienzo { border-radius: 10px; box-shadow: 0 2px 10px rgba(60,50,140,.2); }
+.cu-con-sig { opacity: .85; }
+.cu-negro { aspect-ratio: 16 / 9; background: #000; color: #777; border-radius: 10px; display: grid; place-items: center; font-weight: 800; font-size: 14px; }
+.cu-con-botones { display: grid; grid-template-columns: 1fr 1.4fr repeat(5, 1fr); gap: 10px; margin-top: 16px; }
+.cu-con-botones .btn { padding: 14px 10px; font-size: 15px; justify-content: center; }
+.cu-con-botones .btn.activo { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+/* ---------- Pantalla de proyección (culto-pantalla.html) ---------- */
+body.cu-pantalla { margin: 0; background: #000; overflow: hidden; height: 100vh; cursor: none; font-family: 'Nunito', system-ui, sans-serif; }
+body.cu-pantalla.activo { cursor: default; }
+.cu-escena { position: fixed; inset: 0; background: #000; }
+.cu-capa { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; transition: opacity .45s ease; }
+.cu-capa.ver { opacity: 1; }
+.cu-capa .lienzo { width: min(100vw, calc(100vh * 16 / 9)); }
+.cu-espera { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #ddd; text-align: center; padding: 24px; }
+.cu-espera[hidden] { display: none; }
+.cu-espera b { font-size: 28px; color: #fff; }
+.cu-espera small { color: #888; }
+.cu-completa { position: fixed; right: 16px; bottom: 16px; z-index: 5; padding: 10px 16px; border: none; border-radius: 12px; background: rgba(255,255,255,.14); color: #fff; font: 800 14px 'Nunito', sans-serif; cursor: pointer; opacity: 0; transition: opacity .3s; backdrop-filter: blur(6px); }
+body.cu-pantalla.activo .cu-completa { opacity: 1; }
+:fullscreen .cu-completa { display: none; }
+
+@media (max-width: 1100px) {
+  .cu-con-botones { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .cu-con-botones [data-sigte] { grid-column: span 2; }
+  .cu-con { grid-template-columns: minmax(150px, 200px) minmax(0, 1fr); }
+  .cu-con-vivo { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 4px 14px; }
+  .cu-con-vivo .cu-rot-sig { grid-row: 1; grid-column: 2; margin-top: 0 !important; }
+  .cu-con-vivo .cu-con-sig { grid-row: 2; grid-column: 2; }
+}
+@media (max-width: 760px) {
+  .cu-proximo { grid-template-columns: minmax(0, 1fr); }
+  .cu-culto-datos { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .cu-culto-datos .lbl { margin-top: 10px; }
+  .cu-el { grid-template-columns: minmax(0, 1fr); }
+  .cu-el-prev { position: static; order: -1; }
+  .cu-con { grid-template-columns: minmax(0, 1fr); }
+  .cu-con-lista { flex-direction: row; overflow-x: auto; max-height: none; padding-bottom: 4px; }
+  .cu-con-el { flex: 0 0 170px; }
+  .cu-con-pant { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: none; }
+  .cu-con-botones { grid-template-columns: 1fr 1fr; }
+  .cu-con-botones [data-sigte] { grid-column: 2; grid-row: 1; }
+  .cu-con-botones [data-modo] { padding: 10px 6px; font-size: 13.5px; }
+  .cu-con-botones [data-modo="limpio"], .cu-con-botones [data-sonido], .cu-con-botones [data-fin] { padding: 10px 6px; font-size: 13.5px; }
+  .cu-con-botones [data-fin] { grid-column: 1 / -1; }
+  .cu-solo-ancho { display: none; }
+  .cu-con-cab h2 { flex-basis: 100%; order: -1; font-size: 20px; }
+  .cu-con-cab .grow { flex-grow: 0; }
+}
+@media (max-width: 560px) {
+  .cu-item { flex-wrap: wrap; gap: 8px; padding: 8px; }
+  .cu-item-mini { flex: 1 1 100%; order: 5; }
+  .cu-item-info { flex: 1 1 0; }
+  .cu-asa { display: none; }
+  .cu-tipos-el { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cu-biblia-sel { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .cu-biblia-sel [data-libro] { grid-column: 1 / -1; }
+}
+
+/* ---------- Fase 3: accesos remotos, sonido y enlace de coristas ---------- */
+.cu-remoto { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: 6px; }
+.cu-remoto-caja { border: 2px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 6px; align-items: center; text-align: center; }
+.cu-qr { display: inline-block; padding: 8px; background: #fff; border-radius: 10px; margin: 6px 0; }
+.cu-qr img, .cu-qr canvas { display: block; max-width: 100%; height: auto; }
+.cu-sonido { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-top: 10px; padding: 10px 14px; border: 2px solid var(--line); border-radius: 14px; background: var(--card); }
+.cu-sonido[hidden] { display: none; }
+.cu-sonido select { width: auto; display: inline-block; padding: 4px 8px; font-size: 13px; }
+.cu-sonido input[type=range] { width: 100%; max-width: 260px; vertical-align: middle; }
+.cu-con-botones [data-sonido].activo { background: var(--green-bg); color: var(--green); border-color: var(--green-bg); }
+
+/* ---------- Control remoto en el celular (culto-control.html) ---------- */
+body.cr { background: #14121F; color: #F4F2FF; min-height: 100vh; margin: 0; padding: 12px 14px calc(16px + env(safe-area-inset-bottom)); font-family: 'Nunito', system-ui, sans-serif; }
+.cr-espera { min-height: 80vh; display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; text-align: center; padding: 20px; color: #CFCBE6; }
+.cr-espera b { font-size: 24px; color: #fff; }
+.cr-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+.cr-cab b { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cr-ok { color: #4ADE80; font-size: 12.5px; font-weight: 800; white-space: nowrap; }
+.cr-ahora { background: #221F33; border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+.cr-ahora small { color: #A9A3C7; font-weight: 700; }
+.cr-ahora b { font-size: 16px; overflow-wrap: anywhere; }
+.cr-botones { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+.cr-botones .btn { justify-content: center; padding: 14px 6px; font-size: 15px; grid-column: span 2; }
+.cr-botones [data-a="ant"], .cr-botones [data-a="sig"] { grid-column: span 3; padding: 26px 6px; font-size: 18px; }
+.cr-botones .btn.activo { background: #fff; color: #14121F; }
+.cr-lista { display: flex; flex-direction: column; gap: 6px; }
+.cr-el { background: #221F33; border-radius: 12px; border: 2px solid transparent; overflow: hidden; }
+.cr-el.aire { border-color: #E5484D; }
+.cr-el-cab { width: 100%; display: flex; gap: 8px; align-items: center; padding: 10px 12px; background: none; border: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.cr-el-cab b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cr-el-cab small { color: #A9A3C7; font-weight: 800; }
+.cr-pant { display: flex; flex-direction: column; gap: 4px; padding: 0 8px 8px; }
+.cr-pant button { text-align: left; padding: 9px 10px; border-radius: 9px; border: none; background: #2E2A45; color: #E9E6FA; font: inherit; font-size: 14px; cursor: pointer; }
+.cr-pant button.aire { background: #E5484D; color: #fff; font-weight: 800; }
+
+/* ---------- Letras para coristas (letras.html) ---------- */
+body.le { --le-fondo: #FFFFFF; --le-tinta: #1E1B2E; --le-suave: #6E6890; --le-caja: #F3F1FB; --le-linea: #E6E2F5;
+  margin: 0; background: var(--le-fondo); color: var(--le-tinta); min-height: 100vh; font-family: 'Nunito', system-ui, sans-serif; }
+body.le.oscuro { --le-fondo: #14121F; --le-tinta: #F4F2FF; --le-suave: #A9A3C7; --le-caja: #221F33; --le-linea: #2E2A45; }
+.le-aviso { min-height: 80vh; display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; text-align: center; padding: 24px; color: var(--le-suave); }
+.le-aviso b { font-size: 22px; color: var(--le-tinta); }
+.le-cab { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--le-fondo); border-bottom: 1px solid var(--le-linea); }
+.le-cab > div:first-of-type { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.le-cab b { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.le-cab small { color: var(--le-suave); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.le-volver { border: none; background: var(--le-caja); color: var(--le-tinta); width: 38px; height: 38px; border-radius: 10px; font-size: 18px; cursor: pointer; flex: none; }
+.le-barra { display: flex; gap: 4px; flex: none; }
+.le-barra button { border: none; background: var(--le-caja); color: var(--le-tinta); min-width: 36px; height: 36px; border-radius: 10px; font: 800 13px 'Nunito', sans-serif; cursor: pointer; padding: 0 6px; }
+.le-barra button.activo { background: #E5484D; color: #fff; }
+.le-nota { margin: 10px 14px 0; font-size: 13px; font-weight: 700; color: var(--le-suave); }
+.le-nota.vivo { color: #E5484D; }
+.le-lista { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px 30px; }
+.le-item { display: flex; align-items: center; gap: 12px; padding: 12px; border: 2px solid transparent; border-radius: 14px; background: var(--le-caja); color: var(--le-tinta); font: inherit; text-align: left; cursor: pointer; }
+.le-item.vivo { border-color: #E5484D; }
+.le-n { font-family: 'Baloo 2'; font-size: 20px; color: var(--le-suave); min-width: 24px; text-align: center; }
+.le-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.le-t b { font-size: 16px; }
+.le-t small { color: var(--le-suave); font-weight: 700; }
+.le-vivo { color: #E5484D; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.le-letra { padding: 14px 16px 100px; line-height: 1.5; }
+.le-letra .cu-letra-bloque { margin-bottom: 1.1em; font-weight: 600; }
+.le-letra .cu-letra-bloque > b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--le-suave); margin-bottom: 2px; }
+.le-letra .cu-letra-bloque.coro { border-left: 4px solid #8B7CF6; padding-left: 12px; font-weight: 800; }
+.le-letra .cu-letra-bloque div b { color: #8B7CF6; }
+.le-pie { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 8px; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); background: var(--le-fondo); border-top: 1px solid var(--le-linea); }
+.le-pie button { flex: 1; padding: 12px; border: none; border-radius: 12px; background: var(--le-caja); color: var(--le-tinta); font: 800 15px 'Nunito', sans-serif; cursor: pointer; }
+.le-pie button:disabled { opacity: .4; }
+.le-toast { position: fixed; left: 50%; bottom: 80px; transform: translateX(-50%); background: #1E1B2E; color: #fff; padding: 10px 14px; border-radius: 12px; font-weight: 700; font-size: 14px; max-width: calc(100vw - 32px); z-index: 20; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
+.le-toast[hidden] { display: none; }
