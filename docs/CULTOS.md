@@ -181,8 +181,30 @@ cultos           (id, profesor_id, nombre, fecha, plantilla_base, items jsonb,  
 - **Palabras botón al proyectar:** entran con un salto y luego flotan, laten, rebotan o brillan (`MOVIMIENTOS_BOTON`, `.rs-boton` en `css/proyectos.css`); en el editor quedan quietas.
 - **Palabras botón (datos):** estilo de resaltado `modo: 'boton'` (`js/cultos/resaltar.js`); los versículos de un culto guardan `resaltados` ({ l, p, n, texto }) y se editan tocando palabras en el formulario del versículo.
 
+
+## 12. Pendiente
+
+**Para activar (lo hace el usuario en Supabase, una vez):**
+
+- [ ] Ejecutar `sql/12_cultos.sql`, luego `sql/08_archivos.sql` y al final `sql/06_permisos.sql`.
+- [ ] Ejecutar `pruebas/flujos_cultos.sql` y confirmar "TODAS LAS PRUEBAS DE CULTOS PASARON" (no se pudo correr aquí: sin acceso a la base).
+- [ ] Probar con datos reales: armar un culto, publicarlo para coristas en un celular, proyectar y usar el control remoto desde otro celular.
+
+**Mejoras pendientes:**
+
+- [ ] **Marcas de la Biblia en la nube:** hoy los colores y las palabras botón del lector quedan solo en el navegador (`localStorage`). Guardarlas en Supabase para verlas en todos los equipos del profesor.
+- [ ] **Clave de YouVersion por profesor o institución:** hoy queda en el navegador (`localStorage`); en otro equipo hay que pegarla otra vez. Opción: guardarla en el perfil o en la institución.
+- [ ] **YouVersion más rápido:** cada versículo es un pedido (un capítulo largo como el Salmo 119 tarda). Probar si la API devuelve el capítulo entero con los números de versículo y usar eso.
+- [ ] **Búsqueda por palabra en YouVersion:** hoy se busca en la RV1909 y al abrir se lee en la versión elegida.
+- [ ] **Proyección suelta con control remoto:** hoy una canción, plantilla o Biblia proyectada sin culto no tiene 📱 control remoto (los códigos viven en un culto guardado). Opción: un "culto rápido" temporal guardado.
+- [ ] **El control remoto sin Realtime:** la pantalla remota y los coristas tienen respaldo por sondeo; el celular de control no (necesita Realtime).
+- [ ] **Sonido por plantilla:** hoy el ambiente es uno para toda la proyección y suena en la consola; la especificación pedía un sonido opcional por plantilla.
+- [ ] **Videos:** si el navegador bloquea el inicio automático, hay que hacer clic en la pantalla; agregar ▶/⏸ del video en la consola.
+- [ ] **Coristas:** versículos y canciones se publican; los demás elementos (avisos, textos) no salen en `letras.html`.
+- [ ] **Palabras botón en las canciones desde el formulario rápido:** en las canciones se aplican con la barra "✨ Resaltar" del editor (preset 🔘 Botón); el movimiento se elige solo al proyectar la Biblia (en canciones queda "flotar").
+
 Al cerrar cada fase:
 
 - Pruebas SQL y E2E con Playwright: PC con consola + pantalla, celular con control y celular de corista.
 - Revisar en 390 px que no haya desbordes.
-- **No hacer push** hasta que el usuario lo pruebe.
+- Hacer push solo cuando el usuario lo pida.
