@@ -2,8 +2,8 @@
 // Cultos: control remoto en el celular (culto-control.html?k=<código de control>)
 // No necesita sesión: el código largo y secreto es la llave. Se conecta a la consola por Realtime
 // (canal cc-<código>) y muestra lo que la consola le manda:
-//   consola → celular: { t: 'estado', nombre, els: [{ t, ico, p: [etiquetas] }], i, j, modo, sig } · { t: 'fin' }
-//   celular → consola: { t: 'hola' } · { t: 'cmd', a: 'sig' | 'ant' | 'negro' | 'logo' | 'limpio' | 'ir', i, j }
+//   consola → celular: { t: 'estado', nombre, els: [{ t, ico, p: [etiquetas] }], i, j, modo, sig, video } · { t: 'fin' }
+//   celular → consola: { t: 'hola' } · { t: 'cmd', a: 'sig' | 'ant' | 'negro' | 'logo' | 'limpio' | 'ir' | 'play' | 'pausa' | 'inicio', i, j }
 // ============================================================
 import { esc } from '../comun.js';
 import { abrirCanal, pantallaEncendida } from './remoto.js';
@@ -49,6 +49,7 @@ else {
         <button class="btn ${est.modo === 'negro' ? 'activo' : ''}" data-a="negro">⬛ Negro</button>
         <button class="btn ${est.modo === 'logo' ? 'activo' : ''}" data-a="logo">🖼 Logo</button>
         <button class="btn ${est.modo === 'limpio' ? 'activo' : ''}" data-a="limpio">🧹 Limpiar</button></div>
+      ${est.video ? `<div class="cr-video"><button class="btn" data-a="play">▶ Video</button><button class="btn" data-a="pausa">⏸ Pausa</button><button class="btn" data-a="inicio">⏮ Inicio</button></div>` : ''}
       <div class="cr-lista">${(est.els || []).map((x, k) => `<div class="cr-el ${k === est.i && est.modo !== 'logo' ? 'aire' : ''}">
           <button class="cr-el-cab" data-el="${k}"><span>${x.ico || ''}</span><b>${esc(x.t)}</b><small>${(x.p || []).length}</small></button>
           ${k === abierto ? `<div class="cr-pant">${(x.p || []).map((p, j) => `<button class="${k === est.i && j === est.j && est.modo !== 'logo' ? 'aire' : ''}" data-i="${k}" data-j="${j}">${j + 1}. ${esc(p)}</button>`).join('')}</div>` : ''}

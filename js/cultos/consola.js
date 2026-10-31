@@ -4,7 +4,9 @@
 // - Las dos ventanas están en el mismo equipo y se hablan por BroadcastChannel (sin pasar por Supabase):
 //     consola → pantalla: { t: 'mostrar', hoja, inicio }   la hoja ya armada (null = negro); inicio: reloj
 //     consola → pantalla: { t: 'fin' }   "Finalizar": la pantalla se pone en negro y se cierra
-//     pantalla → consola: { t: 'hola' } al abrir, { t: 'adios' } al cerrar, { t: 'tecla', k } (clicker)
+//     consola → pantalla: { t: 'video', a: 'play' | 'pausa' | 'inicio' }   ▶/⏸ del video en pantalla
+//     pantalla → consola: { t: 'hola' } al abrir, { t: 'adios' } al cerrar, { t: 'tecla', k } (clicker),
+//                         { t: 'video-mudo' } (el navegador no dejó empezar el video con sonido)
 // - En otros equipos (Fase 3) se usan canales de Realtime con códigos secretos (js/cultos/remoto.js):
 //   la pantalla remota recibe los mismos mensajes; el celular de control recibe { t: 'estado' } y manda
 //   { t: 'cmd' }; los coristas reciben { t: 'vivo', id } (el elemento en pantalla) para "Seguir proyección".
@@ -78,6 +80,9 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
       <aside class="cu-con-vivo">
         <div class="cu-con-rot"><span class="cu-punto"></span> En pantalla <span class="small muted" data-que></span></div>
         <div class="cu-con-grande" data-vivo></div>
+        <div class="cu-con-video" data-video hidden>
+          <button class="btn btn-sm" data-v="play">▶ Reproducir</button><button class="btn btn-sm" data-v="pausa">⏸ Pausa</button>
+          <button class="btn btn-sm" data-v="inicio" title="Volver al inicio del video">⏮ Desde el inicio</button></div>
         <div class="cu-con-rot cu-rot-sig" style="margin-top:12px;">Siguiente <span class="small muted" data-que-sig></span></div>
         <div class="cu-con-sig" data-sig></div></aside>
     </div>
@@ -93,7 +98,7 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
       <label class="small"><b>Ambiente</b> <select class="input" data-ambiente>${Object.entries(AMBIENTES).map(([k, a]) => `<option value="${k}">${esc(a.nombre)}</option>`).join('')}</select></label>
       <label class="small grow"><b>Volumen</b> <input type="range" min="0" max="100" value="50" data-vol></label>
       <span class="small muted">Suena en este equipo. Empieza siempre apagado.</span></div>
-    <p class="hint cu-solo-ancho" style="text-align:center;">Teclado: ← → o espacio para avanzar · B negro · L logo · C limpiar texto. La pantalla se pone en pantalla completa con F11 o con su botón.</p>
+    <p class="hint cu-solo-ancho" style="text-align:center;">Teclado: ← → o espacio para avanzar · B negro · L logo · C limpiar texto · P / K reproducir o pausar un video. La pantalla se pone en pantalla completa con F11 o con su botón.</p>
   </div>`;
 
   // ---------- conexión con la pantalla ----------
@@ -108,7 +113,8 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
   // ---------- equipos remotos (Realtime) ----------
   const rem = { cc: null, cp: null, cv: null, vivo: undefined, pantalla: false, control: false };
   const etiquetaSig = () => { const s = siguiente(est.i, est.j); return s ? `${elementos[s.i].titulo} · ${elementos[s.i].hojas[s.j].etiqueta || ''}` : ''; };
-  const enviarEstado = () => rem.cc?.enviar({ t: 'estado', nombre: culto.nombre, i: est.i, j: est.j, modo: est.modo, sig: est.modo === 'normal' ? etiquetaSig() : '',
+  const hayVideo = () => !!hojaActual()?.video;
+  const enviarEstado = () => rem.cc?.enviar({ t: 'estado', nombre: culto.nombre, i: est.i, j: est.j, modo: est.modo, sig: est.modo === 'normal' ? etiquetaSig() : '', video: hayVideo(),
     els: elementos.map(e => ({ t: e.titulo, ico: TIPOS_ELEMENTO[e.it.tipo]?.ico || '', p: e.hojas.map(h => h.etiqueta || '') })) });
   const enviarVivo = (forzar = false) => {
     const id = est.modo !== 'logo' && est.enAire ? elementos[est.i]?.it.id || null : null;
@@ -138,6 +144,7 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
         if (m.t === 'hola') { rem.pantalla = true; rem.cp.enviar(mensajeHoja()); }
         else if (m.t === 'adios') rem.pantalla = false;
         else if (m.t === 'tecla') tecla({ key: m.k, preventDefault() {} });
+        else if (m.t === 'video-mudo') avisoMudo();
         pintarRemota();
       }
     });
@@ -150,7 +157,16 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
     else if (m.a === 'ant') avanzar(-1);
     else if (['negro', 'logo', 'limpio'].includes(m.a)) modo(m.a);
     else if (m.a === 'ir' && elementos[m.i]?.hojas[m.j]) ir(m.i, m.j);
+    else if (['play', 'pausa', 'inicio'].includes(m.a)) video(m.a);
   }
+  // ▶/⏸ del video en pantalla (no queda guardado para el respaldo por sondeo)
+  function video(a) {
+    if (!hayVideo()) return;
+    const msg = { t: 'video', a };
+    try { bc?.postMessage(msg); } catch { /* la pantalla está cerrada */ }
+    rem.cp?.enviar(msg);
+  }
+  const avisoMudo = debounce(() => toast('El video empezó sin sonido: el navegador de la pantalla pide un clic. Haz un clic en la ventana de la pantalla.', 'error'), 300);
   // respaldo por sondeo (si en otro equipo Realtime no conecta): se guarda lo que está en pantalla,
   // solo si hay pantalla remota o coristas
   const guardarVivo = debounce((msg) => {
@@ -176,6 +192,7 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
     if (m.t === 'hola') { est.conectada = true; pintarConexion(); enviar(); }
     else if (m.t === 'adios') { est.conectada = false; pintarConexion(); }
     else if (m.t === 'tecla') tecla({ key: m.k, preventDefault() {} });
+    else if (m.t === 'video-mudo') avisoMudo();
   };
   bc?.postMessage({ t: 'quien' });   // si la pantalla ya estaba abierta, responde "hola"
 
@@ -215,6 +232,7 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
     if (s) { pintarHoja(sc, elementos[s.i].hojas[s.j], { modo: 'miniatura' }); $('[data-que-sig]', cuerpo).textContent = `· ${elementos[s.i].titulo} · ${elementos[s.i].hojas[s.j].etiqueta || ''}`; }
     else { sc.innerHTML = '<div class="cu-negro">Fin del culto</div>'; $('[data-que-sig]', cuerpo).textContent = ''; }
     $$('[data-modo]', cuerpo).forEach(b => b.classList.toggle('activo', b.dataset.modo === est.modo));
+    $('[data-video]', cuerpo).hidden = !hayVideo();
   }
   const pintarTodo = () => { if (!cuerpo.isConnected) return; pintarLista(); pintarCentro(); pintarVivo(); };
 
@@ -249,6 +267,7 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
   $('[data-ant]', cuerpo).onclick = () => avanzar(-1);
   $('[data-sigte]', cuerpo).onclick = () => avanzar(1);
   $$('[data-modo]', cuerpo).forEach(b => b.onclick = () => modo(b.dataset.modo));
+  $$('[data-v]', cuerpo).forEach(b => b.onclick = () => video(b.dataset.v));
   $('[data-abrir]', cuerpo).onclick = () => abrirPantalla(culto.id);
   $('[data-fin]', cuerpo).onclick = async () => {
     if (!await confirmar('La pantalla se pondrá en negro y se cerrará.', { titulo: '¿Finalizar la proyección?', boton: '⏹ Finalizar', peligro: false })) return;
@@ -270,6 +289,8 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
     else if (/^[b.]$/i.test(k)) modo('negro');
     else if (/^l$/i.test(k)) modo('logo');
     else if (/^c$/i.test(k)) modo('limpio');
+    else if (/^p$/i.test(k)) video('play');
+    else if (/^k$/i.test(k)) video('pausa');
   }
   function limpiar() {
     document.removeEventListener('keydown', tecla);

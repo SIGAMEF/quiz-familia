@@ -257,12 +257,14 @@ function crearElemento(el, modo, ctx) {
     const emb = urlEmbed(el);
     if (modo === 'ver' && emb) {
       const f = document.createElement('iframe');
-      f.src = el.auto ? emb + (emb.includes('?') ? '&' : '?') + 'autoplay=1' : emb; f.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media'; f.allowFullscreen = true;
-      f.referrerPolicy = 'strict-origin-when-cross-origin'; f.title = 'Video';
+      // auto (proyección de un culto): empieza solo y acepta ▶/⏸ de la consola por postMessage (enablejsapi en YouTube)
+      f.src = el.auto ? emb + (emb.includes('?') ? '&' : '?') + 'autoplay=1' + (el.fuente === 'youtube' ? '&enablejsapi=1' : '') : emb;
+      f.allow = 'autoplay; fullscreen; picture-in-picture; encrypted-media'; f.allowFullscreen = true;
+      f.referrerPolicy = 'strict-origin-when-cross-origin'; f.title = 'Video'; f.dataset.fuente = el.fuente;
       d.appendChild(f);
     } else if (modo === 'ver' && el.fuente === 'mp4' && urlSegura(el.url)) {
       const v = document.createElement('video');
-      v.src = el.url; v.controls = true; v.preload = 'metadata'; v.playsInline = true; v.autoplay = !!el.auto;   // auto: en la proyección de un culto
+      v.src = el.url; v.controls = !el.auto; v.preload = 'metadata'; v.playsInline = true; v.autoplay = !!el.auto;   // auto: en la proyección de un culto (se maneja desde la consola)
       d.appendChild(v);
     } else {
       const mini = miniaturaVideo(el);
