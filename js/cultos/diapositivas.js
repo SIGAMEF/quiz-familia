@@ -25,10 +25,24 @@ export function plantillaDe(id) {
 }
 export const existePlantilla = (id) => mias.has(id) || !!plantillaIncluida(id);
 const zonaLetra = (p) => hojaDePlantilla(p).diseno.elementos.find(e => e.vinculo === 'letra');
-// La letra elegida para toda una canción (cancion.opciones.letra = { fuente, peso, efecto }) sobre la zona de la plantilla
+// La letra elegida para una canción (cancion.opciones.letra) o para una estrofa (cancion.opciones.letraEstrofas[bloque]),
+// sobre la zona de la letra de la plantilla:
+//   { fuente, peso, efecto, color, escala (tamaño base: × el máximo de la plantilla), mayus, interlineado, alinear, sombra }
+// efecto: null = sin efecto (aunque la plantilla tenga uno); sin la clave = el de la plantilla.
+export const CAMPOS_LETRA = ['fuente', 'peso', 'efecto', 'color', 'escala', 'mayus', 'interlineado', 'alinear', 'sombra'];
 export function zonaConLetra(z, letra) {
   if (!z || !letra) return z;
-  return { ...z, ...(letra.fuente ? { fuente: letra.fuente } : {}), ...(letra.peso ? { peso: letra.peso } : {}), ...(letra.efecto ? { efecto: letra.efecto } : {}) };
+  const r = { ...z };
+  for (const k of CAMPOS_LETRA) if (k in letra && k !== 'escala') r[k] = letra[k];
+  if (letra.efecto === null) delete r.efecto;
+  const esc = Number(letra.escala);
+  if (esc && esc !== 1) r.tam = Math.max(1.5, Math.min(16, (Number(z.tam) || 5.4) * Math.max(0.5, Math.min(1.6, esc))));
+  return r;
+}
+// La letra de una pantalla: la de la canción y, encima, la de su estrofa
+export function letraDePantalla(c, bloque) {
+  const g = c?.opciones?.letra, e = bloque != null ? c?.opciones?.letraEstrofas?.[bloque] : null;
+  return g || e ? { ...(g || {}), ...(e || {}) } : null;
 }
 
 // La hoja de una pantalla de letra, con el tamaño de letra ajustado
@@ -108,14 +122,15 @@ export function hojasDeCancion(c) {
   const base = hojaDePlantilla(plantillaDe(id)).diseno;
   return diapositivas(c).map(d => {
     const det = c.detalles?.[d.clave] || {};
-    const a = ajustar(id, d.fuente, c.resaltados, c.opciones?.letra);
+    const letra = letraDePantalla(c, d.bloque);
+    const a = ajustar(id, d.fuente, c.resaltados, letra);
     return {
       id: d.clave, tipo: 'contenido', config: {}, info: d, ver: 'letra', resaltados: c.resaltados || [], chico: a.chico,
       textos: { fuente: d.fuente, pie: `${c.titulo || 'Canción'} · ${d.nombre}`, partir: a.partir, chico: a.chico },
       diseno: {
         fondo: det.fondo || base.fondo,
         elementos: [
-          ...base.elementos.filter(e => !e.en || e.en === 'letra').map(e => ({ ...e, bloqueado: true, ...(e.vinculo === 'letra' ? { ...zonaConLetra(e, c.opciones?.letra), tam: a.tam } : {}) })),
+          ...base.elementos.filter(e => !e.en || e.en === 'letra').map(e => ({ ...e, bloqueado: true, ...(e.vinculo === 'letra' ? { ...zonaConLetra(e, letra), tam: a.tam } : {}) })),
           ...(Array.isArray(det.el) ? det.el : [])
         ]
       }

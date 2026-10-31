@@ -36,7 +36,7 @@ alter table public.canciones drop constraint if exists canciones_orden_check;
 alter table public.canciones add constraint canciones_orden_check
   check (orden_canto is null or (jsonb_typeof(orden_canto) = 'array' and jsonb_array_length(orden_canto) <= 80));
 alter table public.canciones drop constraint if exists canciones_opciones_check;
-alter table public.canciones add constraint canciones_opciones_check check (jsonb_typeof(opciones) = 'object' and pg_column_size(opciones) < 2000);
+alter table public.canciones add constraint canciones_opciones_check check (jsonb_typeof(opciones) = 'object' and pg_column_size(opciones) < 20000);   -- con la letra de la canción y de cada estrofa (opciones.letra, opciones.letraEstrofas)
 -- Palabras resaltadas (ancladas al texto: estrofa, línea y palabra) y detalles de cada pantalla
 -- (objetos, emojis, imágenes o textos extra de una pantalla concreta: { "C1-2-1": { el: [...], fondo } })
 alter table public.canciones add column if not exists resaltados jsonb not null default '[]'::jsonb;

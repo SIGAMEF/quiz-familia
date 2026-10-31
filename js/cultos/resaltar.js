@@ -3,7 +3,7 @@
 // - Cada resaltado está anclado al texto (estrofa, línea y palabra; ver letra.js → ubicarResaltados).
 // - pintarLetraRica(): dibuja la letra de una pantalla con sus palabras resaltadas (lienzo, proyección).
 // - htmlLetraCoristas(): la letra limpia para el celular de los coristas (resaltados en negrita, sin animación).
-// - abrirBarraResaltar(): la barra flotante "✨ Resaltar" del editor.
+// - montarResaltar(): "✨ Resaltar" en el panel derecho del editor; abrirMenuResaltar(): el menú corto del clic derecho.
 // ============================================================
 import { $, $$, esc } from '../comun.js';
 import { fuenteValida, cargarFuente, colorValido, aplicarCartel } from '../proyectos/recursos.js';
@@ -170,30 +170,24 @@ export function htmlDeLetra(bloques) {
 }
 export const htmlLetraCoristas = (cancion) => htmlDeLetra(letraCoristas(cancion));
 
-// ---------- Barra flotante "✨ Resaltar" ----------
-// cont: el escenario del editor; rect: dónde está la selección; texto: las palabras elegidas;
-// actual: el resaltado que se edita (o null); alCambiar(estilo, todas) / alQuitar() / alCerrar()
-let barraAbierta = null, verModelos = false;
-export function cerrarBarraResaltar() { barraAbierta?.cerrar(); }
-export function abrirBarraResaltar({ cont, rect, texto, actual = null, fuentePlantilla = 'Nunito', alCambiar, alQuitar, alCerrar }) {
-  cerrarBarraResaltar();
-  let estilo = { ...(actual?.estilo || {}) }, todas = !!actual?.todas, abierta = !!actual;
-  const b = document.createElement('div');
-  b.className = 'rs-barra';
-  b.setAttribute('role', 'dialog');
-  b.setAttribute('aria-label', 'Resaltar palabras');
-  cont.appendChild(b);
+// ---------- ✨ Resaltar: en el panel derecho del editor (no flota) ----------
+// cont: la sección del panel; texto: las palabras elegidas; actual: el resaltado que se edita (o null);
+// alCambiar(estilo, todas) / alQuitar() / alCerrar() (✕: deja de resaltar y el panel vuelve a la canción)
+let verModelos = false;
+export function montarResaltar(cont, { texto, actual = null, fuentePlantilla = 'Nunito', alCambiar, alQuitar, alCerrar }) {
+  let estilo = { ...(actual?.estilo || {}) }, todas = !!actual?.todas;
+  const b = cont;
+  b.classList.add('rs-panel');
   const cambiar = (cambios) => { estilo = { ...estilo, ...cambios }; for (const k of Object.keys(estilo)) if (estilo[k] === '' || estilo[k] == null) delete estilo[k]; alCambiar({ ...estilo }, todas); pintar(); };
   const pintar = () => {
     const pal = todasPaletas(), colores = coloresDe(estilo);
     b.innerHTML = `<div class="rs-cab"><b>✨ Resaltar</b><span class="rs-que" title="${esc(texto)}">«${esc(texto)}»</span>
-        <button type="button" class="btn btn-sm btn-ghost btn-icon" data-cerrar aria-label="Cerrar">✕</button></div>
+        <button type="button" class="btn btn-sm btn-ghost btn-icon" data-cerrar aria-label="Terminar de resaltar" title="Terminar (Esc)">✕</button></div>
       <div class="rs-presets">${PRESETS.map(([k, t]) => `<button type="button" class="chip" data-pre="${k}">${t}</button>`).join('')}</div>
-      <details class="ml-det" data-det-mod ${verModelos ? 'open' : ''}><summary>🔤 Letras de cartel</summary><div data-modelos></div></details>
-      <button type="button" class="btn btn-sm btn-ghost rs-mas" data-mas aria-expanded="${abierta}">${abierta ? '▾ Menos opciones' : '▸ Más opciones'}</button>
-      <div class="rs-opciones" ${abierta ? '' : 'hidden'}>
+      <details class="ml-det" data-det-mod ${verModelos ? 'open' : ''}><summary>🔤 Modelos de letras</summary><div data-modelos></div></details>
+      <div class="rs-opciones">
         <div class="prop-fila"><label>Tamaño</label><input type="range" min="1" max="2" step="0.1" data-escala value="${num(estilo.escala, 1, 1, 2)}"><b data-ver-escala>×${num(estilo.escala, 1, 1, 2).toFixed(1)}</b></div>
-        <div class="prop-fila"><label>Fuente</label><select class="input" data-fuente><option value="">La de la plantilla (${esc(fuentePlantilla)})</option>${opcionesFuentes(estilo.fuente)}</select></div>
+        <div class="prop-fila"><label>Fuente</label><select class="input" data-fuente><option value="">La de la letra (${esc(fuentePlantilla)})</option>${opcionesFuentes(estilo.fuente)}</select></div>
         <div class="grupo-btn rs-modos">${[['', 'Normal'], ['color', 'Color'], ['degradado', 'Degradado'], ['multicolor', 'Multicolor'], ['cartel', 'Cartel']].map(([k, t]) => `<button type="button" class="btn btn-sm btn-outline ${(estilo.modo || '') === k ? 'activo' : ''}" data-modo="${k}">${t}</button>`).join('')}</div>
         ${estilo.modo === 'color' ? `<div class="prop-fila"><label>Color</label><input type="color" data-c="color" value="${colorValido(estilo.color, '#FFFFFF').slice(0, 7)}"></div>` : ''}
         ${estilo.modo === 'degradado' ? `<div class="prop-fila"><label>Colores</label><input type="color" data-c="color" value="${colorValido(estilo.color, '#22D3EE').slice(0, 7)}"><input type="color" data-c="color2" value="${colorValido(estilo.color2, '#F472B6').slice(0, 7)}"></div>` : ''}
@@ -211,15 +205,15 @@ export function abrirBarraResaltar({ cont, rect, texto, actual = null, fuentePla
         <label class="check small" style="margin-top:6px;"><input type="checkbox" data-todas ${todas ? 'checked' : ''}> Aplicar en todas las veces que se repite</label>
         ${actual || Object.keys(estilo).length ? '<button type="button" class="btn btn-sm btn-red btn-block" data-quitar style="margin-top:8px;">Quitar resaltado</button>' : ''}
       </div>`;
-    $('[data-cerrar]', b).onclick = () => cerrar();
+    $('[data-cerrar]', b).onclick = () => alCerrar?.();
     $$('[data-pre]', b).forEach(x => x.onclick = () => {
       const p = PRESETS.find(y => y[0] === x.dataset.pre)[2];
       cambiar({ ...p, ...(p.paleta ? { colores: undefined } : {}) });
     });
-    // 🔤 letras de cartel: el modelo se aplica a las palabras elegidas
+    // 🔤 modelos de letras: el modelo se aplica a las palabras elegidas
     const detMod = $('[data-det-mod]', b);
     const pintarMod = () => { if (detMod.open && !$('[data-modelos]', b).childElementCount) pintarModelos($('[data-modelos]', b), (id, m) => cambiar({ ...resaltadoDeModelo(m), peso: m.peso || '', color: '', color2: '', paleta: '', colores: '' })); };
-    detMod.ontoggle = () => { verModelos = detMod.open; pintarMod(); colocar(); };
+    detMod.ontoggle = () => { verModelos = detMod.open; pintarMod(); };
     pintarMod();
     selectConFuentes($('[data-fuente]', b));
     const cartel = $('[data-cartel]', b);
@@ -227,7 +221,6 @@ export function abrirBarraResaltar({ cont, rect, texto, actual = null, fuentePla
       if (final) cambiar({ cartel: nuevo });
       else { estilo = { ...estilo, cartel: nuevo }; alCambiar({ ...estilo }, todas); }
     });
-    $('[data-mas]', b).onclick = () => { abierta = !abierta; pintar(); };
     const esc_ = $('[data-escala]', b);
     esc_.oninput = () => { $('[data-ver-escala]', b).textContent = '×' + Number(esc_.value).toFixed(1); };
     esc_.onchange = () => cambiar({ escala: Number(esc_.value) === 1 ? '' : Number(esc_.value) });
@@ -250,23 +243,55 @@ export function abrirBarraResaltar({ cont, rect, texto, actual = null, fuentePla
     $$('[data-vel]', b).forEach(x => x.onclick = () => cambiar({ vel: x.dataset.vel === 'normal' ? '' : x.dataset.vel }));
     $('[data-todas]', b).onchange = (e) => { todas = e.target.checked; if (Object.keys(estilo).length) alCambiar({ ...estilo }, todas); };
     const q = $('[data-quitar]', b);
-    if (q) q.onclick = () => { alQuitar?.(); cerrar(); };
-    colocar();
+    if (q) q.onclick = () => { alQuitar?.(); alCerrar?.(); };
   };
-  // junto a la selección (en el celular, abajo como hoja)
-  const colocar = () => {
-    if (matchMedia('(max-width: 860px)').matches) { b.classList.add('abajo'); return; }
-    const c = cont.getBoundingClientRect(), w = b.offsetWidth, h = b.offsetHeight;
-    let x = rect.left - c.left + rect.width / 2 - w / 2, y = rect.bottom - c.top + 10;
-    if (y + h > c.height - 8) y = Math.max(8, rect.top - c.top - h - 10);
-    b.style.left = Math.max(8, Math.min(x, c.width - w - 8)) + 'px';
-    b.style.top = Math.max(8, Math.min(y, c.height - h - 8)) + 'px';
-  };
-  const tecla = (e) => { if (e.key === 'Escape') cerrar(); };
-  const cerrar = () => { if (!b.isConnected) return; b.remove(); document.removeEventListener('keydown', tecla); barraAbierta = null; alCerrar?.(); };
-  document.addEventListener('keydown', tecla);
-  b.addEventListener('pointerdown', (e) => e.stopPropagation());
   pintar();
-  barraAbierta = { cerrar, el: b };
-  return barraAbierta;
+}
+
+// ---------- Menú contextual corto (clic derecho o toque largo sobre las palabras) ----------
+// x, y: dónde (px de la ventana); hay: ya hay un resaltado; todas: se aplica en las repeticiones;
+// alResaltar() (lleva al panel derecho), alEstilo(estilo) (Más grande, Latido o Multicolor), alQuitar(), alTodas(bool)
+const MENU_RAPIDO = [['grande', '🔠 Más grande'], ['latido', '❤️ Latido'], ['multicolor', '🌈 Multicolor']];
+let menuAbierto = null;
+export function cerrarMenuResaltar() { menuAbierto?.cerrar(); }
+export function abrirMenuResaltar({ x, y, texto = '', hay = false, todas = false, alResaltar, alEstilo, alQuitar, alTodas }) {
+  cerrarMenuResaltar();
+  const m = document.createElement('div');
+  m.className = 'rs-menu';
+  m.setAttribute('role', 'menu');
+  m.setAttribute('aria-label', 'Resaltar «' + texto + '»');
+  m.innerHTML = `${texto ? `<div class="rs-menu-que" title="${esc(texto)}">«${esc(texto)}»</div>` : ''}
+    <button type="button" role="menuitem" data-m="resaltar">✨ Resaltar…</button>
+    ${MENU_RAPIDO.map(([k, t]) => `<button type="button" role="menuitem" data-m="${k}">${t}</button>`).join('')}
+    ${hay ? '<button type="button" role="menuitem" data-m="quitar" class="peligro">🧹 Quitar resaltado</button>' : ''}
+    <hr><label class="rs-menu-todas"><input type="checkbox" data-todas ${todas ? 'checked' : ''}> Aplicar en todas las repeticiones</label>`;
+  document.body.appendChild(m);
+  // dentro de la ventana
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.max(6, Math.min(x, innerWidth - w - 6)) + 'px';
+  m.style.top = Math.max(6, Math.min(y, innerHeight - h - 6)) + 'px';
+  const cerrar = () => {
+    if (!m.isConnected) return;
+    m.remove(); menuAbierto = null;
+    document.removeEventListener('keydown', tecla, true);
+    document.removeEventListener('pointerdown', fuera, true);
+    removeEventListener('blur', cerrar); removeEventListener('resize', cerrar);
+  };
+  const tecla = (e) => { if (e.key === 'Escape') { e.stopPropagation(); cerrar(); } };
+  const fuera = (e) => { if (!m.contains(e.target)) cerrar(); };
+  document.addEventListener('keydown', tecla, true);
+  setTimeout(() => document.addEventListener('pointerdown', fuera, true), 0);
+  addEventListener('blur', cerrar); addEventListener('resize', cerrar);
+  m.addEventListener('contextmenu', (e) => e.preventDefault());
+  $$('[data-m]', m).forEach(b => b.onclick = () => {
+    const k = b.dataset.m;
+    cerrar();
+    if (k === 'resaltar') alResaltar?.();
+    else if (k === 'quitar') alQuitar?.();
+    else alEstilo?.({ ...PRESETS.find(p => p[0] === k)[2] });
+  });
+  $('[data-todas]', m).onchange = (e) => alTodas?.(e.target.checked);
+  $('[data-m]', m).focus();
+  menuAbierto = { cerrar, el: m };
+  return menuAbierto;
 }

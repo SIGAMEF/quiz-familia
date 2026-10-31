@@ -309,6 +309,8 @@ textarea.part-campo { min-height: 30cqw; resize: none; }
   .ed[data-movil="izq"] .ed-izq, .ed[data-movil="der"] .ed-der { transform: none; }
   .ed-centro { grid-row: 2; }
   .escenario { padding: 10px; }
+  .ed.resaltando .escenario { place-items: start center; }   /* mientras se resalta, la letra queda arriba, sin taparse con el panel */
+  .ed.resaltando[data-movil="der"] .ed-der { max-height: 52vh; }
   .tira { padding: 8px; }
   .mini-hoja { width: 96px; }
   .mini-hoja .mas-op { display: block; }
@@ -698,8 +700,6 @@ body.ritmo-pag { background: linear-gradient(160deg, #8B7EF7, #6C5CE7); min-heig
 .izq-tabs button.activo { border-color: var(--primary); background: var(--primary-light); color: var(--primary-dark); }
 
 /* barra flotante ✨ Resaltar */
-.rs-barra { position: absolute; z-index: 40; width: 340px; max-height: calc(100% - 16px); overflow-y: auto; background: #fff; border-radius: 14px; box-shadow: 0 14px 40px rgba(40,30,90,.28); padding: 10px 12px; font-size: 13px; }
-.rs-barra.abajo { position: fixed; left: 8px; right: 8px; bottom: 64px; top: auto !important; width: auto; max-height: 55vh; }
 .rs-cab { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .rs-que { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-weight: 700; }
 .rs-presets { display: flex; flex-wrap: wrap; gap: 5px; }
@@ -767,8 +767,8 @@ textarea.pl-area { min-height: 220px; font-size: 13px; line-height: 1.45; }
 .ml-cartel .prop-fila label { display: inline-flex; align-items: center; gap: 4px; }
 .ml-colores { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .ml-cartel input[type="range"] { flex: 1; min-width: 80px; }
-.rs-barra .ml-grid { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); max-height: 220px; overflow-y: auto; }
-.rs-barra .ml-abc { font-size: 24px; }
+.rs-panel .ml-grid { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); max-height: 260px; overflow-y: auto; }
+.rs-panel .ml-abc { font-size: 24px; }
 
 /* ---------- Panel Fondo: categorías, ⬆ Subir fondo y Mis fondos (js/proyectos/subir-fondo.js) ---------- */
 .fondo-panel { border: 2px dashed transparent; border-radius: 12px; margin: -4px; padding: 4px; transition: border-color .15s, background .15s; }
@@ -779,3 +779,24 @@ textarea.pl-area { min-height: 220px; font-size: 13px; line-height: 1.45; }
 .fondos-anim .fondo-capa img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .fondos-anim .fondo-play { position: absolute; top: 4px; right: 4px; font-style: normal; font-size: 10px; color: #fff; background: rgba(0,0,0,.55); border-radius: 6px; padding: 1px 5px; }
 .fondo-video-info { display: flex; flex-direction: column; gap: 2px; padding: 10px; margin-bottom: 4px; }
+
+/* ---------- ✨ Resaltar en el panel derecho y menú del clic derecho (js/cultos/resaltar.js) ---------- */
+.rs-panel { font-size: 13px; padding-top: 2px; }
+.rs-panel .rs-cab { justify-content: flex-end; margin: -6px 0 6px; }
+.rs-panel .rs-cab b, .rs-panel .rs-que { display: none; }   /* el título ya está en la sección */
+.rs-sec > summary b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.rs-sec[open] { border-color: var(--primary); }
+.lienzo .pe-letra .w.w-sel { background: rgba(124, 111, 240, .35); outline: .12em solid rgba(124, 111, 240, .9); border-radius: .15em; }
+.rs-menu { position: fixed; z-index: 1000; min-width: 220px; max-width: calc(100vw - 12px); background: #fff; border-radius: 12px; box-shadow: 0 12px 34px rgba(40,30,90,.3); padding: 6px; font-size: 14px; display: flex; flex-direction: column; }
+.rs-menu-que { padding: 4px 8px 6px; color: var(--muted); font-weight: 800; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+.rs-menu button { border: none; background: none; text-align: left; padding: 8px 10px; border-radius: 8px; font: inherit; font-weight: 700; color: var(--ink); cursor: pointer; }
+.rs-menu button:hover, .rs-menu button:focus-visible { background: var(--primary-soft, #F0EEFF); outline: none; }
+.rs-menu button.peligro { color: #DC2626; }
+.rs-menu hr { border: none; border-top: 1px solid var(--line); margin: 4px 2px; }
+.rs-menu-todas { display: flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.lt-destino { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 4px; }
+.lt-prev { margin: 6px 0 8px; padding: 8px 10px; border-radius: 10px; background: #1E1B2E; color: #fff; font-size: 20px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* en el celular, tocar las palabras las elige (sin la selección del sistema; el toque largo abre el menú) */
+@media (pointer: coarse) {
+  .ed-centro .pe[data-vinculo="letra"] .pe-txt { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+}

@@ -11,7 +11,7 @@ import {
   pintarHoja, pintarHojaMovil, pintarCelular, pintarFondo, repintarElemento, colocar, posMovil, leerVideo, miniaturaVideo, MODOS_FONDO, EFECTOS_TEXTO
 } from './lienzo.js';
 import {
-  fuenteValida, COLORES, DEGRADADOS, cssDegradado, PATRONES, estiloFondo, FORMAS, EMOJIS, PLANTILLAS,
+  fuenteValida, cargarFuente, COLORES, DEGRADADOS, cssDegradado, PATRONES, estiloFondo, FORMAS, EMOJIS, PLANTILLAS,
   cargarIconos, nodosIcono, ICONOS_ES, ICONOS_POPULARES, colorValido, urlSegura
 } from './recursos.js';
 import { opcionesFuentes, selectConFuentes, pintarModelos, pintarFuentes, efectoDeModelo, htmlCartel, enlazarCartel } from './letras-ui.js';
@@ -25,16 +25,16 @@ import { configJuego, infoJuego, UNIDAD, TIEMPOS_JUEGO } from './juego-hoja.js';
 import { elegirActividad, TIPOS_JUEGO_CATALOGO, ACTIVIDADES } from '../catalogo.js';
 import { abrirEditor } from '../editor-juegos.js';
 import { problemas, revisar, necesitaUnirse, esRegistro, agruparAntes, registroAntes, registroDeRuleta } from './revision.js';
-import { plantillaIncluida, PLANTILLA_BLANCO, CATEGORIAS } from '../cultos/plantillas.js';
+import { plantillaIncluida, PLANTILLA_BLANCO, CATEGORIAS, hojaDePlantilla as hojaDePlantillaCulto } from '../cultos/plantillas.js';
 import { datosPlantillas } from '../cultos/datos.js';
 import { colorBase, FONDOS, CATEGORIAS_FONDO, parametros, montarFondoAnimado } from '../cultos/fondos.js';
 import { ACEPTA_FONDO, subirFondo, tipoDeFondo } from './subir-fondo.js';
 import { datosCanciones } from '../cultos/datos.js';
 import { OPCIONES_DEFECTO, ordenNormal, ubicarResaltados, lineasDeContenido, palabras, etiquetas } from '../cultos/letra.js';
-import { hojasDeCancion, plantillaDeCancion, plantillaDe, registrarMisPlantillas, misPlantillas, prepararFuente, pintarPantalla, existePlantilla } from '../cultos/diapositivas.js';
+import { hojasDeCancion, plantillaDeCancion, plantillaDe, registrarMisPlantillas, misPlantillas, prepararFuente, pintarPantalla, existePlantilla, zonaConLetra, letraDePantalla } from '../cultos/diapositivas.js';
 import { PLANTILLAS as PLANTILLAS_CULTO, PLANTILLA_DEFECTO } from '../cultos/plantillas.js';
 import { montarPanelLetra } from '../cultos/panel-letra.js';
-import { abrirBarraResaltar, cerrarBarraResaltar } from '../cultos/resaltar.js';
+import { montarResaltar, abrirMenuResaltar, cerrarMenuResaltar } from '../cultos/resaltar.js';
 import { buscarObjetos, SVG as SVG_OBJ, ANIMACIONES, ANIMACIONES_TEXTO, EMOJIS_LLUVIA, VELOCIDADES } from '../cultos/objetos.js';
 
 const raiz = $('#raiz');
@@ -67,6 +67,7 @@ const NOMBRE_EN = { portada: 'Solo portada', letra: 'Solo con letra' };
 // Canción: los datos, el panel de la letra, la pestaña izquierda y la estrofa elegida
 let cancion = null, panelLetra = null, tabIzq = 'letra', bloqueSel = -1, verPlantillas = false, verLetra = false;
 let catFondo = null;   // la categoría de fondos que se ve en el panel Fondo
+let letraDestino = 'cancion';   // 🔤 Letra: 'cancion' (toda la canción) o 'estrofa' (solo la estrofa de la pantalla)
 // Nombres de los colores de los fondos animados (los demás se muestran con su nombre: Cielo, Madera…)
 const NOMBRES_COLOR = { base: 'Fondo', colores: 'Luces', c1: 'Color 1', c2: 'Color 2' };
 
@@ -826,6 +827,7 @@ function pintarLienzo() {
     capa.className = 'capa-sel';
     marco.appendChild(capa);
     pintarSeleccion();
+    if (MODO_CAN) marcarPalabras();   // las palabras elegidas para resaltar
     return;
   }
   // Celular: el teléfono y, al lado, un aviso grande que explica qué se puede hacer aquí
@@ -1723,7 +1725,11 @@ function pintarPropiedades() {
   if (h.id !== hojaAntes) { pestanaDer = 'tipo'; hojaAntes = h.id; selAntes = null; }
   if (selId && selId !== selAntes) pestanaDer = 'diseno';
   selAntes = selId;
-  if (MODO_CAN) return el ? pintarPropsElemento(p, el) : pintarPropsCancion(p);
+  if (MODO_CAN) {
+    if (el) resaltando = null;
+    $('.ed')?.classList.toggle('resaltando', !!resaltando);
+    return el ? pintarPropsElemento(p, el) : pintarPropsCancion(p);
+  }
   if (!interactiva(h.tipo)) return el ? pintarPropsElemento(p, el) : pintarPropsHoja(p);
   const nombre = esPregunta(h.tipo) ? '❓ Pregunta' : { agrupar: '👥 Agrupar', unirse: '📲 Unirse', ruleta: '🎡 Ruleta', juego: '🎮 Juego' }[h.tipo];
   p.innerHTML = `<div class="der-tabs" role="tablist">
@@ -2484,8 +2490,8 @@ function montarCancion() {
   nom.oninput = () => { cancion.titulo = nom.value; proyecto.nombre = nom.value; panelLetra?.ponerTitulo(nom.value); document.title = `${nom.value || 'Canción nueva'} · Canción`; cambioCancion({ demorarHistorial: true }); };
   $('[data-deshacer]').onclick = () => moverHist(-1);
   $('[data-rehacer]').onclick = () => moverHist(1);
-  $('[data-animar]').onclick = () => { animarEd = !animarEd; $('[data-animar]').classList.toggle('activo', animarEd); cerrarBarraResaltar(); pintarLienzo(); };
-  $('[data-presentar]').onclick = () => { if (!hoja().info) return toast('Primero pega la letra', 'error'); cerrarBarraResaltar(); presentar(hojas, { inicio: actual, alSalir: (i) => irAHoja(i) }); };
+  $('[data-animar]').onclick = () => { animarEd = !animarEd; $('[data-animar]').classList.toggle('activo', animarEd); cerrarMenuResaltar(); pintarLienzo(); };
+  $('[data-presentar]').onclick = () => { if (!hoja().info) return toast('Primero pega la letra', 'error'); cerrarMenuResaltar(); presentar(hojas, { inicio: actual, alSalir: (i) => irAHoja(i) }); };
   $('[data-estado]').onclick = () => { if (!conflicto && sucio) guardar(); };
   // en el celular: Letra y Recursos son dos pestañas de abajo que abren el mismo panel
   $$('[data-tab]').forEach(b => b.onclick = () => {
@@ -2556,7 +2562,7 @@ function pintarTiraCancion(tira) {
   hojas.forEach((_, i) => pintarMini(i));
   $$('.mini-hoja', tira).forEach(m => {
     const i = +m.dataset.i;
-    m.onclick = () => { cerrarBarraResaltar(); irAHoja(i); };
+    m.onclick = () => { cerrarMenuResaltar(); irAHoja(i); };
     m.onkeydown = (e) => { if (e.target === m && e.key === 'Enter') irAHoja(i); };
   });
 }
@@ -2568,20 +2574,41 @@ function pintarPropsCancion(p) {
   const det = h.diseno.elementos.filter(e => !e.bloqueado);
   const fondoPropio = d && JSON.stringify(h.diseno.fondo) !== fondoPlantilla();
   const hermanas = d ? hojas.filter(x => x.info?.bloque === d.bloque && x !== h).length : 0;
-  const letra = cancion.opciones.letra || {};
-  const zonaPl = (pl.diseno?.elementos || pl.elementos || []).find(e => e.vinculo === 'letra');
-  p.innerHTML = `<details class="pl-plantilla" data-det-pl ${verPlantillas ? 'open' : ''}><summary class="panel-cab" style="cursor:pointer;"><b>🎨 Plantilla: ${esc(pl.nombre)}</b><span class="grow"></span><span class="small muted">Cambiar ▾</span></summary>
+  // 🔤 la letra: la de la canción (opciones.letra) o la de esta estrofa (opciones.letraEstrofas[bloque]); efectiva: lo que se ve
+  if (!d) letraDestino = 'cancion';
+  const zonaPl = (pl.diseno?.elementos || pl.elementos || []).find(e => e.vinculo === 'letra') || {};
+  const letra = (letraDestino === 'estrofa' ? cancion.opciones.letraEstrofas?.[d.bloque] : cancion.opciones.letra) || {};
+  const efectiva = zonaConLetra(zonaPl, letraDePantalla(cancion, d?.bloque)) || {};
+  const hayLetra = !!(cancion.opciones.letra || (d && cancion.opciones.letraEstrofas?.[d.bloque]));
+  const efSel = !('efecto' in letra) && !('sombra' in letra) ? '' : letra.efecto?.tipo === 'cartel' ? 'cartel'
+    : letra.efecto?.tipo || (letra.sombra ? 'sombra' : 'ninguno');
+  p.innerHTML = `<details class="pl-plantilla rs-sec" data-sec-resaltar ${resaltando ? 'open' : ''}><summary class="panel-cab" style="cursor:pointer;"><b>✨ Resaltar${resaltando ? ` «${esc(textoAnclas(resaltando.anclas))}»` : ''}</b></summary>
+      <div data-resaltar></div></details>
+    <details class="pl-plantilla" data-det-pl ${verPlantillas ? 'open' : ''}><summary class="panel-cab" style="cursor:pointer;"><b>🎨 Plantilla: ${esc(pl.nombre)}</b><span class="grow"></span><span class="small muted">Cambiar ▾</span></summary>
       <div class="pl-plantillas" data-pls></div>
       <p class="hint"><a href="${VOLVER.replace('#cultos/canciones', '#cultos/plantillas')}">🎨 Ver y editar plantillas</a></p></details>
-    <details class="pl-plantilla" data-det-letra ${verLetra ? 'open' : ''}><summary class="panel-cab" style="cursor:pointer;"><b>🔤 Letra: ${esc(letra.fuente || 'la de la plantilla')}</b><span class="grow"></span><span class="small muted">Cambiar ▾</span></summary>
-      <p class="hint" style="margin-top:0;">Para toda la canción. Para unas palabras, selecciónalas en la pantalla (✨ Resaltar).</p>
-      <label class="lbl">Fuente</label><select class="input" data-letra-fuente><option value="">La de la plantilla (${esc(zonaPl?.fuente || 'Nunito')})</option>${opcionesFuentes(letra.fuente)}</select>
+    <details class="pl-plantilla lt-letra" data-det-letra ${verLetra ? 'open' : ''}><summary class="panel-cab" style="cursor:pointer;"><b>🔤 Letra de toda la canción</b><span class="grow"></span><span class="small muted">${esc(fuenteValida(efectiva.fuente))} ▾</span></summary>
+      ${d ? `<div class="lt-destino"><span class="small muted">Aplicar a:</span><div class="grupo-btn">
+        <button type="button" class="btn btn-sm btn-outline ${letraDestino === 'cancion' ? 'activo' : ''}" data-destino="cancion">Esta canción</button>
+        <button type="button" class="btn btn-sm btn-outline ${letraDestino === 'estrofa' ? 'activo' : ''}" data-destino="estrofa">Solo ${esc(d.nombre)}</button></div></div>` : ''}
+      <label class="lbl">Fuente</label><select class="input" data-letra-fuente><option value="">La de la plantilla (${esc(fuenteValida(zonaPl.fuente))})</option>${opcionesFuentes(letra.fuente)}</select>
+      <div class="lt-prev" data-letra-prev style="font-family:'${esc(fuenteValida(efectiva.fuente))}', sans-serif; font-weight:${Number(efectiva.peso) || (efectiva.negrita ? 800 : 400)};${efectiva.mayus ? ' text-transform:uppercase;' : ''}">Te alabaré con todo mi ser</div>
+      <div class="prop-fila"><label>Tamaño</label><input type="range" min="0.6" max="1.4" step="0.05" data-letra-n="escala" value="${Number(letra.escala) || 1}"><b data-ver-n="escala">×${(Number(letra.escala) || 1).toFixed(2)}</b></div>
+      <div class="prop-fila"><label>Color</label><input type="color" data-letra-color value="${colorValido(efectiva.color, '#FFFFFF').slice(0, 7)}">
+        ${'color' in letra ? '<button type="button" class="btn btn-sm btn-ghost btn-icon" data-letra-sin="color" title="El color de la plantilla">↺</button>' : ''}</div>
+      <div class="prop-fila"><label>Sombra o contorno</label><select class="input" data-letra-efecto>${[['', 'La de la plantilla'], ['ninguno', 'Ninguno'], ['sombra', 'Sombra suave'], ['solida', 'Sombra sólida'], ['contorno', 'Contorno'], ['brillo', 'Brillo'], ...(efSel === 'cartel' ? [['cartel', 'Letra de cartel (modelo)']] : [])]
+        .map(([k, t]) => `<option value="${k}" ${efSel === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
+        ${['solida', 'contorno', 'brillo'].includes(efSel) ? `<input type="color" data-letra-efcolor value="${colorValido(letra.efecto?.color, '#000000').slice(0, 7)}">` : ''}</div>
+      <div class="prop-fila"><label>Interlínea</label><input type="range" min="0.8" max="2" step="0.05" data-letra-n="interlineado" value="${Number(efectiva.interlineado) || 1.15}"><b data-ver-n="interlineado">${(Number(efectiva.interlineado) || 1.15).toFixed(2)}</b></div>
+      <div class="grupo-btn" style="margin-bottom:8px;">${[['left', '⯇'], ['center', '≡'], ['right', '⯈']].map(([k, t]) => `<button type="button" class="btn btn-sm btn-outline ${(efectiva.alinear || 'center') === k ? 'activo' : ''}" data-letra-alinear="${k}" title="Alinear ${k === 'left' ? 'a la izquierda' : k === 'right' ? 'a la derecha' : 'al centro'}">${t}</button>`).join('')}
+        <button type="button" class="btn btn-sm btn-outline ${efectiva.mayus ? 'activo' : ''}" data-letra-mayus title="Todo en mayúsculas">AA</button></div>
       <label class="lbl">Modelos de letras</label><div data-letra-modelos></div>
-      ${letra.efecto?.tipo === 'cartel' ? `<label class="lbl">Colores de la letra</label><div data-letra-cartel>${htmlCartel(letra.efecto)}</div>` : ''}
-      ${letra.fuente || letra.efecto ? '<button class="btn btn-sm btn-block btn-ghost" data-letra-quitar style="margin-top:8px;">↺ Volver a la letra de la plantilla</button>' : ''}</details>
+      ${letra.efecto?.tipo === 'cartel' ? `<label class="lbl">Colores del modelo</label><div data-letra-cartel>${htmlCartel(letra.efecto)}</div>` : ''}
+      <p class="hint">Las palabras resaltadas mantienen su propio estilo encima.</p>
+      <button type="button" class="btn btn-sm btn-block" data-letra-plantilla>💾 Guardar en mi plantilla</button>
+      ${hayLetra ? '<button type="button" class="btn btn-sm btn-block btn-ghost" data-letra-quitar style="margin-top:4px;">↺ Volver al estilo de la plantilla</button>' : ''}</details>
     <div class="panel-cab" style="margin-top:8px;"><b>${d ? `Pantalla ${actual + 1} de ${hojas.length}` : 'Sin pantallas'}</b><span class="grow"></span>${d ? `<span class="badge">${esc(d.codigo)} · ${esc(d.nombre)}</span>` : ''}</div>
-    ${d ? `<p class="hint" style="margin-top:0;">✨ <b>Para resaltar</b>, selecciona una o varias palabras de la letra en la pantalla.</p>
-    <h4>Detalles de esta pantalla (${det.length})</h4>
+    ${d ? `<h4>Detalles de esta pantalla (${det.length})</h4>
     <div class="capas">${det.slice().reverse().map(e => `<button data-elegir="${e.id}">${e.tipo === 'emoji' ? esc(e.emoji || '😀') : ICO_EL[e.tipo] || '•'}
       <span>${esc(e.tipo === 'texto' ? (e.texto || '').slice(0, 40) || '(texto vacío)' : NOMBRE_EL[e.tipo] || e.tipo)}</span></button>`).join('') || '<p class="hint">Agrega objetos, emojis, imágenes o un texto desde <b>➕ Recursos</b>: solo saldrán en esta pantalla.</p>'}</div>
     ${det.length || fondoPropio ? `${hermanas ? `<button class="btn btn-sm btn-block" data-copiar-det style="margin-top:8px;">📋 Copiar estos detalles a las demás pantallas de ${esc(d.codigo)} (${hermanas})</button>` : ''}
@@ -2610,30 +2637,69 @@ function pintarPropsCancion(p) {
   };
   detPl.ontoggle = () => { verPlantillas = detPl.open; pintarPls(); };
   pintarPls();
-  // 🔤 la letra de toda la canción: cancion.opciones.letra = { fuente, peso, efecto }
+  // ✨ Resaltar (arriba): las opciones de las palabras elegidas
+  seccionResaltar($('[data-resaltar]', p));
+  // 🔤 la letra de toda la canción (o de esta estrofa)
   const detLetra = $('[data-det-letra]', p);
-  const ponerLetra = async (nueva) => {
-    for (const k of Object.keys(nueva)) if (!nueva[k]) delete nueva[k];
-    if (Object.keys(nueva).length) cancion.opciones.letra = nueva; else delete cancion.opciones.letra;
+  const ponerLetra = async (nueva, { demorar = false } = {}) => {
+    for (const k of Object.keys(nueva)) if (nueva[k] === undefined || nueva[k] === '') delete nueva[k];   // null y false sí valen
+    const vacia = !Object.keys(nueva).length;
+    if (letraDestino === 'estrofa' && d) {
+      const m = { ...(cancion.opciones.letraEstrofas || {}) };
+      if (vacia) delete m[d.bloque]; else m[d.bloque] = nueva;
+      if (Object.keys(m).length) cancion.opciones.letraEstrofas = m; else delete cancion.opciones.letraEstrofas;
+    } else if (vacia) delete cancion.opciones.letra;
+    else cancion.opciones.letra = nueva;
     if (nueva.fuente) await prepararFuente('fuente:' + nueva.fuente);   // para medir con la letra real
-    cambioCancion();
+    if (JSON.stringify(cancion.opciones).length > 15000) toast('Hay muchos estilos por estrofa: quizá no se pueda guardar. Usa “Esta canción” o quita algunos.', 'error');
+    cambioCancion({ demorarHistorial: demorar });
   };
   const pintarLetraOps = () => {
     if (!detLetra.open || $('[data-letra-modelos]', p).childElementCount) return;
-    pintarModelos($('[data-letra-modelos]', p), (id, m) => ponerLetra({ fuente: m.fuente, peso: m.peso, efecto: efectoDeModelo(m) }));
+    pintarModelos($('[data-letra-modelos]', p), (id, m) => ponerLetra({ ...letra, fuente: m.fuente, peso: m.peso, efecto: efectoDeModelo(m), sombra: undefined }));
   };
   detLetra.ontoggle = () => { verLetra = detLetra.open; pintarLetraOps(); };
   pintarLetraOps();
+  $$('[data-destino]', p).forEach(b => b.onclick = () => { letraDestino = b.dataset.destino; pintarPropiedades(); });
   const selLetra = $('[data-letra-fuente]', p);
   selectConFuentes(selLetra);
-  selLetra.onchange = () => ponerLetra({ ...letra, fuente: selLetra.value, ...(selLetra.value ? {} : { peso: '' }) });
+  selLetra.onchange = () => {
+    cargarFuente(selLetra.value);
+    $('[data-letra-prev]', p).style.fontFamily = `'${fuenteValida(selLetra.value || zonaPl.fuente)}', sans-serif`;
+    ponerLetra({ ...letra, fuente: selLetra.value, ...(selLetra.value ? {} : { peso: undefined }) });
+  };
+  $$('[data-letra-n]', p).forEach(inp => {
+    const k = inp.dataset.letraN;
+    inp.oninput = () => { $(`[data-ver-n="${k}"]`, p).textContent = (k === 'escala' ? '×' : '') + Number(inp.value).toFixed(2); };
+    inp.onchange = () => ponerLetra({ ...letra, [k]: k === 'escala' && Number(inp.value) === 1 ? undefined : Number(inp.value) }, { demorar: true });
+  });
+  $('[data-letra-color]', p).onchange = (e) => ponerLetra({ ...letra, color: e.target.value }, { demorar: true });
+  const sinColor = $('[data-letra-sin="color"]', p);
+  if (sinColor) sinColor.onclick = () => ponerLetra({ ...letra, color: undefined });
+  $('[data-letra-efecto]', p).onchange = (e) => {
+    const v = e.target.value, n = { ...letra };
+    if (!v) { delete n.efecto; delete n.sombra; }
+    else if (v === 'ninguno') { n.efecto = null; n.sombra = false; }
+    else if (v === 'sombra') { n.efecto = null; n.sombra = true; }
+    else if (v !== 'cartel') { n.efecto = { tipo: v, color: v === 'brillo' ? '#FFFFFF' : v === 'solida' ? '#7C2D92' : '#1F1147', ...(v === 'contorno' ? { grosor: 0.3 } : {}) }; n.sombra = false; }
+    ponerLetra(n);
+  };
+  const efColor = $('[data-letra-efcolor]', p);
+  if (efColor) efColor.onchange = () => ponerLetra({ ...letra, efecto: { ...letra.efecto, color: efColor.value } }, { demorar: true });
+  $$('[data-letra-alinear]', p).forEach(b => b.onclick = () => ponerLetra({ ...letra, alinear: b.dataset.letraAlinear }));
+  $('[data-letra-mayus]', p).onclick = () => ponerLetra({ ...letra, mayus: !efectiva.mayus });
   const cartelLetra = $('[data-letra-cartel]', p);
   if (cartelLetra) enlazarCartel(cartelLetra, letra.efecto, (nuevo, final) => {
-    cancion.opciones.letra = { ...letra, efecto: { ...nuevo, tipo: 'cartel' } };
-    if (final) cambioCancion({ demorarHistorial: true });
+    if (final) ponerLetra({ ...letra, efecto: { ...nuevo, tipo: 'cartel' } }, { demorar: true });
   });
+  $('[data-letra-plantilla]', p).onclick = () => guardarLetraEnPlantilla(d);
   const quitarLetra = $('[data-letra-quitar]', p);
-  if (quitarLetra) quitarLetra.onclick = () => ponerLetra({});
+  if (quitarLetra) quitarLetra.onclick = () => {
+    delete cancion.opciones.letra;
+    if (d && cancion.opciones.letraEstrofas) { delete cancion.opciones.letraEstrofas[d.bloque]; if (!Object.keys(cancion.opciones.letraEstrofas).length) delete cancion.opciones.letraEstrofas; }
+    cambioCancion();
+    toast('La letra vuelve al estilo de la plantilla');
+  };
   $$('[data-elegir]', p).forEach(b => b.onclick = () => { selId = b.dataset.elegir; pintarSeleccion(); pintarPropiedades(); });
   const cp = $('[data-copiar-det]', p);
   if (cp) cp.onclick = () => {
@@ -2651,53 +2717,203 @@ function pintarPropsCancion(p) {
   if (fp) fp.onclick = () => { h.diseno.fondo = JSON.parse(fondoPlantilla()); confirmarCambio(); };
 }
 
-// ---------- ✨ Resaltar: elegir palabras en la letra ----------
-function conectarResaltar() {
-  const escn = $('[data-escenario]');
-  const revisar = () => {
-    const sel = getSelection();
-    const zona = lienzo?.querySelector('.pe[data-vinculo="letra"]');
-    if (!zona || !sel || sel.isCollapsed || !sel.rangeCount || !zona.contains(sel.anchorNode)) return;
-    const ws = [...zona.querySelectorAll('.w[data-w]')].filter(w => sel.containsNode(w, true));
-    if (!ws.length) return;
-    const grupos = [];
-    for (const w of ws) {
-      const k = w.dataset.b + ':' + w.dataset.l;
-      let g = grupos.find(x => x.k === k);
-      if (!g) grupos.push(g = { k, b: +w.dataset.b, l: +w.dataset.l, w: [] });
-      g.w.push(+w.dataset.w);
+// 💾 Guardar en mi plantilla: la letra que se ve (la de la canción y la de esta estrofa) pasa a la zona de la letra
+// de la plantilla. Si la plantilla es prediseñada, se crea una copia mía y la canción la usa.
+async function guardarLetraEnPlantilla(d) {
+  const letra = letraDePantalla(cancion, d?.bloque);
+  if (!letra) return toast('Primero cambia la fuente, el color u otro estilo de la letra.', 'error');
+  const pl = plantillaDe(plantillaDeCancion(cancion));
+  if (pl.mia && !await confirmar(`La letra de “${pl.nombre}” cambiará en todas las canciones y cultos que usan esta plantilla.`,
+    { titulo: '¿Guardar en tu plantilla?', boton: '💾 Guardar', peligro: false })) return;
+  const base = hojaDePlantillaCulto(pl).diseno;
+  const diseno = { fondo: clonar(base.fondo), elementos: base.elementos.map(e => {
+    if (e.vinculo !== 'letra') return clonar(e);
+    const z = zonaConLetra(clonar(e), letra);
+    for (const k of Object.keys(z)) if (z[k] === null) delete z[k];
+    return z;
+  }) };
+  estado('guardando', 'Guardando la plantilla…');
+  try {
+    let id;
+    if (pl.mia) { await datosPlantillas.guardar(pl.idBase, { diseno }); id = pl.idBase; }
+    else {
+      const nueva = await datosPlantillas.crear({ nombre: `${pl.nombre} (mi letra)`.slice(0, 80), categoria: pl.categoria || 'Mis plantillas', base: pl.id, diseno, profesor_id: perfil.id });
+      id = nueva.id;
+      cancion.opciones.plantilla = 'mi:' + id;
     }
-    const anclas = grupos.map(g => {
-      const p = Math.min(...g.w), n = Math.max(...g.w) - p + 1;
-      return { b: g.b, l: g.l, p, n, texto: palabras(lineasDeContenido(cancion.bloques[g.b]?.texto)[g.l]).slice(p, p + n).join(' ') };
-    }).filter(a => a.texto);
-    if (anclas.length) abrirResaltar(anclas, null, sel.getRangeAt(0).getBoundingClientRect());
-  };
-  escn.addEventListener('pointerup', () => setTimeout(revisar, 10));
-  let tSel;
-  document.addEventListener('selectionchange', () => { if (matchMedia('(pointer: coarse)').matches) { clearTimeout(tSel); tSel = setTimeout(revisar, 600); } });
-  // tocar una palabra ya resaltada abre sus opciones
-  escn.addEventListener('click', (e) => {
-    const rs = e.target.closest('.pe[data-vinculo="letra"] .rs');
-    if (!rs || !getSelection()?.isCollapsed) return;
-    const r = cancion.resaltados.find(x => x.id === rs.dataset.rs);
-    if (r) abrirResaltar([r], r, rs.getBoundingClientRect());
+    registrarMisPlantillas(await datosPlantillas.listar());
+    avisarPlantilla(pl.mia ? 'cambio' : 'nueva', id);
+    // la letra ya está en la plantilla: la canción (y esta estrofa) quedan sin estilo propio
+    delete cancion.opciones.letra;
+    if (d && cancion.opciones.letraEstrofas) { delete cancion.opciones.letraEstrofas[d.bloque]; if (!Object.keys(cancion.opciones.letraEstrofas).length) delete cancion.opciones.letraEstrofas; }
+    await prepararFuente(cancion.opciones.plantilla);
+    cambioCancion();
+    toast(pl.mia ? `Guardado en tu plantilla “${pl.nombre}”` : `Se creó tu plantilla “${pl.nombre} (mi letra)” y esta canción la usa`);
+  } catch (e) { toast(mensajeError(e), 'error'); }
+  finally { if (!sucio && !guardando) estado('ok', 'Guardado ✓'); }
+}
+
+// ---------- ✨ Resaltar: elegir palabras en la letra ----------
+// Al seleccionar (o tocar) palabras, sus opciones aparecen en el panel derecho (sección "✨ Resaltar", arriba).
+// El clic derecho (o el toque largo en el celular) abre un menú corto. Al soltar, el panel vuelve a la canción.
+// resaltando: { anclas: [{ b, l, p, n, texto }], actual: el resaltado que se edita (o null), ids }
+let resaltando = null, scrollCancion = 0;
+const zonaLetraLienzo = () => lienzo?.querySelector('.pe[data-vinculo="letra"]');
+const anclaDePalabra = (w) => {
+  const b = +w.dataset.b, l = +w.dataset.l, p = +w.dataset.w;
+  return { b, l, p, n: 1, texto: palabras(lineasDeContenido(cancion.bloques[b]?.texto)[l])[p] || w.textContent };
+};
+// Las palabras de la selección del navegador, agrupadas por línea
+function anclasDeSeleccion() {
+  const sel = getSelection(), zona = zonaLetraLienzo();
+  if (!zona || !sel || sel.isCollapsed || !sel.rangeCount || !zona.contains(sel.anchorNode)) return null;
+  const ws = [...zona.querySelectorAll('.w[data-w]')].filter(w => sel.containsNode(w, true));
+  if (!ws.length) return null;
+  const grupos = [];
+  for (const w of ws) {
+    const k = w.dataset.b + ':' + w.dataset.l;
+    let g = grupos.find(x => x.k === k);
+    if (!g) grupos.push(g = { k, b: +w.dataset.b, l: +w.dataset.l, w: [] });
+    g.w.push(+w.dataset.w);
+  }
+  const anclas = grupos.map(g => {
+    const p = Math.min(...g.w), n = Math.max(...g.w) - p + 1;
+    return { b: g.b, l: g.l, p, n, texto: palabras(lineasDeContenido(cancion.bloques[g.b]?.texto)[g.l]).slice(p, p + n).join(' ') };
+  }).filter(a => a.texto);
+  return anclas.length ? anclas : null;
+}
+const textoAnclas = (anclas) => anclas.map(a => a.texto).join(' / ');
+// Las palabras elegidas se marcan en el lienzo (la selección del navegador se quita al cambiar)
+function marcarPalabras() {
+  const zona = zonaLetraLienzo();
+  if (!zona) return;
+  zona.querySelectorAll('.w-sel').forEach(w => w.classList.remove('w-sel'));
+  for (const a of resaltando?.anclas || []) {
+    for (let k = a.p; k < a.p + a.n; k++) zona.querySelector(`.w[data-b="${a.b}"][data-l="${a.l}"][data-w="${k}"]`)?.classList.add('w-sel');
+  }
+}
+function elegirResaltar(anclas, actual = null) {
+  const p = $('[data-der]');
+  if (!resaltando && p) scrollCancion = p.scrollTop;
+  resaltando = { anclas, actual, ids: actual ? [actual.id] : [] };
+  $('.ed')?.classList.add('resaltando');
+  selId = null;
+  getSelection()?.removeAllRanges();
+  pintarSeleccion(); pintarPropiedades(); marcarPalabras();
+  if (esMovil() && $('.ed')?.dataset.movil !== 'der') alternarPanelMovil('der');
+  // la sección se despliega y se ve
+  const sec = $('[data-sec-resaltar]');
+  if (sec && p) { sec.open = true; requestAnimationFrame(() => p.scrollTo({ top: Math.max(0, sec.offsetTop - 8), behavior: 'smooth' })); }
+}
+function soltarResaltar() {
+  if (!resaltando) return;
+  resaltando = null;
+  $('.ed')?.classList.remove('resaltando');
+  marcarPalabras();
+  pintarPropiedades();
+  const p = $('[data-der]');
+  if (p) p.scrollTop = scrollCancion;   // vuelve a donde estaba la vista de la canción
+}
+// Aplica un estilo a lo elegido: al resaltado que ya existe o creando uno por línea
+function aplicarResaltado(anclas, actual, estilo, todas, { mezclar = false } = {}) {
+  let ids = resaltando?.anclas === anclas && resaltando.ids.length ? resaltando.ids : actual ? [actual.id] : [];
+  if (!ids.length) {
+    ids = anclas.map(a => { const r = { id: uid(), b: a.b, l: a.l, p: a.p, n: a.n, texto: a.texto, todas, estilo }; cancion.resaltados.push(r); return r.id; });
+  } else {
+    ids.forEach(id => { const r = cancion.resaltados.find(x => x.id === id); if (r) { r.estilo = mezclar ? { ...r.estilo, ...estilo } : estilo; r.todas = todas; } });
+  }
+  if (resaltando && (resaltando.anclas === anclas || resaltando.actual === actual)) {
+    resaltando.ids = ids;
+    resaltando.actual = cancion.resaltados.find(x => x.id === ids[0]) || null;   // así el panel sigue con su estilo
+  }
+  cambioCancion();
+}
+function quitarResaltado(ids) {
+  cancion.resaltados = cancion.resaltados.filter(r => !ids.includes(r.id));
+  resaltando = null;
+  cambioCancion();
+}
+// La sección "✨ Resaltar" del panel derecho (o el aviso de cómo usarla)
+function seccionResaltar(cont) {
+  if (!resaltando) {
+    cont.innerHTML = '<p class="hint" style="margin:6px 0 0;">Selecciona o toca palabras de la letra en la pantalla para resaltarlas. Con clic derecho (o un toque largo) hay un menú rápido.</p>';
+    return;
+  }
+  const z = plantillaDe(plantillaDeCancion(cancion)).diseno?.elementos?.find(e => e.vinculo === 'letra') || plantillaDe(plantillaDeCancion(cancion)).elementos?.find(e => e.vinculo === 'letra');
+  const { anclas, actual } = resaltando;
+  montarResaltar(cont, {
+    texto: textoAnclas(anclas), actual, fuentePlantilla: cancion.opciones.letra?.fuente || z?.fuente || 'Nunito',
+    alCambiar: (estilo, todas) => aplicarResaltado(anclas, resaltando?.actual || actual, estilo, todas),
+    alQuitar: () => quitarResaltado(resaltando?.ids || []),
+    alCerrar: () => soltarResaltar()
   });
 }
-function abrirResaltar(anclas, actualR, rect) {
-  let ids = actualR ? [actualR.id] : [];
-  const z = plantillaDe(plantillaDeCancion(cancion)).diseno?.elementos?.find(e => e.vinculo === 'letra') || plantillaDe(plantillaDeCancion(cancion)).elementos?.find(e => e.vinculo === 'letra');
-  abrirBarraResaltar({
-    cont: $('.ed-centro'), rect, actual: actualR, fuentePlantilla: z?.fuente || 'Nunito',
-    texto: anclas.map(a => a.texto).join(' / '),
-    alCambiar: (estilo, todas) => {
-      if (!ids.length) ids = anclas.map(a => { const r = { id: uid(), b: a.b, l: a.l, p: a.p, n: a.n, texto: a.texto, todas, estilo }; cancion.resaltados.push(r); return r.id; });
-      else ids.forEach(id => { const r = cancion.resaltados.find(x => x.id === id); if (r) { r.estilo = estilo; r.todas = todas; } });
-      getSelection()?.removeAllRanges();
-      cambioCancion();
-    },
-    alQuitar: () => { cancion.resaltados = cancion.resaltados.filter(r => !ids.includes(r.id)); cambioCancion(); }
+// El menú corto del clic derecho / toque largo, sobre la palabra w (o lo ya elegido si w está dentro)
+function menuResaltar(w, x, y) {
+  const rs = w.closest('.rs');
+  const r = rs ? cancion.resaltados.find(z => z.id === rs.dataset.rs) : null;
+  const dentro = resaltando && w.classList.contains('w-sel');
+  const anclas = dentro ? resaltando.anclas : r ? [r] : w.dataset.w != null ? [anclaDePalabra(w)] : null;
+  if (!anclas) return;
+  const actual = dentro ? resaltando.actual : r;
+  abrirMenuResaltar({
+    x, y, texto: textoAnclas(anclas), hay: !!actual, todas: !!actual?.todas,
+    alResaltar: () => elegirResaltar(anclas, actual),
+    alEstilo: (estilo) => aplicarResaltado(anclas, actual, estilo, !!actual?.todas, { mezclar: true }),
+    alQuitar: () => actual && quitarResaltado(dentro ? resaltando.ids : [actual.id]),
+    alTodas: (todas) => { if (actual) { actual.todas = todas; cambioCancion(); } else toast('Primero elige un estilo') }
   });
+}
+function conectarResaltar() {
+  const escn = $('[data-escenario]');
+  const palabraEn = (t) => t?.closest?.('.pe[data-vinculo="letra"] .w[data-w], .pe[data-vinculo="letra"] .rs');
+  let toque = null, largo = 0;
+  // ratón: al soltar, lo seleccionado; un clic en una palabra la elige; un clic fuera de la letra suelta
+  escn.addEventListener('pointerup', (e) => {
+    if (e.pointerType === 'touch' || e.button !== 0) return;
+    setTimeout(() => {
+      const anclas = anclasDeSeleccion();
+      if (anclas) return elegirResaltar(anclas, null);
+      const w = palabraEn(e.target);
+      if (!w) return;
+      const rs = w.closest('.rs'), r = rs ? cancion.resaltados.find(x => x.id === rs.dataset.rs) : null;
+      if (r) elegirResaltar([r], r); else elegirResaltar([anclaDePalabra(w.closest('.w') || w)], null);
+    }, 10);
+  });
+  escn.addEventListener('pointerdown', (e) => {
+    if (resaltando && !palabraEn(e.target) && e.button !== 2) soltarResaltar();
+    // celular: el toque largo abre el menú (en lugar del clic derecho)
+    if (e.pointerType !== 'touch' || !palabraEn(e.target)) return;
+    const w = e.target.closest('.w') || palabraEn(e.target);
+    toque = { x: e.clientX, y: e.clientY, w, t: setTimeout(() => { largo = Date.now(); toque = null; menuResaltar(w, e.clientX, e.clientY); }, 550) };
+  });
+  escn.addEventListener('pointermove', (e) => { if (toque && Math.hypot(e.clientX - toque.x, e.clientY - toque.y) > 10) { clearTimeout(toque.t); toque = null; } });
+  escn.addEventListener('pointerup', (e) => {
+    if (e.pointerType !== 'touch' || !toque) return;
+    clearTimeout(toque.t);
+    const w = toque.w;
+    toque = null;
+    // un toque: elige la palabra; otro toque en la misma línea alarga la selección
+    const rs = w.closest('.rs'), r = rs ? cancion.resaltados.find(x => x.id === rs.dataset.rs) : null;
+    if (r) return elegirResaltar([r], r);
+    const a = anclaDePalabra(w.closest('.w') || w);
+    const prev = resaltando && !resaltando.actual && resaltando.anclas.length === 1 ? resaltando.anclas[0] : null;
+    if (prev && prev.b === a.b && prev.l === a.l && a.p !== prev.p) {
+      const p = Math.min(prev.p, a.p), n = Math.max(prev.p + prev.n, a.p + 1) - p;
+      return elegirResaltar([{ b: a.b, l: a.l, p, n, texto: palabras(lineasDeContenido(cancion.bloques[a.b]?.texto)[a.l]).slice(p, p + n).join(' ') }], null);
+    }
+    elegirResaltar([a], null);
+  });
+  escn.addEventListener('contextmenu', (e) => {
+    const w = palabraEn(e.target);
+    if (!w) return;
+    e.preventDefault();
+    if (Date.now() - largo < 900) return;   // ya lo abrió el toque largo
+    const anclas = anclasDeSeleccion();
+    if (anclas) { elegirResaltar(anclas, null); }
+    menuResaltar(e.target.closest('.w') || w, e.clientX, e.clientY);
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && resaltando && !document.querySelector('.rs-menu, .modal-fondo')) soltarResaltar(); });
 }
 
 // ======================= ARRANQUE =======================
