@@ -10,7 +10,7 @@
 // Los videos de YouTube o Vimeo no se pueden guardar: en el archivo siguen necesitando internet.
 // ============================================================
 import { $, esc, toast, abrirModal, mensajeError } from '../comun.js';
-import { FUENTES, FUENTES_EXTRA, URL_FUENTES, urlSegura } from '../proyectos/recursos.js';
+import { FUENTES, FUENTES_EXTRA, URL_FUENTES, urlFuente, urlSegura } from '../proyectos/recursos.js';
 import { prepararFuente } from './diapositivas.js';
 import { plantillasDeCulto, hojaLogo } from './elementos.js';
 import { armarElementos } from './consola.js';
@@ -71,10 +71,7 @@ async function empaquetar() {
 
 // ---------- las fuentes que usa el culto ----------
 async function fuentesCss(usadas) {
-  const urls = [URL_FUENTES, ...[...usadas].filter(f => FUENTES_EXTRA.includes(f)).map(f => {
-    const pesos = ['Outfit', 'Raleway', 'Rubik', 'Quicksand', 'Dancing Script'].includes(f) ? ':wght@400;500;700' : '';   // como cargarFuente()
-    return `https://fonts.googleapis.com/css2?family=${encodeURIComponent(f).replace(/%20/g, '+')}${pesos}&display=swap`;
-  })];
+  const urls = [URL_FUENTES, ...[...usadas].filter(f => FUENTES_EXTRA.includes(f)).map(urlFuente)];
   const partes = [], faltan = [];
   for (const u of urls) {
     let css;

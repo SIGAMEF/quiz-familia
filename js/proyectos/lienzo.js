@@ -5,7 +5,7 @@
 // Celular: el fondo ocupa toda la pantalla y los elementos se acomodan solos en una columna
 // (o en las posiciones que el profesor ajustó a mano, guardadas en diseno.movil sin tocar las de Web).
 // ============================================================
-import { estiloFondo, fuenteValida, colorValido, urlSegura, FORMAS, limpiarNodos, URL_FUENTES } from './recursos.js';
+import { estiloFondo, fuenteValida, cargarFuente, colorValido, urlSegura, FORMAS, limpiarNodos, URL_FUENTES, aplicarCartel } from './recursos.js';
 import { esPregunta, pintarZona, textoEnunciado, pintarParticipante } from './preguntas.js';
 import { pintarZonaAgrupar, pintarRegistro } from './agrupar.js';
 import { pintarZonaRuleta, pintarRuletaCelular } from './ruleta.js';
@@ -132,6 +132,7 @@ function crearElemento(el, modo, ctx) {
   if (el.tipo === 'texto') {
     const t = document.createElement('div');
     t.className = 'pe-txt';
+    cargarFuente(el.fuente);   // las fuentes extra (de cartel) se piden al usarlas
     t.textContent = el.vinculo === 'enunciado' && ctx.hoja ? textoEnunciado(ctx.hoja)
       : el.vinculo === 'letra' ? (ctx.textos?.letra ?? LETRA_EJEMPLO) : el.vinculo === 'pie' ? (ctx.textos?.pie ?? 'Canción de ejemplo · Estrofa 1') : (el.texto ?? '');
     Object.assign(t.style, {
@@ -148,9 +149,10 @@ function crearElemento(el, modo, ctx) {
       if (fmt === 'auto' || el.redondo) t.style.padding = el.redondo ? '0 2.4cqw' : '2cqw 3cqw';
     }
     if (el.sombra) t.style.textShadow = '0 0.25cqw 0.6cqw rgba(0,0,0,.35)';
-    efectoTexto(t, el.efecto);
+    const coloresLetra = efectoTexto(t, el.efecto);
     if (el.vinculo === 'letra' && Array.isArray(ctx.textos?.fuente)) {
       pintarLetraRica(t, ctx.textos.fuente, ctx.resaltados, { animar: animar(ctx), marcar: !!ctx.marcar });
+      if (coloresLetra) colorearPalabras(t, coloresLetra);
       t.style.whiteSpace = ctx.textos.partir ? 'pre-wrap' : 'pre';
       t.style.overflowWrap = ctx.textos.chico ? 'anywhere' : 'normal';
     }
@@ -301,26 +303,47 @@ function ponerAnimacion(nodo, el) {
   nodo.style.setProperty('--t', dur.toFixed(2) + 's');
   if (el.retraso) nodo.style.setProperty('--d', num(el.retraso, 0, -60, 60) + 's');
 }
-// efecto: { tipo: 'brillo'|'solida'|'contorno'|'degradado', color, color2 }
-export const EFECTOS_TEXTO = { brillo: 'Brillo', solida: 'Sombra sólida', contorno: 'Contorno', degradado: 'Degradado', multicolor: 'Multicolor por letra' };
+// efecto: { tipo: 'brillo'|'solida'|'contorno'|'degradado', color, color2 } · { tipo: 'multicolor', paleta, colores }
+//         { tipo: 'cartel', relleno, porLetra, angulo, borde, grosor, sombra, prof, brillo }   (aplicarCartel, en recursos.js)
+export const EFECTOS_TEXTO = { brillo: 'Brillo', solida: 'Sombra sólida', contorno: 'Contorno', degradado: 'Degradado', multicolor: 'Multicolor por letra', cartel: 'Letra de cartel' };
+// Cada letra de un color (se turnan)
+function pintarPorLetra(t, colores) {
+  const texto = t.textContent;
+  t.textContent = '';
+  const bloque = document.createElement('div');   // un solo hijo: el .pe-txt es una grilla y cada letra sería una fila
+  bloque.className = 'pe-letra';
+  let i = 0;
+  for (const ch of texto) {
+    if (/\s/.test(ch)) { bloque.append(ch); continue; }
+    const l = document.createElement('span');
+    l.textContent = ch;
+    l.style.color = colores[i++ % colores.length];
+    bloque.appendChild(l);
+  }
+  t.appendChild(bloque);
+}
+// La letra de una canción ya dibujada: cada letra de un color (sin tocar las palabras resaltadas)
+function colorearPalabras(t, colores) {
+  let i = 0;
+  t.querySelectorAll('.w').forEach(w => {
+    if (w.closest('.rs')) return;
+    const s = w.textContent;
+    w.textContent = '';
+    for (const ch of s) { const l = document.createElement('span'); l.textContent = ch; l.style.color = colores[i++ % colores.length]; w.appendChild(l); }
+  });
+}
+// Devuelve los colores por letra (multicolor o cartel con un color por letra), o nada
 function efectoTexto(t, ef) {
-  if (!ef || typeof ef !== 'object' || !EFECTOS_TEXTO[ef.tipo]) return;
+  if (!ef || typeof ef !== 'object' || !EFECTOS_TEXTO[ef.tipo]) return null;
   if (ef.tipo === 'multicolor') {
     const colores = (Array.isArray(ef.colores) && ef.colores.length ? ef.colores : (PALETAS[ef.paleta] || PALETAS.buscador).colores).slice(0, 8).map(c => colorValido(c, '#FFFFFF'));
-    const texto = t.textContent;
-    t.textContent = '';
-    const bloque = document.createElement('div');   // un solo hijo: el .pe-txt es una grilla y cada letra sería una fila
-    bloque.className = 'pe-letra';
-    let i = 0;
-    for (const ch of texto) {
-      if (/\s/.test(ch)) { bloque.append(ch); continue; }
-      const l = document.createElement('span');
-      l.textContent = ch;
-      l.style.color = colores[i++ % colores.length];
-      bloque.appendChild(l);
-    }
-    t.appendChild(bloque);
-    return;
+    pintarPorLetra(t, colores);
+    return colores;
+  }
+  if (ef.tipo === 'cartel') {
+    const colores = aplicarCartel(t, ef);
+    if (colores) pintarPorLetra(t, colores);
+    return colores;
   }
   const c = colorValido(ef.color, '#FFFFFF'), c2 = colorValido(ef.color2, '#F0ABFC');
   if (ef.tipo === 'brillo') t.style.textShadow = `0 0 3cqw ${c}`;

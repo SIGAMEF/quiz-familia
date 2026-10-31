@@ -205,7 +205,10 @@ export function montarReloj(lienzo, hoja, inicio = null) {
 
 // Las canciones que usa un culto
 export const idsDeCanciones = (items) => [...new Set((items || []).filter(it => it.tipo === 'cancion' && it.cancion).map(it => it.cancion))];
-// Las plantillas que usa un culto (para cargar sus letras antes de medir)
+// Las plantillas que usa un culto (para cargar sus letras antes de medir con prepararFuente),
+// más 'fuente:<nombre>' por cada canción con su propia letra elegida
 export function plantillasDeCulto(culto, canciones) {
-  return [...new Set([plantillaDe(culto?.plantilla_base).id, ...(culto?.items || []).map(it => plantillaDeElemento(it, culto, canciones.get(it.cancion)))])];
+  const items = culto?.items || [];
+  return [...new Set([plantillaDe(culto?.plantilla_base).id, ...items.map(it => plantillaDeElemento(it, culto, canciones.get(it.cancion))),
+    ...items.map(it => canciones.get(it.cancion)?.opciones?.letra?.fuente).filter(Boolean).map(f => 'fuente:' + f)])];
 }

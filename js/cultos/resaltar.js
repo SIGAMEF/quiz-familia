@@ -6,7 +6,8 @@
 // - abrirBarraResaltar(): la barra flotante "✨ Resaltar" del editor.
 // ============================================================
 import { $, $$, esc } from '../comun.js';
-import { FUENTES, FUENTES_EXTRA, fuenteValida, cargarFuente, colorValido } from '../proyectos/recursos.js';
+import { fuenteValida, cargarFuente, colorValido, aplicarCartel } from '../proyectos/recursos.js';
+import { opcionesFuentes, selectConFuentes, pintarModelos, resaltadoDeModelo, htmlCartel, enlazarCartel } from '../proyectos/letras-ui.js';
 import { palabras, resaltadosDeLinea, segmentosDeBloque, etiquetas } from './letra.js';
 
 // ---------- Paletas ----------
@@ -60,7 +61,8 @@ function coloresDe(estilo) {
   return (todasPaletas()[estilo.paleta] || PALETAS.arcoiris).colores;
 }
 
-// Aplica el estilo a la caja del resaltado (span.rs). Devuelve si hay que partir en letras.
+// Aplica el estilo a la caja del resaltado (span.rs). Devuelve los colores que se turnan por letra (o null)
+// y si hay que partir en letras.
 function estilar(span, e, animar) {
   const es = num(e.escala, 1, 0.6, 2.5);
   if (es !== 1) span.style.fontSize = es + 'em';
@@ -77,6 +79,8 @@ function estilar(span, e, animar) {
   if (e.modo === 'degradado') {
     Object.assign(span.style, { backgroundImage: `linear-gradient(90deg, ${colorValido(e.color, '#22D3EE')}, ${colorValido(e.color2, '#F472B6')})`, webkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' });
   }
+  // letra de cartel (un modelo de MODELOS_LETRA o hecha a mano): relleno, contorno, sombra 3D y brillo
+  const porCartel = e.modo === 'cartel' ? aplicarCartel(span, e.cartel || {}) : null;
   const ef = EFECTOS[e.efecto] ? e.efecto : '';
   if (ef) {
     span.classList.add('rs-' + ef);
@@ -85,7 +89,8 @@ function estilar(span, e, animar) {
     if (ef === 'marcador') span.style.setProperty('--m', colorValido(e.marca, '#FDE047') + '99');
     if (ef === 'subrayado' || ef === 'contorno') span.style.setProperty('--m', colorValido(e.marca || e.color, '#FDE047'));
   }
-  return e.modo === 'multicolor' || POR_LETRA.includes(ef);
+  const colores = e.modo === 'multicolor' ? coloresDe(e) : porCartel;
+  return { colores, porLetra: !!colores || POR_LETRA.includes(ef) };
 }
 
 // Dibuja en `txt` (el .pe-txt de la zona de la letra) las líneas { t, b, l } con sus resaltados.
@@ -117,8 +122,7 @@ export function pintarLetraRica(cajaTxt, fuente, resaltados, { animar = true, ma
       const caja = document.createElement('span');
       caja.className = 'rs';
       caja.dataset.rs = g.r.id;
-      const porLetra = estilar(caja, e, animar);
-      const colores = e.modo === 'multicolor' ? coloresDe(e) : null;
+      const { porLetra, colores } = estilar(caja, e, animar);
       const hasta = Math.min(g.hasta, nOrigen);
       for (let j = k; j < hasta; j++) {
         if (j > k) caja.append(' ');
@@ -169,7 +173,7 @@ export const htmlLetraCoristas = (cancion) => htmlDeLetra(letraCoristas(cancion)
 // ---------- Barra flotante "✨ Resaltar" ----------
 // cont: el escenario del editor; rect: dónde está la selección; texto: las palabras elegidas;
 // actual: el resaltado que se edita (o null); alCambiar(estilo, todas) / alQuitar() / alCerrar()
-let barraAbierta = null;
+let barraAbierta = null, verModelos = false;
 export function cerrarBarraResaltar() { barraAbierta?.cerrar(); }
 export function abrirBarraResaltar({ cont, rect, texto, actual = null, fuentePlantilla = 'Nunito', alCambiar, alQuitar, alCerrar }) {
   cerrarBarraResaltar();
@@ -179,20 +183,21 @@ export function abrirBarraResaltar({ cont, rect, texto, actual = null, fuentePla
   b.setAttribute('role', 'dialog');
   b.setAttribute('aria-label', 'Resaltar palabras');
   cont.appendChild(b);
-  const fuentes = [...new Set([fuentePlantilla, ...FUENTES, ...FUENTES_EXTRA])];
   const cambiar = (cambios) => { estilo = { ...estilo, ...cambios }; for (const k of Object.keys(estilo)) if (estilo[k] === '' || estilo[k] == null) delete estilo[k]; alCambiar({ ...estilo }, todas); pintar(); };
   const pintar = () => {
     const pal = todasPaletas(), colores = coloresDe(estilo);
     b.innerHTML = `<div class="rs-cab"><b>✨ Resaltar</b><span class="rs-que" title="${esc(texto)}">«${esc(texto)}»</span>
         <button type="button" class="btn btn-sm btn-ghost btn-icon" data-cerrar aria-label="Cerrar">✕</button></div>
       <div class="rs-presets">${PRESETS.map(([k, t]) => `<button type="button" class="chip" data-pre="${k}">${t}</button>`).join('')}</div>
+      <details class="ml-det" data-det-mod ${verModelos ? 'open' : ''}><summary>🔤 Letras de cartel</summary><div data-modelos></div></details>
       <button type="button" class="btn btn-sm btn-ghost rs-mas" data-mas aria-expanded="${abierta}">${abierta ? '▾ Menos opciones' : '▸ Más opciones'}</button>
       <div class="rs-opciones" ${abierta ? '' : 'hidden'}>
         <div class="prop-fila"><label>Tamaño</label><input type="range" min="1" max="2" step="0.1" data-escala value="${num(estilo.escala, 1, 1, 2)}"><b data-ver-escala>×${num(estilo.escala, 1, 1, 2).toFixed(1)}</b></div>
-        <div class="prop-fila"><label>Fuente</label><select class="input" data-fuente><option value="">La de la plantilla</option>${fuentes.map(f => `<option ${f === estilo.fuente ? 'selected' : ''}>${esc(f)}</option>`).join('')}</select></div>
-        <div class="grupo-btn rs-modos">${[['', 'Normal'], ['color', 'Color'], ['degradado', 'Degradado'], ['multicolor', 'Multicolor']].map(([k, t]) => `<button type="button" class="btn btn-sm btn-outline ${(estilo.modo || '') === k ? 'activo' : ''}" data-modo="${k}">${t}</button>`).join('')}</div>
+        <div class="prop-fila"><label>Fuente</label><select class="input" data-fuente><option value="">La de la plantilla (${esc(fuentePlantilla)})</option>${opcionesFuentes(estilo.fuente)}</select></div>
+        <div class="grupo-btn rs-modos">${[['', 'Normal'], ['color', 'Color'], ['degradado', 'Degradado'], ['multicolor', 'Multicolor'], ['cartel', 'Cartel']].map(([k, t]) => `<button type="button" class="btn btn-sm btn-outline ${(estilo.modo || '') === k ? 'activo' : ''}" data-modo="${k}">${t}</button>`).join('')}</div>
         ${estilo.modo === 'color' ? `<div class="prop-fila"><label>Color</label><input type="color" data-c="color" value="${colorValido(estilo.color, '#FFFFFF').slice(0, 7)}"></div>` : ''}
         ${estilo.modo === 'degradado' ? `<div class="prop-fila"><label>Colores</label><input type="color" data-c="color" value="${colorValido(estilo.color, '#22D3EE').slice(0, 7)}"><input type="color" data-c="color2" value="${colorValido(estilo.color2, '#F472B6').slice(0, 7)}"></div>` : ''}
+        ${estilo.modo === 'cartel' ? `<div data-cartel>${htmlCartel(estilo.cartel)}</div>` : ''}
         ${estilo.modo === 'multicolor' ? `<div class="rs-paletas">${Object.entries(pal).map(([k, p]) => `<button type="button" class="rs-paleta ${!estilo.colores && estilo.paleta === k ? 'sel' : ''}" data-paleta="${esc(k)}" title="${esc(p.nombre)}">
             ${p.colores.map(c => `<i style="background:${colorValido(c)}"></i>`).join('')}<span>${esc(p.nombre)}</span></button>`).join('')}</div>
           <div class="rs-editar-paleta"><span class="small muted">Esta paleta:</span>${colores.map((c, i) => `<input type="color" data-pc="${i}" value="${colorValido(c).slice(0, 7)}" aria-label="Color ${i + 1}">`).join('')}
@@ -211,12 +216,24 @@ export function abrirBarraResaltar({ cont, rect, texto, actual = null, fuentePla
       const p = PRESETS.find(y => y[0] === x.dataset.pre)[2];
       cambiar({ ...p, ...(p.paleta ? { colores: undefined } : {}) });
     });
+    // 🔤 letras de cartel: el modelo se aplica a las palabras elegidas
+    const detMod = $('[data-det-mod]', b);
+    const pintarMod = () => { if (detMod.open && !$('[data-modelos]', b).childElementCount) pintarModelos($('[data-modelos]', b), (id, m) => cambiar({ ...resaltadoDeModelo(m), peso: m.peso || '', color: '', color2: '', paleta: '', colores: '' })); };
+    detMod.ontoggle = () => { verModelos = detMod.open; pintarMod(); colocar(); };
+    pintarMod();
+    selectConFuentes($('[data-fuente]', b));
+    const cartel = $('[data-cartel]', b);
+    if (cartel) enlazarCartel(cartel, estilo.cartel, (nuevo, final) => {
+      if (final) cambiar({ cartel: nuevo });
+      else { estilo = { ...estilo, cartel: nuevo }; alCambiar({ ...estilo }, todas); }
+    });
     $('[data-mas]', b).onclick = () => { abierta = !abierta; pintar(); };
     const esc_ = $('[data-escala]', b);
     esc_.oninput = () => { $('[data-ver-escala]', b).textContent = '×' + Number(esc_.value).toFixed(1); };
     esc_.onchange = () => cambiar({ escala: Number(esc_.value) === 1 ? '' : Number(esc_.value) });
     $('[data-fuente]', b).onchange = (e) => { cargarFuente(e.target.value); cambiar({ fuente: e.target.value, peso: e.target.value ? estilo.peso : '' }); };
-    $$('[data-modo]', b).forEach(x => x.onclick = () => cambiar({ modo: x.dataset.modo, ...(x.dataset.modo === 'multicolor' && !estilo.paleta ? { paleta: 'arcoiris' } : {}) }));
+    $$('[data-modo]', b).forEach(x => x.onclick = () => cambiar({ modo: x.dataset.modo, ...(x.dataset.modo === 'multicolor' && !estilo.paleta ? { paleta: 'arcoiris' } : {}),
+      ...(x.dataset.modo === 'cartel' && !estilo.cartel ? { cartel: { relleno: ['#FDE047'], borde: '#111827', grosor: 0.05, sombra: '#111827', prof: 0.06 } } : {}) }));
     $$('[data-c]', b).forEach(x => { x.onchange = () => cambiar({ [x.dataset.c]: x.value }); });
     $$('[data-paleta]', b).forEach(x => x.onclick = () => cambiar({ paleta: x.dataset.paleta, colores: '' }));
     $$('[data-pc]', b).forEach(x => x.onchange = () => { const c = [...colores]; c[Number(x.dataset.pc)] = x.value; cambiar({ colores: c }); });

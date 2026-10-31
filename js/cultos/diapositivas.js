@@ -6,7 +6,7 @@
 //   miniatura y el proyector se ven igual), primero sin partir las líneas y, si no cabe, partiéndolas.
 // ============================================================
 import { pintarHoja, asegurarFuentes } from '../proyectos/lienzo.js';
-import { fuenteValida } from '../proyectos/recursos.js';
+import { fuenteValida, cargarFuente } from '../proyectos/recursos.js';
 import { PLANTILLAS, PLANTILLA_DEFECTO, plantillaIncluida, hojaDePlantilla } from './plantillas.js';
 import { diapositivas } from './letra.js';
 
@@ -25,6 +25,11 @@ export function plantillaDe(id) {
 }
 export const existePlantilla = (id) => mias.has(id) || !!plantillaIncluida(id);
 const zonaLetra = (p) => hojaDePlantilla(p).diseno.elementos.find(e => e.vinculo === 'letra');
+// La letra elegida para toda una canción (cancion.opciones.letra = { fuente, peso, efecto }) sobre la zona de la plantilla
+export function zonaConLetra(z, letra) {
+  if (!z || !letra) return z;
+  return { ...z, ...(letra.fuente ? { fuente: letra.fuente } : {}), ...(letra.peso ? { peso: letra.peso } : {}), ...(letra.efecto ? { efecto: letra.efecto } : {}) };
+}
 
 // La hoja de una pantalla de letra, con el tamaño de letra ajustado
 export function hojaDePantalla(id, tam) {
@@ -57,12 +62,12 @@ function mayorQueCabe(txt, pe, max) {
 }
 // Devuelve { tam, partir, chico } para unas líneas en una plantilla.
 // lineas: textos o { t, b, l } (con resaltados, que pueden agrandar algunas palabras)
-export function ajustar(id, lineas, resaltados = null) {
-  const p = plantillaDe(id), z = zonaLetra(p);
+export function ajustar(id, lineas, resaltados = null, letra = null) {
+  const p = plantillaDe(id), z = zonaConLetra(zonaLetra(p), letra);
   if (!z) return { tam: 5, partir: true, chico: false };
   const max = Number(z.tam) || 5.4;
   const fuente = (lineas || []).map(x => typeof x === 'string' ? { t: x } : x);
-  const clave = `${p.id}|${p.updated_at || ''}|${JSON.stringify(fuente)}|${resaltados?.length ? JSON.stringify(resaltados) : ''}`;
+  const clave = `${p.id}|${p.updated_at || ''}|${JSON.stringify(fuente)}|${resaltados?.length ? JSON.stringify(resaltados) : ''}|${letra ? JSON.stringify(letra) : ''}`;
   if (cache.has(clave)) return cache.get(clave);
   // se mide solo la zona de la letra, sobre un fondo liso y sin animaciones
   const lienzo = pintarHoja(caja(), { diseno: { fondo: { tipo: 'color', valor: '#000000' }, elementos: [z] } },
@@ -82,14 +87,14 @@ export function ajustar(id, lineas, resaltados = null) {
   return r;
 }
 
-// Espera la fuente de la letra de la plantilla (para medir con la letra real), como máximo ~1,5 s
+// Espera la fuente de la letra de la plantilla (para medir con la letra real), como máximo ~1,5 s.
+// id: una plantilla, o 'fuente:<nombre>' para la letra elegida de una canción
 const fuentesListas = new Set();
 export async function prepararFuente(id) {
   asegurarFuentes();
-  const z = zonaLetra(plantillaDe(id));
-  const f = fuenteValida(z?.fuente);
+  const f = String(id || '').startsWith('fuente:') ? fuenteValida(id.slice(7)) : fuenteValida(zonaLetra(plantillaDe(id))?.fuente);
   if (fuentesListas.has(f) || !document.fonts?.load) return;
-  await Promise.race([Promise.all([document.fonts.load(`800 40px "${f}"`), document.fonts.load(`400 40px "${f}"`)]).catch(() => {}),
+  await Promise.race([cargarFuente(f).then(() => Promise.all([document.fonts.load(`800 40px "${f}"`), document.fonts.load(`400 40px "${f}"`)])).catch(() => {}),
     new Promise(r => setTimeout(r, 1500))]);
   fuentesListas.add(f);
   cache.clear();
@@ -103,14 +108,14 @@ export function hojasDeCancion(c) {
   const base = hojaDePlantilla(plantillaDe(id)).diseno;
   return diapositivas(c).map(d => {
     const det = c.detalles?.[d.clave] || {};
-    const a = ajustar(id, d.fuente, c.resaltados);
+    const a = ajustar(id, d.fuente, c.resaltados, c.opciones?.letra);
     return {
       id: d.clave, tipo: 'contenido', config: {}, info: d, ver: 'letra', resaltados: c.resaltados || [], chico: a.chico,
       textos: { fuente: d.fuente, pie: `${c.titulo || 'Canción'} · ${d.nombre}`, partir: a.partir, chico: a.chico },
       diseno: {
         fondo: det.fondo || base.fondo,
         elementos: [
-          ...base.elementos.filter(e => !e.en || e.en === 'letra').map(e => ({ ...e, bloqueado: true, ...(e.vinculo === 'letra' ? { tam: a.tam } : {}) })),
+          ...base.elementos.filter(e => !e.en || e.en === 'letra').map(e => ({ ...e, bloqueado: true, ...(e.vinculo === 'letra' ? { ...zonaConLetra(e, c.opciones?.letra), tam: a.tam } : {}) })),
           ...(Array.isArray(det.el) ? det.el : [])
         ]
       }
@@ -120,10 +125,12 @@ export function hojasDeCancion(c) {
 
 // Dibuja una pantalla de letra en `cont` (líneas de texto o { t, b, l }). Devuelve el ajuste usado.
 // pie: "Título · Estrofa 1" para el pie de la plantilla (si tiene)
-export function pintarPantalla(cont, id, lineas, { modo = 'miniatura', pie = '', animar, resaltados = null } = {}) {
+export function pintarPantalla(cont, id, lineas, { modo = 'miniatura', pie = '', animar, resaltados = null, letra = null } = {}) {
   const fuente = (lineas || []).map(x => typeof x === 'string' ? { t: x } : x);
-  const a = ajustar(id, fuente, resaltados);
-  pintarHoja(cont, hojaDePantalla(id, a.tam), { modo, ver: 'letra', textos: { fuente, pie, partir: a.partir, chico: a.chico }, resaltados,
+  const a = ajustar(id, fuente, resaltados, letra);
+  const h = hojaDePantalla(id, a.tam);
+  if (letra) h.diseno.elementos = h.diseno.elementos.map(e => e.vinculo === 'letra' ? zonaConLetra(e, letra) : e);
+  pintarHoja(cont, h, { modo, ver: 'letra', textos: { fuente, pie, partir: a.partir, chico: a.chico }, resaltados,
     ...(animar === undefined ? {} : { animar }) });
   return a;
 }

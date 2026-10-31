@@ -14,18 +14,118 @@ export const URL_FUENTES = 'https://fonts.googleapis.com/css2?family=Baloo+2:wgh
   '&family=Montserrat:wght@300;500;700;800&family=Anton&family=Archivo+Black&family=Oswald:wght@400;500;700&family=Josefin+Sans:wght@300;600&family=Cinzel:wght@500;700' +
   '&family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&family=Playfair+Display:ital,wght@0,600;1,600&family=DM+Serif+Display&family=Caveat:wght@600&family=Great+Vibes' +
   '&family=Press+Start+2P&display=swap';
-// Más fuentes de Google Fonts para resaltar palabras: se cargan solo cuando se usan
+// Más fuentes de Google Fonts (para resaltar palabras y letras de cartel): se cargan solo cuando se usan
 export const FUENTES_EXTRA = ['Outfit', 'Lobster', 'Righteous', 'Bangers', 'Permanent Marker', 'Dancing Script', 'Satisfy', 'Raleway',
-  'Lilita One', 'Sacramento', 'Kaushan Script', 'Fjalla One', 'Rubik', 'Quicksand', 'Abril Fatface', 'Shadows Into Light'];
+  'Lilita One', 'Sacramento', 'Kaushan Script', 'Fjalla One', 'Rubik', 'Quicksand', 'Abril Fatface', 'Shadows Into Light',
+  // letras de cartel: burbuja, gruesas, contorno, 3D, pincel, grafiti, caligrafía y escolares
+  'Rubik Bubbles', 'Luckiest Guy', 'Chewy', 'Titan One', 'Bungee', 'Bungee Shade', 'Bungee Outline', 'Bungee Inline', 'Londrina Solid',
+  'Londrina Outline', 'Sniglet', 'Bowlby One', 'Sigmar One', 'Rubik Mono One', 'Black Ops One', 'Monoton', 'Shrikhand', 'Knewave',
+  'Fascinate', 'Creepster', 'Rock Salt', 'Sedgwick Ave Display', 'Rubik Spray Paint', 'Rubik Wet Paint', 'Yellowtail', 'Alex Brush',
+  'Allura', 'Tangerine', 'Parisienne', 'Cookie', 'Cabin Sketch', 'Fredericka the Great', 'Gochi Hand', 'Schoolbell', 'Andika',
+  'Playpen Sans', 'Coiny', 'Modak', 'Rampart One', 'Train One', 'Zen Dots', 'Berkshire Swash', 'Mountains of Christmas',
+  'Cinzel Decorative', 'Bubblegum Sans', 'Gluten', 'Rubik Doodle Shadow', 'Rubik Puddles', 'Bagel Fat One', 'Sour Gummy', 'Grandstander'];
+// Las fuentes agrupadas para elegir (cada una está en FUENTES o en FUENTES_EXTRA)
+export const GRUPOS_FUENTES = [
+  ['Para leer', ['Nunito', 'Poppins', 'Montserrat', 'Raleway', 'Rubik', 'Quicksand', 'Outfit', 'Josefin Sans', 'Merriweather', 'Andika', 'Playpen Sans']],
+  ['Cartel y títulos', ['Bebas Neue', 'Anton', 'Archivo Black', 'Oswald', 'Fjalla One', 'Abril Fatface', 'Bowlby One', 'Sigmar One', 'Rubik Mono One',
+    'Black Ops One', 'Bungee', 'Titan One', 'Lilita One', 'Righteous', 'Zen Dots', 'Shrikhand']],
+  ['Burbuja y divertidas', ['Baloo 2', 'Fredoka', 'Rubik Bubbles', 'Luckiest Guy', 'Chewy', 'Bubblegum Sans', 'Sniglet', 'Coiny', 'Modak', 'Bagel Fat One',
+    'Sour Gummy', 'Grandstander', 'Gluten', 'Bangers', 'Londrina Solid', 'Knewave', 'Comic Neue']],
+  ['Contorno y 3D', ['Bungee Outline', 'Bungee Inline', 'Bungee Shade', 'Londrina Outline', 'Rampart One', 'Train One', 'Monoton', 'Rubik Doodle Shadow',
+    'Rubik Puddles', 'Fascinate', 'Creepster']],
+  ['Pincel y grafiti', ['Permanent Marker', 'Rock Salt', 'Sedgwick Ave Display', 'Rubik Spray Paint', 'Rubik Wet Paint', 'Kaushan Script', 'Lobster',
+    'Pacifico', 'Yellowtail', 'Cookie']],
+  ['Caligrafía', ['Great Vibes', 'Dancing Script', 'Satisfy', 'Sacramento', 'Alex Brush', 'Allura', 'Tangerine', 'Parisienne', 'Berkshire Swash',
+    'Cinzel', 'Cinzel Decorative', 'Cormorant Garamond', 'Playfair Display', 'DM Serif Display']],
+  ['A mano y escolar', ['Patrick Hand', 'Caveat', 'Shadows Into Light', 'Gochi Hand', 'Schoolbell', 'Cabin Sketch', 'Fredericka the Great',
+    'Mountains of Christmas', 'Press Start 2P']]
+];
 export function fuenteValida(f) { return FUENTES.includes(f) || FUENTES_EXTRA.includes(f) ? f : 'Nunito'; }
+// Grosores que se piden de las fuentes extra que tienen varios (las demás tienen uno solo)
+const PESOS_FUENTE = { Outfit: '400;500;700', Raleway: '400;500;700', Rubik: '400;500;700', Quicksand: '400;500;700', 'Dancing Script': '400;500;700',
+  Andika: '400;700', 'Playpen Sans': '400;700;800', Gluten: '400;700;900', Sniglet: '400;800', 'Londrina Solid': '400;900', 'Cabin Sketch': '400;700',
+  'Cinzel Decorative': '400;700;900', 'Sour Gummy': '400;700;900', Grandstander: '400;700;900' };
+const familia = (f) => `family=${encodeURIComponent(f).replace(/%20/g, '+')}${PESOS_FUENTE[f] ? ':wght@' + PESOS_FUENTE[f] : ''}`;
+export const urlFuente = (f) => `https://fonts.googleapis.com/css2?${familia(f)}&display=swap`;
+// Carga una fuente extra (las de FUENTES ya vienen con URL_FUENTES). Devuelve una promesa que se cumple al cargar su CSS.
+const cargadas = new Map();
 export function cargarFuente(f) {
-  if (!FUENTES_EXTRA.includes(f) || globalThis.__CULTO_SIN_RED__ || document.querySelector(`link[data-fuente="${CSS.escape(f)}"]`)) return;
-  const l = document.createElement('link');
-  l.rel = 'stylesheet'; l.dataset.fuente = f;
-  const pesos = ['Outfit', 'Raleway', 'Rubik', 'Quicksand', 'Dancing Script'].includes(f) ? ':wght@400;500;700' : '';   // las demás tienen un solo grosor
-  l.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(f).replace(/%20/g, '+')}${pesos}&display=swap`;
-  document.head.appendChild(l);
+  if (!FUENTES_EXTRA.includes(f) || globalThis.__CULTO_SIN_RED__) return Promise.resolve();
+  if (!cargadas.has(f)) cargadas.set(f, enlaceFuentes(urlFuente(f), [f]));
+  return cargadas.get(f);
 }
+// Varias de una vez (para las listas con vista previa): un solo pedido
+export function cargarFuentes(lista) {
+  const faltan = [...new Set(lista)].filter(f => FUENTES_EXTRA.includes(f) && !cargadas.has(f));
+  if (!faltan.length || globalThis.__CULTO_SIN_RED__) return Promise.resolve();
+  const p = enlaceFuentes(`https://fonts.googleapis.com/css2?${faltan.map(familia).join('&')}&display=swap`, faltan);
+  faltan.forEach(f => cargadas.set(f, p));
+  return p;
+}
+function enlaceFuentes(href, lista) {
+  return new Promise((listo) => {
+    const l = document.createElement('link');
+    l.rel = 'stylesheet'; l.dataset.fuente = lista.join('|'); l.href = href;
+    l.onload = l.onerror = () => listo();
+    document.head.appendChild(l);
+  });
+}
+
+// ---------- Letras de cartel: relleno (liso, degradado o un color por letra), contorno, sombra 3D y brillo ----------
+// cartel: { relleno: [colores], porLetra, angulo, borde, grosor (em), sombra, prof (em), brillo }
+// Pone el estilo en `nodo` (un texto) y devuelve los colores que se turnan por letra (o null).
+export function aplicarCartel(nodo, c = {}) {
+  const n = (v, d, min, max) => { const x = Number(v); return Number.isFinite(x) ? Math.min(max, Math.max(min, x)) : d; };
+  const rel = (Array.isArray(c.relleno) && c.relleno.length ? c.relleno : ['#FFFFFF']).slice(0, 8).map(x => colorValido(x, '#FFFFFF'));
+  let porLetra = null;
+  if (c.porLetra && rel.length > 1) porLetra = rel;
+  else if (rel.length > 1) {
+    Object.assign(nodo.style, { backgroundImage: `linear-gradient(${n(c.angulo, 180, 0, 360)}deg, ${rel.join(', ')})`,
+      webkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' });
+  } else nodo.style.color = rel[0];
+  if (c.borde) {
+    nodo.style.webkitTextStroke = `${n(c.grosor, 0.06, 0.01, 0.3)}em ${colorValido(c.borde, '#000000')}`;
+    nodo.style.paintOrder = 'stroke fill';
+  }
+  // sombras con filter (con text-shadow, la sombra tapa el degradado); la sombra difusa de la plantilla no se hereda
+  nodo.style.textShadow = 'none';
+  const f = [];
+  if (c.sombra) {
+    const s = colorValido(c.sombra, '#000000'), p = n(c.prof, 0.06, 0.01, 0.2), pasos = Math.max(1, Math.round(p / 0.02));
+    for (let i = 0; i < Math.min(pasos, 6); i++) f.push(`drop-shadow(${(p / pasos).toFixed(3)}em ${(p / pasos).toFixed(3)}em 0 ${s})`);
+  }
+  if (c.brillo) f.push(`drop-shadow(0 0 0.12em ${colorValido(c.brillo, '#FFFFFF')})`);
+  if (f.length) nodo.style.filter = f.join(' ');
+  return porLetra;
+}
+// Modelos de letras coloreadas: [id, nombre, { fuente, peso?, fondo? (solo para la muestra), cartel }]
+export const MODELOS_LETRA = [
+  ['creativo', 'Creativo', { fuente: 'Kaushan Script', cartel: { relleno: ['#67E8F9', '#0EA5E9'], borde: '#0B1E3F', grosor: 0.05, sombra: '#0B1E3F', prof: 0.08 } }],
+  ['deseos', 'Deseos', { fuente: 'Yellowtail', cartel: { relleno: ['#FFFFFF'], borde: '#1F2937', grosor: 0.05, sombra: '#A3E635', prof: 0.08 } }],
+  ['colorido', 'Colorido', { fuente: 'Pacifico', cartel: { relleno: ['#F472B6', '#FB923C', '#FACC15', '#38BDF8'], angulo: 90, brillo: '#F0ABFC' } }],
+  ['burbuja', 'Burbuja', { fuente: 'Rubik Bubbles', cartel: { relleno: ['#FFFFFF'], borde: '#111827', grosor: 0.05, sombra: '#111827', prof: 0.06 } }],
+  ['molde', 'Molde', { fuente: 'Bebas Neue', cartel: { relleno: ['#111827'] } }],
+  ['contorno', 'Contorno', { fuente: 'Londrina Outline', peso: 400, cartel: { relleno: ['#111827'] } }],
+  ['pastel', 'Tarjeta pastel', { fuente: 'Fredoka', peso: 700, cartel: { relleno: ['#F9A8D4'], borde: '#DB2777', grosor: 0.04 } }],
+  ['pincel', 'Pincel', { fuente: 'Rock Salt', cartel: { relleno: ['#111827'] } }],
+  ['tiza', 'Tiza', { fuente: 'Fredericka the Great', fondo: '#1F3A2E', cartel: { relleno: ['#F8FAFC'], brillo: '#CBD5E1' } }],
+  ['boceto', 'Lápiz', { fuente: 'Cabin Sketch', peso: 700, cartel: { relleno: ['#334155'] } }],
+  ['caligrafia', 'Caligrafía', { fuente: 'Alex Brush', cartel: { relleno: ['#111827'] } }],
+  ['escolar', 'Escolar', { fuente: 'Andika', peso: 700, cartel: { relleno: ['#1E293B'] } }],
+  ['abecedario', 'Abecedario', { fuente: 'Fredoka', peso: 700, cartel: { relleno: ['#60A5FA', '#F87171', '#FBBF24', '#34D399', '#A78BFA', '#FB923C'], porLetra: true } }],
+  ['chocolate', 'Chocolate', { fuente: 'Lilita One', cartel: { relleno: ['#B45309', '#5B2A0E'], borde: '#FDE68A', grosor: 0.04, sombra: '#3B1A08', prof: 0.06 } }],
+  ['comic', 'Cómic', { fuente: 'Bangers', cartel: { relleno: ['#FDE047', '#84CC16'], borde: '#111827', grosor: 0.06, sombra: '#111827', prof: 0.08 } }],
+  ['fuego', 'Fuego', { fuente: 'Luckiest Guy', cartel: { relleno: ['#FDE047', '#F97316', '#DC2626'], borde: '#111827', grosor: 0.05, sombra: '#111827', prof: 0.06 } }],
+  ['neon', 'Neón', { fuente: 'Monoton', fondo: '#140F2A', cartel: { relleno: ['#F0ABFC'], brillo: '#E879F9' } }],
+  ['retro', 'Retro 3D', { fuente: 'Bungee', cartel: { relleno: ['#FDE047'], sombra: '#EF4444', prof: 0.12 } }],
+  ['oro', 'Oro', { fuente: 'Cinzel Decorative', peso: 700, cartel: { relleno: ['#FEF3C7', '#F59E0B', '#92400E'], sombra: '#1C1917', prof: 0.04 } }],
+  ['grafiti', 'Grafiti', { fuente: 'Sedgwick Ave Display', cartel: { relleno: ['#A855F7', '#EC4899'], angulo: 90, borde: '#111827', grosor: 0.05, sombra: '#111827', prof: 0.06 } }],
+  ['hielo', 'Hielo', { fuente: 'Titan One', cartel: { relleno: ['#F0F9FF', '#38BDF8'], borde: '#0C4A6E', grosor: 0.04, brillo: '#BAE6FD' } }],
+  ['dulce', 'Dulce', { fuente: 'Chewy', cartel: { relleno: ['#FB7185'], borde: '#FFFFFF', grosor: 0.06, sombra: '#BE185D', prof: 0.06 } }],
+  ['sello', 'Sello', { fuente: 'Bowlby One', cartel: { relleno: ['#FFFFFF'], borde: '#111827', grosor: 0.08, sombra: '#111827', prof: 0.04 } }],
+  ['fiesta', 'Fiesta', { fuente: 'Sniglet', peso: 800, cartel: { relleno: ['#EF4444', '#F59E0B', '#22C55E', '#3B82F6', '#A855F7'], porLetra: true, borde: '#FFFFFF', grosor: 0.05, sombra: '#1F2937', prof: 0.05 } }]
+];
+export const modeloLetra = (id) => MODELOS_LETRA.find(m => m[0] === id)?.[2] || null;
 
 // ---------- Colores ----------
 export const COLORES = ['#FFFFFF', '#F8F7FC', '#2D2A45', '#000000', '#7C6FF0', '#6C5CE7', '#A855F7', '#EC4899', '#E14D72', '#FF6F91',

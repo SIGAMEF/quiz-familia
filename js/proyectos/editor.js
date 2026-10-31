@@ -11,9 +11,10 @@ import {
   pintarHoja, pintarHojaMovil, pintarCelular, pintarFondo, repintarElemento, colocar, posMovil, leerVideo, miniaturaVideo, MODOS_FONDO, EFECTOS_TEXTO
 } from './lienzo.js';
 import {
-  FUENTES, COLORES, DEGRADADOS, cssDegradado, PATRONES, estiloFondo, FORMAS, EMOJIS, PLANTILLAS,
+  fuenteValida, COLORES, DEGRADADOS, cssDegradado, PATRONES, estiloFondo, FORMAS, EMOJIS, PLANTILLAS,
   cargarIconos, nodosIcono, ICONOS_ES, ICONOS_POPULARES, colorValido, urlSegura
 } from './recursos.js';
+import { opcionesFuentes, selectConFuentes, pintarModelos, pintarFuentes, efectoDeModelo, htmlCartel, enlazarCartel } from './letras-ui.js';
 import { TIPOS_PREGUNTA, esPregunta, configInicial, huecos, LETRAS, COLORES_OPCION, textoEnunciado, normalizar } from './preguntas.js';
 import { presentar } from './presentar.js';
 import { crearVivo, borrarFotos, enlaceParticipante } from './vivo-profe.js';
@@ -63,7 +64,7 @@ let verPl = 'portada';       // vista de la plantilla: 'portada' o 'letra'
 let animarEd = false;        // ver las animaciones en el editor
 const NOMBRE_EN = { portada: 'Solo portada', letra: 'Solo con letra' };
 // Canción: los datos, el panel de la letra, la pestaña izquierda y la estrofa elegida
-let cancion = null, panelLetra = null, tabIzq = 'letra', bloqueSel = -1, verPlantillas = false;
+let cancion = null, panelLetra = null, tabIzq = 'letra', bloqueSel = -1, verPlantillas = false, verLetra = false;
 
 let perfil, proyecto, hojas = [], actual = 0, selId = null, vista = 'web', recurso = null, editandoTexto = null;
 let lienzo = null;          // .lienzo que se edita: el 16:9 en Web o el del celular ajustado a mano
@@ -381,10 +382,11 @@ function agregarElemento(el) {
   confirmarCambio();
   cerrarPanelMovil();
 }
-function agregarTexto(nivel, fuente) {
+// extra: más propiedades (un modelo de letra: fuente, efecto y grosor)
+function agregarTexto(nivel, fuente, extra = {}) {
   const p = { titulo: ['Título', 6, true, 18], subtitulo: ['Subtítulo', 3.6, true, 12], parrafo: ['Escribe aquí tu texto', 2.4, false, 18] }[nivel];
   agregarElemento({ tipo: 'texto', texto: p[0], x: 15, y: 50 - p[3] / 2, w: 70, h: p[3], tam: p[1], negrita: p[2],
-    fuente: fuente || 'Nunito', color: oscuro(hoja().diseno.fondo) ? '#FFFFFF' : '#2D2A45', alinear: 'center' });
+    fuente: fuente || 'Nunito', color: oscuro(hoja().diseno.fondo) ? '#FFFFFF' : '#2D2A45', alinear: 'center', ...extra });
 }
 // ¿El fondo es oscuro? (para elegir el color de un texto nuevo)
 function oscuro(f) {
@@ -1293,12 +1295,20 @@ const PANELES = {
       <button class="btn btn-block" data-n="titulo" style="font-size:20px;">Agregar título</button>
       <button class="btn btn-block" data-n="subtitulo" style="font-size:16px;">Agregar subtítulo</button>
       <button class="btn btn-block btn-outline" data-n="parrafo" style="font-family:Nunito; font-weight:600;">Agregar párrafo</button></div>
+      <h4 style="margin-top:16px;">🎨 Modelos de letras</h4><p class="hint" style="margin-bottom:8px;">Con un texto elegido, le pone el modelo; si no, agrega un título con él.</p>
+      <div data-modelos></div>
       <h4 style="margin-top:16px;">Fuentes</h4><p class="hint" style="margin-bottom:8px;">Con un texto elegido, cambia su fuente; si no, agrega un título con ella.</p>
-      ${FUENTES.map(f => `<button class="fuente-op" data-f="${esc(f)}" style="font-family:'${esc(f)}';">${esc(f)}</button>`).join('')}`;
+      <div data-fuentes></div>`;
     $$('[data-n]', c).forEach(b => b.onclick = () => agregarTexto(b.dataset.n));
-    $$('[data-f]', c).forEach(b => b.onclick = () => {
+    pintarModelos($('[data-modelos]', c), (id, m) => {
       const el = elSel();
-      if (el?.tipo === 'texto') { el.fuente = b.dataset.f; confirmarCambio(); } else agregarTexto('titulo', b.dataset.f);
+      const estilo = { fuente: m.fuente, efecto: efectoDeModelo(m), ...(m.peso ? { peso: m.peso } : {}) };
+      if (el?.tipo === 'texto') { Object.assign(el, estilo); if (!m.peso) delete el.peso; confirmarCambio(); }
+      else agregarTexto('titulo', m.fuente, estilo);
+    });
+    pintarFuentes($('[data-fuentes]', c), (f) => {
+      const el = elSel();
+      if (el?.tipo === 'texto') { el.fuente = f; confirmarCambio(); } else agregarTexto('titulo', f);
     });
   },
 
@@ -1693,7 +1703,8 @@ function pintarPropsElemento(p, el) {
         : '🎵 <b>Pie.</b> Aquí sale el título de la canción y la estrofa.'}</p>`
       : `<label class="lbl" style="margin-top:0;">${vinc ? (hoja().tipo === 'completar' ? 'Frase (usa ___ para cada espacio)' : 'Enunciado de la pregunta') : 'Texto'}</label>
       <textarea class="input" data-prop-texto style="min-height:70px;">${esc(textoDe(el))}</textarea>`) + `
-      <label class="lbl">Fuente</label><select class="input" data-p="fuente">${FUENTES.map(f => `<option ${f === el.fuente ? 'selected' : ''} style="font-family:'${esc(f)}'">${esc(f)}</option>`).join('')}</select>
+      <label class="lbl">Fuente</label><select class="input" data-p="fuente">${opcionesFuentes(fuenteValida(el.fuente))}</select>
+      <details class="ml-det" data-det-modelos><summary>🎨 Modelos de letras</summary><div data-modelos-el></div></details>
       <div style="margin-top:10px;">${fila('Tamaño', `<input type="range" min="1" max="16" step="0.1" data-p="tam" data-num value="${el.tam ?? 4}"><b data-ver="tam">${r1(el.tam ?? 4)}</b>`)}
       ${fila('Color', `<input type="color" data-p="color" value="${colorValido(el.color, '#2D2A45')}">
         <label class="check small" style="margin-left:6px;"><input type="checkbox" data-fondo-caja ${el.fondoCaja ? 'checked' : ''}> Caja</label>
@@ -1710,7 +1721,8 @@ function pintarPropsElemento(p, el) {
       ${fila('Espaciado', `<input type="range" min="-0.05" max="0.6" step="0.01" data-p="espaciado" data-num value="${el.espaciado || 0}">`)}
       ${fila('Interlínea', `<input type="range" min="0.8" max="2" step="0.05" data-p="interlineado" data-num value="${el.interlineado || 1.15}">`)}
       ${fila('Efecto', `<select class="input" data-efecto><option value="">Ninguno</option>${Object.entries(EFECTOS_TEXTO).map(([k, t]) => `<option value="${k}" ${ef.tipo === k ? 'selected' : ''}>${t}</option>`).join('')}</select>`)}
-      ${ef.tipo ? fila('Color', `<input type="color" data-ef="color" value="${colorValido(ef.color, '#FFFFFF').slice(0, 7)}">${ef.tipo === 'degradado' ? `<input type="color" data-ef="color2" value="${colorValido(ef.color2, '#F0ABFC').slice(0, 7)}">` : ''}`) : ''}`;
+      ${ef.tipo === 'cartel' ? `<div data-cartel>${htmlCartel(ef)}</div>`
+        : ef.tipo ? fila('Color', `<input type="color" data-ef="color" value="${colorValido(ef.color, '#FFFFFF').slice(0, 7)}">${ef.tipo === 'degradado' ? `<input type="color" data-ef="color2" value="${colorValido(ef.color2, '#F0ABFC').slice(0, 7)}">` : ''}`) : ''}`;
   } else if (el.tipo === 'imagen') {
     const aj = el.ajuste === 'contain' ? 'contain' : el.ajuste === 'fill' ? 'fill' : 'cover';
     esp = `<div class="grupo-btn" style="margin-bottom:8px;">${[['cover', 'Rellenar'], ['contain', 'Ver completa'], ['fill', 'Estirar']].map(([k, t]) => `<button class="btn btn-sm btn-outline ${aj === k ? 'activo' : ''}" data-ajuste="${k}">${t}</button>`).join('')}</div>
@@ -1794,9 +1806,26 @@ function pintarPropsElemento(p, el) {
   }
   $$('[data-alinear]', p).forEach(b => b.onclick = () => { el.alinear = b.dataset.alinear; confirmarCambio(); });
   $$('[data-alt]', p).forEach(b => b.onclick = () => { el[b.dataset.alt] = !el[b.dataset.alt]; confirmarCambio(); });
+  // 🎨 modelos de letras y letra de cartel
+  selectConFuentes($('select[data-p="fuente"]', p));
+  const detMod = $('[data-det-modelos]', p);
+  if (detMod) detMod.ontoggle = () => {
+    if (!detMod.open || $('[data-modelos-el]', p).childElementCount) return;
+    pintarModelos($('[data-modelos-el]', p), (id, m) => {
+      Object.assign(el, { fuente: m.fuente, efecto: efectoDeModelo(m) });
+      if (m.peso) el.peso = m.peso; else delete el.peso;
+      confirmarCambio();
+    });
+  };
+  const cartel = $('[data-cartel]', p);
+  if (cartel) enlazarCartel(cartel, el.efecto, (nuevo, final) => {
+    el.efecto = { ...nuevo, tipo: 'cartel' };
+    if (final) confirmarCambio(); else if (lienzo) repintarElemento(lienzo, el, 'editor', ctxHoja());
+  });
   const selEf = $('[data-efecto]', p);
   if (selEf) selEf.onchange = () => {
     if (!selEf.value) delete el.efecto;
+    else if (selEf.value === 'cartel') el.efecto = { tipo: 'cartel', relleno: [colorValido(el.color, '#FFFFFF')], borde: '#111827', grosor: 0.05, sombra: '#111827', prof: 0.06 };
     else el.efecto = { color: selEf.value === 'contorno' ? '#1F1147' : selEf.value === 'solida' ? '#7C2D92' : '#FFFFFF', color2: '#F0ABFC', ...(el.efecto || {}), tipo: selEf.value };
     confirmarCambio();
   };
@@ -2462,9 +2491,17 @@ function pintarPropsCancion(p) {
   const det = h.diseno.elementos.filter(e => !e.bloqueado);
   const fondoPropio = d && JSON.stringify(h.diseno.fondo) !== fondoPlantilla();
   const hermanas = d ? hojas.filter(x => x.info?.bloque === d.bloque && x !== h).length : 0;
+  const letra = cancion.opciones.letra || {};
+  const zonaPl = (pl.diseno?.elementos || pl.elementos || []).find(e => e.vinculo === 'letra');
   p.innerHTML = `<details class="pl-plantilla" data-det-pl ${verPlantillas ? 'open' : ''}><summary class="panel-cab" style="cursor:pointer;"><b>🎨 Plantilla: ${esc(pl.nombre)}</b><span class="grow"></span><span class="small muted">Cambiar ▾</span></summary>
       <div class="pl-plantillas" data-pls></div>
       <p class="hint"><a href="${VOLVER.replace('#cultos/canciones', '#cultos/plantillas')}">🎨 Ver y editar plantillas</a></p></details>
+    <details class="pl-plantilla" data-det-letra ${verLetra ? 'open' : ''}><summary class="panel-cab" style="cursor:pointer;"><b>🔤 Letra: ${esc(letra.fuente || 'la de la plantilla')}</b><span class="grow"></span><span class="small muted">Cambiar ▾</span></summary>
+      <p class="hint" style="margin-top:0;">Para toda la canción. Para unas palabras, selecciónalas en la pantalla (✨ Resaltar).</p>
+      <label class="lbl">Fuente</label><select class="input" data-letra-fuente><option value="">La de la plantilla (${esc(zonaPl?.fuente || 'Nunito')})</option>${opcionesFuentes(letra.fuente)}</select>
+      <label class="lbl">Modelos de letras</label><div data-letra-modelos></div>
+      ${letra.efecto?.tipo === 'cartel' ? `<label class="lbl">Colores de la letra</label><div data-letra-cartel>${htmlCartel(letra.efecto)}</div>` : ''}
+      ${letra.fuente || letra.efecto ? '<button class="btn btn-sm btn-block btn-ghost" data-letra-quitar style="margin-top:8px;">↺ Volver a la letra de la plantilla</button>' : ''}</details>
     <div class="panel-cab" style="margin-top:8px;"><b>${d ? `Pantalla ${actual + 1} de ${hojas.length}` : 'Sin pantallas'}</b><span class="grow"></span>${d ? `<span class="badge">${esc(d.codigo)} · ${esc(d.nombre)}</span>` : ''}</div>
     ${d ? `<p class="hint" style="margin-top:0;">✨ <b>Para resaltar</b>, selecciona una o varias palabras de la letra en la pantalla.</p>
     <h4>Detalles de esta pantalla (${det.length})</h4>
@@ -2485,7 +2522,7 @@ function pintarPropsCancion(p) {
     cont.innerHTML = lista.map(x => `<button type="button" data-pl="${esc(x.id)}" class="${x.id === pl.id ? 'sel' : ''}" title="${esc(x.nombre)}"><div data-mini></div><span>${x.mia ? '⭐ ' : ''}${esc(x.nombre)}</span></button>`).join('');
     lista.forEach(x => {
       const b = $(`[data-pl="${CSS.escape(x.id)}"]`, cont);
-      pintarPantalla($('[data-mini]', b), x.id, lineas, { resaltados: cancion.resaltados });
+      pintarPantalla($('[data-mini]', b), x.id, lineas, { resaltados: cancion.resaltados, letra: cancion.opciones.letra });
       b.onclick = async () => {
         cancion.opciones.plantilla = x.id;
         try { localStorage.setItem('cultos.plantilla', x.id); } catch { /* sin almacenamiento */ }
@@ -2496,6 +2533,30 @@ function pintarPropsCancion(p) {
   };
   detPl.ontoggle = () => { verPlantillas = detPl.open; pintarPls(); };
   pintarPls();
+  // 🔤 la letra de toda la canción: cancion.opciones.letra = { fuente, peso, efecto }
+  const detLetra = $('[data-det-letra]', p);
+  const ponerLetra = async (nueva) => {
+    for (const k of Object.keys(nueva)) if (!nueva[k]) delete nueva[k];
+    if (Object.keys(nueva).length) cancion.opciones.letra = nueva; else delete cancion.opciones.letra;
+    if (nueva.fuente) await prepararFuente('fuente:' + nueva.fuente);   // para medir con la letra real
+    cambioCancion();
+  };
+  const pintarLetraOps = () => {
+    if (!detLetra.open || $('[data-letra-modelos]', p).childElementCount) return;
+    pintarModelos($('[data-letra-modelos]', p), (id, m) => ponerLetra({ fuente: m.fuente, peso: m.peso, efecto: efectoDeModelo(m) }));
+  };
+  detLetra.ontoggle = () => { verLetra = detLetra.open; pintarLetraOps(); };
+  pintarLetraOps();
+  const selLetra = $('[data-letra-fuente]', p);
+  selectConFuentes(selLetra);
+  selLetra.onchange = () => ponerLetra({ ...letra, fuente: selLetra.value, ...(selLetra.value ? {} : { peso: '' }) });
+  const cartelLetra = $('[data-letra-cartel]', p);
+  if (cartelLetra) enlazarCartel(cartelLetra, letra.efecto, (nuevo, final) => {
+    cancion.opciones.letra = { ...letra, efecto: { ...nuevo, tipo: 'cartel' } };
+    if (final) cambioCancion({ demorarHistorial: true });
+  });
+  const quitarLetra = $('[data-letra-quitar]', p);
+  if (quitarLetra) quitarLetra.onclick = () => ponerLetra({});
   $$('[data-elegir]', p).forEach(b => b.onclick = () => { selId = b.dataset.elegir; pintarSeleccion(); pintarPropiedades(); });
   const cp = $('[data-copiar-det]', p);
   if (cp) cp.onclick = () => {
