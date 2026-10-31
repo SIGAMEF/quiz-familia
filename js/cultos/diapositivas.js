@@ -117,10 +117,16 @@ export async function prepararFuente(id) {
 // Las hojas de una canción (una por pantalla): la plantilla de la canción (sus elementos quedan bloqueados),
 // la letra con sus resaltados y los detalles propios de esa pantalla (cancion.detalles[clave] = { el, fondo }).
 export const plantillaDeCancion = (c) => plantillaDe(c?.opciones?.plantilla).id;
+// La plantilla de una estrofa: la suya (cancion.opciones.plantillasEstrofas[bloque], p. ej. un coro distinto) o la de la canción
+export function plantillaDeEstrofa(c, bloque) {
+  const e = c?.opciones?.plantillasEstrofas?.[bloque];
+  return e && existePlantilla(e) ? plantillaDe(e).id : plantillaDeCancion(c);
+}
 export function hojasDeCancion(c) {
-  const id = plantillaDeCancion(c);
-  const base = hojaDePlantilla(plantillaDe(id)).diseno;
+  const bases = new Map();
+  const baseDe = (id) => { if (!bases.has(id)) bases.set(id, hojaDePlantilla(plantillaDe(id)).diseno); return bases.get(id); };
   return diapositivas(c).map(d => {
+    const id = plantillaDeEstrofa(c, d.bloque), base = baseDe(id);
     const det = c.detalles?.[d.clave] || {};
     const letra = letraDePantalla(c, d.bloque);
     const a = ajustar(id, d.fuente, c.resaltados, letra);

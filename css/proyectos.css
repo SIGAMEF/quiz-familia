@@ -800,3 +800,12 @@ textarea.pl-area { min-height: 220px; font-size: 13px; line-height: 1.45; }
 @media (pointer: coarse) {
   .ed-centro .pe[data-vinculo="letra"] .pe-txt { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 }
+
+/* ---------- Plantilla de la canción: qué la tapa, vista previa y plantilla por estrofa ---------- */
+.pl-tapa { margin: -2px 0 8px; padding: 6px 10px; border-radius: 10px; background: #FFF7E6; color: #92400E; font-size: 12.5px; font-weight: 700; line-height: 1.4; }
+.pl-tapa a { color: #B45309; text-decoration: underline; white-space: nowrap; }
+.marco.previa { outline: 3px dashed var(--primary); outline-offset: 4px; }
+.marco.previa::after { content: 'Vista previa'; position: absolute; top: 8px; left: 8px; z-index: 5; background: var(--primary); color: #fff; font: 800 12px 'Nunito', sans-serif; padding: 3px 8px; border-radius: 8px; }
+.pl-estrofa { margin-top: 6px; flex-wrap: wrap; }
+.pl-estrofa label { min-width: 0; }
+.pl-estrofa select { flex: 1; min-width: 150px; }

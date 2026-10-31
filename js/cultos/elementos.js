@@ -210,6 +210,7 @@ export const idsDeCanciones = (items) => [...new Set((items || []).filter(it => 
 export function plantillasDeCulto(culto, canciones) {
   const items = culto?.items || [];
   return [...new Set([plantillaDe(culto?.plantilla_base).id, ...items.map(it => plantillaDeElemento(it, culto, canciones.get(it.cancion))),
+    ...items.flatMap(it => Object.values(canciones.get(it.cancion)?.opciones?.plantillasEstrofas || {})),   // estrofas con otra plantilla
     ...items.flatMap(it => { const o = canciones.get(it.cancion)?.opciones; return [o?.letra, ...Object.values(o?.letraEstrofas || {})].map(l => l?.fuente); })
       .filter(Boolean).map(f => 'fuente:' + f)])];
 }

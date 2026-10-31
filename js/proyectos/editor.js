@@ -31,7 +31,7 @@ import { colorBase, FONDOS, CATEGORIAS_FONDO, parametros, montarFondoAnimado } f
 import { ACEPTA_FONDO, subirFondo, tipoDeFondo } from './subir-fondo.js';
 import { datosCanciones } from '../cultos/datos.js';
 import { OPCIONES_DEFECTO, ordenNormal, ubicarResaltados, lineasDeContenido, palabras, etiquetas } from '../cultos/letra.js';
-import { hojasDeCancion, plantillaDeCancion, plantillaDe, registrarMisPlantillas, misPlantillas, prepararFuente, pintarPantalla, existePlantilla, zonaConLetra, letraDePantalla } from '../cultos/diapositivas.js';
+import { hojasDeCancion, plantillaDeCancion, plantillaDeEstrofa, plantillaDe, registrarMisPlantillas, misPlantillas, prepararFuente, pintarPantalla, existePlantilla, zonaConLetra, letraDePantalla } from '../cultos/diapositivas.js';
 import { PLANTILLAS as PLANTILLAS_CULTO, PLANTILLA_DEFECTO } from '../cultos/plantillas.js';
 import { montarPanelLetra } from '../cultos/panel-letra.js';
 import { montarResaltar, abrirMenuResaltar, cerrarMenuResaltar } from '../cultos/resaltar.js';
@@ -2395,7 +2395,8 @@ const filaCancion = () => ({
   bloques: cancion.bloques, orden_canto: cancion.orden_canto?.length ? ordenNormal(cancion.orden_canto) : null, opciones: cancion.opciones,
   compartida: !!cancion.compartida, resaltados: cancion.resaltados || [], detalles: cancion.detalles || {}
 });
-const fondoPlantilla = () => JSON.stringify(plantillaDe(plantillaDeCancion(cancion)).diseno?.fondo || plantillaDe(plantillaDeCancion(cancion)).fondo);
+// El fondo de la plantilla de una estrofa (la de la canción, o la suya si tiene otra), en texto para comparar
+const fondoPlantilla = (bloque) => { const pl = plantillaDe(plantillaDeEstrofa(cancion, bloque)); return JSON.stringify(pl.diseno?.fondo || pl.fondo); };
 // Pantalla de muestra cuando todavía no hay letra
 function hojaVacia() {
   const h = hojasDeCancion({ ...cancion, bloques: [{ tipo: 'estrofa', texto: 'Pega la letra en 🎵 Letra' }], orden_canto: null, resaltados: [], detalles: {} })[0];
@@ -2412,11 +2413,11 @@ function reconstruir() {
 }
 // Los detalles de cada pantalla (lo que no es de la plantilla) vuelven a la canción
 function sincronizarDetalles() {
-  const base = fondoPlantilla(), det = {};
+  const det = {};
   for (const h of hojas) {
     if (!h.info) continue;
     const el = h.diseno.elementos.filter(e => !e.bloqueado);
-    const fondo = JSON.stringify(h.diseno.fondo) !== base ? h.diseno.fondo : null;
+    const fondo = JSON.stringify(h.diseno.fondo) !== fondoPlantilla(h.info.bloque) ? h.diseno.fondo : null;
     if (el.length || fondo) det[h.id] = { el, ...(fondo ? { fondo } : {}) };
   }
   // los de pantallas que ahora no salen (p. ej. se quitó un coro del orden) se guardan por si vuelven
@@ -2425,8 +2426,10 @@ function sincronizarDetalles() {
 }
 let tHist = null;
 // Un cambio de la canción: rearma las pantallas, repinta y guarda
-function cambioCancion({ letra = false, panel = false, demorarHistorial = false } = {}) {
-  sincronizarDetalles();
+// sincronizar: false cuando los detalles ya se tomaron antes de cambiar la plantilla (si no, el fondo de la
+// plantilla anterior quedaría como "fondo propio" de cada pantalla)
+function cambioCancion({ letra = false, panel = false, demorarHistorial = false, sincronizar = true } = {}) {
+  if (sincronizar) sincronizarDetalles();
   if (letra) {
     const { validos, perdidos } = ubicarResaltados(cancion.bloques, cancion.resaltados);
     cancion.resaltados = validos;
@@ -2571,8 +2574,10 @@ function pintarTiraCancion(tira) {
 function pintarPropsCancion(p) {
   const h = hoja(), d = h.info;
   const pl = plantillaDe(plantillaDeCancion(cancion));
+  const propios = cambiosPropios();
+  const plEstrofa = d ? cancion.opciones.plantillasEstrofas?.[d.bloque] || '' : '';
   const det = h.diseno.elementos.filter(e => !e.bloqueado);
-  const fondoPropio = d && JSON.stringify(h.diseno.fondo) !== fondoPlantilla();
+  const fondoPropio = d && JSON.stringify(h.diseno.fondo) !== fondoPlantilla(d.bloque);
   const hermanas = d ? hojas.filter(x => x.info?.bloque === d.bloque && x !== h).length : 0;
   // 🔤 la letra: la de la canción (opciones.letra) o la de esta estrofa (opciones.letraEstrofas[bloque]); efectiva: lo que se ve
   if (!d) letraDestino = 'cancion';
@@ -2587,6 +2592,7 @@ function pintarPropsCancion(p) {
     <details class="pl-plantilla" data-det-pl ${verPlantillas ? 'open' : ''}><summary class="panel-cab" style="cursor:pointer;"><b>🎨 Plantilla: ${esc(pl.nombre)}</b><span class="grow"></span><span class="small muted">Cambiar ▾</span></summary>
       <div class="pl-plantillas" data-pls></div>
       <p class="hint"><a href="${VOLVER.replace('#cultos/canciones', '#cultos/plantillas')}">🎨 Ver y editar plantillas</a></p></details>
+    ${propios.quitables ? `<p class="pl-tapa">⚠️ ${esc(propios.corto)} · <a href="#" data-usar-pl>Quitar y usar la plantilla</a></p>` : ''}
     <details class="pl-plantilla lt-letra" data-det-letra ${verLetra ? 'open' : ''}><summary class="panel-cab" style="cursor:pointer;"><b>🔤 Letra de toda la canción</b><span class="grow"></span><span class="small muted">${esc(fuenteValida(efectiva.fuente))} ▾</span></summary>
       ${d ? `<div class="lt-destino"><span class="small muted">Aplicar a:</span><div class="grupo-btn">
         <button type="button" class="btn btn-sm btn-outline ${letraDestino === 'cancion' ? 'activo' : ''}" data-destino="cancion">Esta canción</button>
@@ -2608,6 +2614,7 @@ function pintarPropsCancion(p) {
       <button type="button" class="btn btn-sm btn-block" data-letra-plantilla>💾 Guardar en mi plantilla</button>
       ${hayLetra ? '<button type="button" class="btn btn-sm btn-block btn-ghost" data-letra-quitar style="margin-top:4px;">↺ Volver al estilo de la plantilla</button>' : ''}</details>
     <div class="panel-cab" style="margin-top:8px;"><b>${d ? `Pantalla ${actual + 1} de ${hojas.length}` : 'Sin pantallas'}</b><span class="grow"></span>${d ? `<span class="badge">${esc(d.codigo)} · ${esc(d.nombre)}</span>` : ''}</div>
+    ${d ? `<div class="prop-fila pl-estrofa"><label title="Usar otra plantilla en esta estrofa">Plantilla de ${esc(d.nombre)}</label><select class="input" data-pl-estrofa><option value="">La de la canción (${esc(pl.nombre)})</option>${[...misPlantillas(), ...PLANTILLAS_CULTO].map(x => `<option value="${esc(x.id)}" ${x.id === plEstrofa ? 'selected' : ''}>${x.mia ? '⭐ ' : ''}${esc(x.nombre)}</option>`).join('')}</select></div>` : ''}
     ${d ? `<h4>Detalles de esta pantalla (${det.length})</h4>
     <div class="capas">${det.slice().reverse().map(e => `<button data-elegir="${e.id}">${e.tipo === 'emoji' ? esc(e.emoji || '😀') : ICO_EL[e.tipo] || '•'}
       <span>${esc(e.tipo === 'texto' ? (e.texto || '').slice(0, 40) || '(texto vacío)' : NOMBRE_EL[e.tipo] || e.tipo)}</span></button>`).join('') || '<p class="hint">Agrega objetos, emojis, imágenes o un texto desde <b>➕ Recursos</b>: solo saldrán en esta pantalla.</p>'}</div>
@@ -2627,16 +2634,17 @@ function pintarPropsCancion(p) {
     lista.forEach(x => {
       const b = $(`[data-pl="${CSS.escape(x.id)}"]`, cont);
       pintarPantalla($('[data-mini]', b), x.id, lineas, { resaltados: cancion.resaltados, letra: cancion.opciones.letra });
-      b.onclick = async () => {
-        cancion.opciones.plantilla = x.id;
-        try { localStorage.setItem('cultos.plantilla', x.id); } catch { /* sin almacenamiento */ }
-        await prepararFuente(x.id);
-        cambioCancion();
-      };
+      b.onmouseenter = () => previaPlantilla(x.id);   // vista previa en el lienzo; al salir, vuelve como estaba
+      b.onmouseleave = () => pintarLienzo();
+      b.onclick = () => { if (x.id !== pl.id || propios.quitables) elegirPlantilla(x.id); };
     });
   };
   detPl.ontoggle = () => { verPlantillas = detPl.open; pintarPls(); };
   pintarPls();
+  const usarPl = $('[data-usar-pl]', p);
+  if (usarPl) usarPl.onclick = (e) => { e.preventDefault(); cambiarPlantilla(pl.id, { modo: 'completa', estrofas: false }); toast('Ahora se ve la plantilla tal como es (los resaltados se quedan)'); };
+  const selPlE = $('[data-pl-estrofa]', p);
+  if (selPlE) selPlE.onchange = () => plantillaDeEstaEstrofa(d.bloque, selPlE.value);
   // ✨ Resaltar (arriba): las opciones de las palabras elegidas
   seccionResaltar($('[data-resaltar]', p));
   // 🔤 la letra de toda la canción (o de esta estrofa)
@@ -2712,9 +2720,93 @@ function pintarPropsCancion(p) {
     toast(`Detalles copiados a ${hermanas} ${hermanas === 1 ? 'pantalla' : 'pantallas'} de ${d.codigo}`);
   };
   const qd = $('[data-quitar-det]', p);
-  if (qd) qd.onclick = () => { h.diseno.elementos = h.diseno.elementos.filter(e => e.bloqueado); h.diseno.fondo = JSON.parse(fondoPlantilla()); selId = null; confirmarCambio({ repintar: 'todo' }); };
+  if (qd) qd.onclick = () => { h.diseno.elementos = h.diseno.elementos.filter(e => e.bloqueado); h.diseno.fondo = JSON.parse(fondoPlantilla(d.bloque)); selId = null; confirmarCambio({ repintar: 'todo' }); };
   const fp = $('[data-fondo-pl]', p);
-  if (fp) fp.onclick = () => { h.diseno.fondo = JSON.parse(fondoPlantilla()); confirmarCambio(); };
+  if (fp) fp.onclick = () => { h.diseno.fondo = JSON.parse(fondoPlantilla(d.bloque)); confirmarCambio(); };
+}
+
+// ---------- Cambiar la plantilla de la canción ----------
+// Lo que la canción cambió por su cuenta y tapa a la plantilla: fondos propios, letra propia y detalles por pantalla
+function cambiosPropios() {
+  const det = Object.values(cancion.detalles || {});
+  const fondos = det.filter(x => x.fondo).length, detalles = det.filter(x => x.el?.length).length;
+  const letra = cancion.opciones.letra, estrofas = Object.keys(cancion.opciones.letraEstrofas || {}).length;
+  const n = (k, uno, varios) => `${k} ${k === 1 ? uno : varios}`;
+  const partes = [];   // [texto corto (para la línea bajo la plantilla), texto largo (para la pregunta)]
+  if (fondos) partes.push([`Fondo propio en ${n(fondos, 'pantalla', 'pantallas')}`, `fondo en ${n(fondos, 'pantalla', 'pantallas')}`]);
+  if (letra?.fuente) partes.push(['Fuente propia', `fuente ${letra.fuente}`]);
+  else if (letra) partes.push(['Letra propia', 'estilo de letra propio']);
+  if (estrofas) partes.push([`Letra propia en ${n(estrofas, 'estrofa', 'estrofas')}`, `letra propia en ${n(estrofas, 'estrofa', 'estrofas')}`]);
+  if (detalles) partes.push([`Detalles en ${n(detalles, 'pantalla', 'pantallas')}`, `detalles en ${n(detalles, 'pantalla', 'pantallas')}`]);
+  return { hay: partes.length > 0, quitables: fondos > 0 || !!letra || estrofas > 0, corto: partes.map(p => p[0]).join(' · '), largo: partes.map(p => p[1]).join(', ') };
+}
+// Quita lo que tapa a la plantilla: los fondos propios y el estilo de letra (los detalles agregados se quedan)
+function quitarCambiosPropios({ resaltados = false } = {}) {
+  const det = {};
+  for (const [k, v] of Object.entries(cancion.detalles || {})) if (v.el?.length) det[k] = { el: v.el };
+  cancion.detalles = det;
+  delete cancion.opciones.letra; delete cancion.opciones.letraEstrofas;
+  if (resaltados) cancion.resaltados = [];
+}
+// Cambia la plantilla de una vez (un solo paso para Deshacer). modo: 'completa' | 'parcial'
+// estrofas: false para mantener las plantillas propias de cada estrofa
+async function cambiarPlantilla(id, { modo = 'parcial', resaltados = false, estrofas = true } = {}) {
+  sincronizarDetalles();   // los cambios de las pantallas, comparados con la plantilla que había
+  if (modo === 'completa') { quitarCambiosPropios({ resaltados }); if (estrofas) delete cancion.opciones.plantillasEstrofas; }
+  cancion.opciones.plantilla = id;
+  try { localStorage.setItem('cultos.plantilla', id); } catch { /* sin almacenamiento */ }
+  await prepararFuente(id);
+  cambioCancion({ sincronizar: false });
+}
+// Al elegir otra plantilla: si hay cambios propios, pregunta qué hacer
+async function elegirPlantilla(id) {
+  sincronizarDetalles();
+  const c = cambiosPropios();
+  if (!c.quitables) return cambiarPlantilla(id);
+  const r = await new Promise(ok => {
+    let elegido = null;
+    const m = abrirModal(`<h3>🎨 Cambiar la plantilla</h3>
+      <p>Esta canción tiene cambios propios: <b>${esc(c.largo)}</b>. ¿Qué hago?</p>
+      <div class="stack" style="margin-top:12px;">
+        <button class="btn btn-primary btn-block" data-modo="completa">Aplicar la plantilla completa</button>
+        <p class="hint" style="margin:-4px 0 0;">Quita el fondo propio y el estilo de la letra, y usa el fondo, las fuentes y los colores de “${esc(plantillaDe(id).nombre)}”.</p>
+        ${cancion.resaltados?.length ? `<label class="check small"><input type="checkbox" data-resaltados> Quitar también los resaltados de palabras (${cancion.resaltados.length})</label>` : ''}
+        <button class="btn btn-outline btn-block" data-modo="parcial" style="margin-top:6px;">Solo cambiar lo que no modifiqué</button>
+        <p class="hint" style="margin:-4px 0 0;">La plantilla se aplica donde no hay cambios propios; lo tuyo se queda.</p>
+      </div>
+      <div class="modal-pie"><button class="btn btn-ghost" data-no>Cancelar</button></div>`, { alCerrar: () => ok(elegido) });
+    $$('[data-modo]', m.el).forEach(b => b.onclick = () => { elegido = { modo: b.dataset.modo, resaltados: !!$('[data-resaltados]', m.el)?.checked }; m.cerrar(); });
+    $('[data-no]', m.el).onclick = () => m.cerrar();
+  });
+  if (r) await cambiarPlantilla(id, r);
+}
+// Vista previa en vivo en el lienzo (al pasar el mouse por una plantilla): la plantilla completa, sin cambiar nada
+function previaPlantilla(id) {
+  const marco = $('[data-escenario] [data-marco]');
+  if (!marco || enCelular() || !hoja()?.info) return;
+  const det = Object.fromEntries(Object.entries(cancion.detalles || {}).map(([k, v]) => [k, { el: v.el || [] }]));
+  const opciones = { ...cancion.opciones, plantilla: id };
+  delete opciones.letra; delete opciones.letraEstrofas; delete opciones.plantillasEstrofas;
+  const h = hojasDeCancion({ ...cancion, opciones, detalles: det }).find(x => x.id === hoja().id);
+  if (!h) return;
+  marco.replaceChildren();
+  pintarHoja(marco, h, { modo: 'editor', animar: animarEd });
+  marco.classList.add('previa');
+}
+// Otra plantilla solo para una estrofa (p. ej. el coro). id '' = la de la canción
+async function plantillaDeEstaEstrofa(bloque, id) {
+  sincronizarDetalles();
+  const pantallas = hojas.filter(x => x.info?.bloque === bloque);
+  const conFondo = pantallas.filter(x => cancion.detalles?.[x.id]?.fondo).length;
+  if (conFondo && await confirmar(`${conFondo === 1 ? 'Una pantalla' : conFondo + ' pantallas'} de esta estrofa ${conFondo === 1 ? 'tiene' : 'tienen'} un fondo propio que tapa la plantilla. ¿Lo quito?`,
+    { titulo: '¿Quitar el fondo propio?', boton: 'Quitar', peligro: false })) {
+    for (const x of pantallas) if (cancion.detalles?.[x.id]) { delete cancion.detalles[x.id].fondo; if (!cancion.detalles[x.id].el?.length) delete cancion.detalles[x.id]; }
+  }
+  const m = { ...(cancion.opciones.plantillasEstrofas || {}) };
+  if (id) m[bloque] = id; else delete m[bloque];
+  if (Object.keys(m).length) cancion.opciones.plantillasEstrofas = m; else delete cancion.opciones.plantillasEstrofas;
+  if (id) await prepararFuente(id);
+  cambioCancion({ sincronizar: false });
 }
 
 // 💾 Guardar en mi plantilla: la letra que se ve (la de la canción y la de esta estrofa) pasa a la zona de la letra
