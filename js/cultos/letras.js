@@ -32,7 +32,9 @@ function cuerpo(x) {
   if (x.tipo === 'versiculo') return lineas(x.texto);
   if (x.tipo === 'texto') return x.texto ? lineas(x.texto) : '';
   if (x.tipo === 'anuncio') return urlSegura(x.url) ? `<img class="le-img" src="${esc(x.url)}" alt="${esc(x.titulo || 'Anuncio')}">` : '<p>Sin imagen.</p>';
-  if (x.tipo === 'video') return urlSegura(x.url) ? `<a class="le-enlace" href="${esc(x.url)}" target="_blank" rel="noopener">▶ Ver el video</a>` : '<p>Sin enlace.</p>';
+  // un video propio muestra su portada (una imagen): el celular solo baja el video si el corista lo abre
+  if (x.tipo === 'video') return urlSegura(x.url) ? `${urlSegura(x.portada) ? `<a href="${esc(x.url)}" target="_blank" rel="noopener"><img class="le-img" src="${esc(x.portada)}" alt="${esc(x.titulo || 'Video')}" loading="lazy"></a>` : ''}
+    <a class="le-enlace" href="${esc(x.url)}" target="_blank" rel="noopener" style="margin-top:10px;">▶ Ver el video</a>` : '<p>Sin enlace.</p>';
   return htmlDeLetra(x.bloques) || '<p>Sin letra.</p>';
 }
 

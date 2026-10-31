@@ -48,6 +48,12 @@ begin
   a := public.archivo_registrar(pg_temp.ruta('prof1', 'dos.mp4'), 'video', 'clase.mp4', 3000000, null, null, h2, 'video/mp4');
   insert into t_ids values ('a2', (a->>'id')::uuid);
   if jsonb_array_length(public.mis_archivos()) <> 2 then raise exception 'FALLO: mis_archivos: %', public.mis_archivos(); end if;
+  -- "Mis fondos": el video queda marcado como fondo, con la portada (una imagen de mi carpeta)
+  v := public.archivo_fondo((a->>'id')::uuid, (select x->>'url' from jsonb_array_elements(public.mis_archivos()) x where x->>'tipo' = 'imagen'));
+  if (v->>'fondo')::boolean is not true or v->>'portada' not like '%/proyectos/' || auth.uid() || '/uno.webp' then raise exception 'FALLO: archivo_fondo: %', v; end if;
+  begin perform public.archivo_fondo((a->>'id')::uuid, 'https://otro.sitio/x.jpg'); exception when others then ok := true; end;
+  if not ok then raise exception 'FALLO: aceptó una portada de otro sitio'; end if;
+  ok := false;
   if (public.archivos_espacio()->>'usado')::bigint <> 4000000 then raise exception 'FALLO: espacio usado: %', public.archivos_espacio(); end if;
   -- rutas no válidas
   begin perform public.archivo_registrar('proyectos/' || gen_random_uuid() || '/x.jpg', 'imagen', 'x', 10); exception when others then ok := true; end;

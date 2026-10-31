@@ -133,7 +133,30 @@ export const PLANTILLAS = [
     ...polaroid(5, 58, -3, '#BBF7D0', '🙏', 'oración', -4),
     portada('Campamento\n2026', 46, 26, 47, 36, 10, { fuente: 'Caveat', alinear: 'right', interlineado: 0.9, color: '#FFFFFF', sombra: true }),
     portada('¡Revive los mejores momentos! 📸', 40, 64, 53, 7, 2, { fuente: 'Montserrat', peso: 700, alinear: 'right', color: '#FFFFFF' }),
-    letra({ fuente: 'Montserrat', peso: 800, color: '#FFFFFF', sombra: true }), pie({ color: '#FFFFFF' })] }
+    letra({ fuente: 'Montserrat', peso: 800, color: '#FFFFFF', sombra: true }), pie({ color: '#FFFFFF' })] },
+  // ---- con los fondos de escenas (assets/fondos-culto/): el texto va arriba, para no tapar la escena ----
+  { id: 'alpie', nombre: 'Al pie de la cruz', categoria: 'Adoración', fondo: animado('cruzAtardecer'), elementos: [
+    // la cruz está a la derecha: el texto va a la izquierda
+    rotulo('— Tiempo de adoración —', 14, { color: '#FFF7E6', x: 4, w: 56 }),
+    portada('Al pie de\nla cruz', 4, 20, 56, 32, 8, { fuente: 'Cormorant Garamond', cursiva: true, peso: 500, color: '#FFF7E6', interlineado: 0.95, efecto: { tipo: 'brillo', color: '#F59E0B' } }),
+    portada('— Aquí encontramos descanso —', 4, 53, 56, 6, 2.2, { fuente: 'Cormorant Garamond', peso: 500, color: '#FFF7E6' }),
+    letra({ fuente: 'Cormorant Garamond', peso: 500, tam: 5.4, color: '#FFF7E6', x: 3, w: 58, y: 6, h: 58, efecto: { tipo: 'brillo', color: '#7C2D12' } }), pie({ color: '#FFF7E6', x: 4, w: 56, y: 66 })] },
+  { id: 'jesusmeama', nombre: 'Escuela dominical', categoria: 'Niños', fondo: animado('pradoOvejas'), elementos: [
+    emoji('❤️', 10, 8, 6, 'latir', 1.5),
+    emoji('🌈', 83, 6, 7, 'flotar', 4),
+    portada('¡Jesús me ama!', 12, 12, 76, 22, 8.4, { fuente: 'Luckiest Guy', color: '#FFFFFF', efecto: { tipo: 'cartel', relleno: ['#FFFFFF'], borde: '#1E3A8A', grosor: 0.08, sombra: '#1E3A8A', prof: 0.06 } }),
+    portada('🐑 ❤️ 🌈', 25, 36, 50, 10, 4.4),
+    letra({ fuente: 'Fredoka', peso: 700, tam: 5, color: '#FFFFFF', y: 6, h: 48, efecto: { tipo: 'cartel', relleno: ['#FFFFFF'], borde: '#1E3A8A', grosor: 0.07 } }), pie({ color: '#1E3A8A', y: 56, opacidad: 0.75 })] },
+  { id: 'nochealabanza', nombre: 'Noche de alabanza', categoria: 'Juvenil', fondo: animado('concierto'), elementos: [
+    { tipo: 'lluvia', emojis: ['🎶', '🙌', '✨', '🔥', '🎤'], cantidad: 8, tam: 4.5, x: 0, y: 0, w: 100, h: 100, rot: 0 },
+    portada('NOCHE DE ALABANZA', 6, 16, 88, 22, 11, { fuente: 'Bebas Neue', color: '#FFFFFF', interlineado: 0.9, efecto: { tipo: 'brillo', color: '#E879F9' } }),
+    portada('Sábado · 7:00 p. m.', 10, 40, 80, 6, 2, { fuente: 'Montserrat', peso: 800, espaciado: 0.3, mayus: true, color: '#FFFFFF' }),
+    letra({ fuente: 'Bebas Neue', tam: 6.6, interlineado: 1.05, color: '#FFFFFF', y: 6, h: 52, efecto: { tipo: 'brillo', color: '#A21CAF' } }), pie({ color: '#FFFFFF', y: 60 })] },
+  { id: 'campamento', nombre: 'Fogata', categoria: 'Evento', fondo: animado('fogata'), elementos: [
+    rotulo('Campamento 2026', 10, { color: '#FDBA74' }),
+    portada('ENCIENDE TU FE', 6, 16, 88, 20, 10, { fuente: 'Anton', espaciado: 0.03, color: '#FFFFFF', efecto: { tipo: 'degradado', color: '#FFFFFF', color2: '#FDBA74', angulo: 180 } }),
+    cita('Lucas 24:32', 38, { color: '#FFFFFF' }),
+    letra({ fuente: 'Anton', tam: 5.4, espaciado: 0.03, color: '#FFFFFF', y: 5, h: 48 }), pie({ color: '#FFFFFF', y: 55 })] }
 ].map(p => ({ ...p, elementos: p.elementos.map((e, i) => ({ id: `${p.id}-${i}`, ...e })) }));
 
 // "+ Nueva plantilla en blanco": un fondo, un título para la portada y la zona de la letra

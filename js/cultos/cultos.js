@@ -374,7 +374,11 @@ function editarElemento(original, { culto, canciones, perfil, recargar, recargar
     const enlazar = () => {
       $$('[data-campo]', form).forEach(x => {
         const k = x.dataset.campo;
-        x.oninput = x.onchange = () => { it[k] = x.type === 'checkbox' ? x.checked : x.type === 'number' ? Number(x.value) : x.value; previa(); };
+        x.oninput = x.onchange = () => {
+          it[k] = x.type === 'checkbox' ? x.checked : x.type === 'number' ? Number(x.value) : x.value;
+          if (k === 'url') delete it.portada;   // la portada era del video anterior
+          previa();
+        };
       });
       const pl = $('[data-pl]', form);
       if (pl) pl.onchange = () => { it.plantilla = pl.value; previa(); };
@@ -436,6 +440,7 @@ function editarElemento(original, { culto, canciones, perfil, recargar, recargar
         <p class="hint">En la proyección el video empieza solo (si el navegador no lo permite, haz clic en la pantalla). Necesita internet.</p>`;
       $('[data-mis]', form).onclick = () => elegirArchivo('video', (a) => {
         it.url = a.url; $('[data-campo="url"]', form).value = a.url;
+        if (a.portada) it.portada = a.portada; else delete it.portada;   // para los coristas: la imagen, no el video
         if (!it.nombre) { it.nombre = a.nombre || ''; $('[data-campo="nombre"]', form).value = it.nombre; }
         previa();
       });
@@ -479,7 +484,7 @@ export function datosCoristas(culto, canciones) {
       return titulo || texto ? [{ id: it.id, tipo: 'texto', titulo: titulo || 'Aviso', texto }] : [];
     }
     if (it.tipo === 'anuncio') return it.url ? [{ id: it.id, tipo: 'anuncio', titulo: it.nombre || 'Anuncio', url: it.url }] : [];
-    if (it.tipo === 'video') return it.url ? [{ id: it.id, tipo: 'video', titulo: it.nombre || 'Video', url: it.url }] : [];
+    if (it.tipo === 'video') return it.url ? [{ id: it.id, tipo: 'video', titulo: it.nombre || 'Video', url: it.url, ...(it.portada ? { portada: it.portada } : {}) }] : [];
     return [];
   });
 }

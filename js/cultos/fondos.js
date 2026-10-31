@@ -5,7 +5,10 @@
 // fondo no se ve (IntersectionObserver) o la pestaña está oculta, y con prefers-reduced-motion
 // se dibuja un solo cuadro quieto.
 // Lo usan el lienzo de Proyectos y Cultos (fondo { tipo: 'animado', valor: 'aurora', p: {…} }).
+// Los fondos con escenas (cruz, paloma, ovejas, concierto…) están en la carpeta oficial assets/fondos-culto/
+// (escenas.js, mismo formato, cada uno con su categoría en cat); los de aquí son los "Abstractos".
 // ============================================================
+import { ESCENAS } from '../../assets/fondos-culto/escenas.js';
 
 const TAU = Math.PI * 2;
 const ciclo = (v) => ((v % 1) + 1) % 1;
@@ -179,19 +182,40 @@ export const FONDOS = {
     } }
 };
 
-// Colores del fondo (los por defecto + los que eligió el profesor), siempre válidos
+// Los fondos con escenas, en su categoría; los de arriba son "Abstractos"
+Object.values(FONDOS).forEach(f => { f.cat ??= 'Abstractos'; });
+Object.assign(FONDOS, Object.fromEntries(Object.entries(ESCENAS).filter(([k]) => !FONDOS[k])));
+export const CATEGORIAS_FONDO = ['Cristianos', 'Niños', 'Jóvenes', 'Abstractos'];
+
+// Colores del fondo (los por defecto + los que eligió el profesor), siempre válidos.
+// Cada fondo trae sus colores en p: base (1–4) y colores (1–6) en los abstractos; en las escenas,
+// listas y colores sueltos con nombre propio (cielo, madera, luz…), que conservan su largo.
 export function parametros(f) {
-  const F = FONDOS[f?.valor] || FONDOS.aurora, d = F.p, q = f?.p || {};
+  const F = FONDOS[f?.valor] || FONDOS.aurora, d = F.p || {}, q = f?.p || {};
   const lista = (v, def, min, max) => {
     const l = Array.isArray(v) ? v.slice(0, max).map((c, i) => hexOk(c, def[i % def.length])) : def;
     return l.length >= min ? l : def;
   };
-  const out = { base: lista(q.base, d.base, 1, 4), colores: lista(q.colores, d.colores, 1, 6) };
-  if (d.n) out.n = Math.max(10, Math.min(120, Number(q.n) || d.n));
+  const out = {};
+  for (const [k, v] of Object.entries(d)) {
+    if (k === 'n') out.n = Math.max(10, Math.min(120, Number(q.n) || v));
+    else if (k === 'base') out.base = lista(q.base, v, 1, 4);
+    else if (k === 'colores' && d.base) out.colores = lista(q.colores, v, 1, 6);
+    else if (Array.isArray(v)) out[k] = lista(q[k], v, v.length, v.length);
+    else if (typeof v === 'string' && HEX.test(v)) out[k] = hexOk(q[k], v);
+    else out[k] = v;
+  }
   return out;
 }
-// Color de muestra (para saber si el fondo es oscuro y para la vista sin animación)
-export const colorBase = (f) => parametros(f).base[0];
+// Color de muestra (para saber si el fondo es oscuro y para la vista sin animación): el primero que haya
+export function colorBase(f) {
+  const p = parametros(f);
+  for (const v of Object.values(p)) {
+    const c = Array.isArray(v) ? v[0] : v;
+    if (typeof c === 'string' && HEX.test(c)) return c;
+  }
+  return '#000000';
+}
 
 // ---------- Motor ----------
 const reducido = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -223,7 +247,7 @@ export function montarFondoAnimado(capa, f, { calidad = 'alta' } = {}) {
   const cv = document.createElement('canvas');
   cv.className = 'fondo-animado';
   cv.setAttribute('aria-hidden', 'true');
-  capa.style.backgroundColor = p.base[0];
+  capa.style.backgroundColor = colorBase(f);
   capa.appendChild(cv);
   const semilla = [...String(f?.valor || 'aurora')].reduce((a, c) => a * 31 + c.charCodeAt(0), 7) >>> 0;
   const s = { cv, ctx: cv.getContext('2d'), F, p, st: F.init(p, crearAzar(semilla)), visible: !io, desfase: (semilla % 97) / 7,

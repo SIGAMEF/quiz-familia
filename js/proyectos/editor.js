@@ -20,14 +20,15 @@ import { presentar } from './presentar.js';
 import { crearVivo, borrarFotos, enlaceParticipante } from './vivo-profe.js';
 import { configAgruparInicial, resumenReparto } from './agrupar.js';
 import { configRuletaInicial, candidatosLocal, PALETAS, ORIGENES } from './ruleta.js';
-import { guardarArchivo, medidas, pintarMisArchivos } from './archivos.js';
+import { guardarArchivo, medidas, pintarMisArchivos, misFondos } from './archivos.js';
 import { configJuego, infoJuego, UNIDAD, TIEMPOS_JUEGO } from './juego-hoja.js';
 import { elegirActividad, TIPOS_JUEGO_CATALOGO, ACTIVIDADES } from '../catalogo.js';
 import { abrirEditor } from '../editor-juegos.js';
 import { problemas, revisar, necesitaUnirse, esRegistro, agruparAntes, registroAntes, registroDeRuleta } from './revision.js';
 import { plantillaIncluida, PLANTILLA_BLANCO, CATEGORIAS } from '../cultos/plantillas.js';
 import { datosPlantillas } from '../cultos/datos.js';
-import { colorBase, FONDOS, parametros, montarFondoAnimado } from '../cultos/fondos.js';
+import { colorBase, FONDOS, CATEGORIAS_FONDO, parametros, montarFondoAnimado } from '../cultos/fondos.js';
+import { ACEPTA_FONDO, subirFondo, tipoDeFondo } from './subir-fondo.js';
 import { datosCanciones } from '../cultos/datos.js';
 import { OPCIONES_DEFECTO, ordenNormal, ubicarResaltados, lineasDeContenido, palabras, etiquetas } from '../cultos/letra.js';
 import { hojasDeCancion, plantillaDeCancion, plantillaDe, registrarMisPlantillas, misPlantillas, prepararFuente, pintarPantalla, existePlantilla } from '../cultos/diapositivas.js';
@@ -65,6 +66,9 @@ let animarEd = false;        // ver las animaciones en el editor
 const NOMBRE_EN = { portada: 'Solo portada', letra: 'Solo con letra' };
 // Canción: los datos, el panel de la letra, la pestaña izquierda y la estrofa elegida
 let cancion = null, panelLetra = null, tabIzq = 'letra', bloqueSel = -1, verPlantillas = false, verLetra = false;
+let catFondo = null;   // la categoría de fondos que se ve en el panel Fondo
+// Nombres de los colores de los fondos animados (los demás se muestran con su nombre: Cielo, Madera…)
+const NOMBRES_COLOR = { base: 'Fondo', colores: 'Luces', c1: 'Color 1', c2: 'Color 2' };
 
 let perfil, proyecto, hojas = [], actual = 0, selId = null, vista = 'web', recurso = null, editandoTexto = null;
 let lienzo = null;          // .lienzo que se edita: el 16:9 en Web o el del celular ajustado a mano
@@ -394,7 +398,7 @@ function oscuro(f) {
   let c = f?.valor;
   if (f?.tipo === 'degradado') c = DEGRADADOS[f.valor]?.[1];
   else if (f?.tipo === 'patron') c = colorValido(f.color, PATRONES[f.valor]?.base);
-  else if (f?.tipo === 'imagen') return true;
+  else if (f?.tipo === 'imagen' || f?.tipo === 'video') return true;
   const m = /^#([0-9a-f]{6})/i.exec(colorValido(c, '#FFFFFF').replace(/^#(.)(.)(.)$/, '#$1$1$2$2$3$3'));
   if (!m) return false;
   const n = parseInt(m[1], 16), [r, g, b] = [n >> 16, (n >> 8) & 255, n & 255];
@@ -455,6 +459,25 @@ async function subirVideo(archivo) {
   finally { if (!sucio && !guardando) estado('ok', 'Guardado ✓'); }
 }
 
+// ⬆ Subir fondo (panel Fondo): imagen, GIF o video; queda en Mis archivos y en "Mis fondos" (js/proyectos/subir-fondo.js)
+async function subirFondoArchivo(archivo) {
+  estado('guardando', 'Subiendo fondo…');
+  try {
+    const r = await subirFondo(archivo, { profesorId: perfil.id, avisar: (t) => estado('guardando', t) });
+    if (r.reutilizado) toast('Ya tenías este fondo en Mis archivos: se reutilizó');
+    catFondo = 'mis';
+    if (r.archivo.tipo === 'video') ponerFondoVideo(r.archivo); else await ponerImagen(r.archivo, { comoFondo: true });
+  } catch (e) { toast(mensajeError(e), 'error'); }
+  finally { if (!sucio && !guardando) estado('ok', 'Guardado ✓'); }
+}
+// Un video de Mis fondos como fondo de la hoja (con su portada para las miniaturas)
+function ponerFondoVideo(a) {
+  const previo = hoja().diseno.fondo?.tipo === 'video' ? hoja().diseno.fondo : {};
+  hoja().diseno.fondo = { tipo: 'video', color: '#000000', oscurecer: previo.oscurecer || 0, valor: a.url, portada: a.portada || null };
+  confirmarCambio();
+  if (recurso === 'fondo') pintarIzquierda();
+}
+
 // Una imagen de Mis archivos (o recién subida) como elemento nuevo, como fondo o en lugar de la de un elemento
 async function ponerImagen(a, { comoFondo = false, reemplazar = null } = {}) {
   const m = await medidas(a);
@@ -474,7 +497,7 @@ async function ponerImagen(a, { comoFondo = false, reemplazar = null } = {}) {
 async function ponerArchivo(a) {
   if (a.tipo !== 'video') return ponerImagen(a);
   const m = await medidas(a);
-  agregarElemento({ tipo: 'video', fuente: 'mp4', url: a.url, ...tamProporcional(m.ancho ? m.ancho / m.alto : 16 / 9, 60) });
+  agregarElemento({ tipo: 'video', fuente: 'mp4', url: a.url, ...(a.portada ? { portada: a.portada } : {}), ...tamProporcional(m.ancho ? m.ancho / m.alto : 16 / 9, 60) });
 }
 
 // ---------- Fondo de imagen ↔ imagen normal ----------
@@ -1077,6 +1100,9 @@ function conectarTeclado() {
   // Pegar: una imagen se sube; un texto se agrega como texto nuevo
   document.addEventListener('paste', (e) => {
     if (e.target.closest?.('input, textarea, [contenteditable]') || document.querySelector('.pres, .modal-fondo')) return;
+    // con el panel Fondo abierto, una imagen o un video pegado es el fondo
+    const archivoFondo = recurso === 'fondo' && [...(e.clipboardData?.files || [])].find(x => tipoDeFondo(x));
+    if (archivoFondo) { e.preventDefault(); subirFondoArchivo(archivoFondo); return; }
     const it = Array.from(e.clipboardData?.items || []).find(i => i.type.startsWith('image/'));
     if (it) { e.preventDefault(); subirImagen(it.getAsFile()); return; }
     const txt = e.clipboardData?.getData('text/plain')?.trim();
@@ -1315,10 +1341,19 @@ const PANELES = {
   fondo(c) {
     const f = hoja().diseno.fondo || {};
     const pa = f.tipo === 'animado' ? parametros(f) : null;
-    c.innerHTML = `<h4>✨ Animados</h4><div class="fondos-anim" data-anim></div>
+    // la categoría que se ve: la del fondo actual (o Mis fondos si es uno subido); se recuerda al cambiar
+    if (!catFondo) catFondo = f.tipo === 'animado' ? (FONDOS[f.valor]?.cat || 'Abstractos') : f.tipo === 'video' || f.tipo === 'imagen' ? 'mis' : CATEGORIAS_FONDO[0];
+    const colores = pa ? Object.entries(pa).filter(([, v]) => Array.isArray(v) || /^#/.test(v)) : [];
+    c.innerHTML = `<div class="fondo-panel" data-panel-fondo>
+      <label class="btn btn-block btn-primary fondo-subir" style="cursor:pointer;">⬆ Subir fondo<input type="file" accept="${ACEPTA_FONDO}" hidden data-subir-fondo></label>
+      <p class="hint" style="margin:4px 0 10px;">Imagen (PNG, JPG, WebP o GIF) o video (MP4, WebM o MOV, hasta 25 MB). También puedes arrastrarlo aquí o pegarlo con Ctrl+V.</p>
+      ${f.tipo === 'video' ? `<div class="card fondo-video-info"><b>🎞 Video de fondo</b><span class="hint">En bucle y sin sonido. Aquí ves su portada; se mueve al proyectar y al presentar.</span>
+        <div class="prop-fila" style="margin:6px 0 0;"><label>Oscurecer</label><input type="range" min="0" max="0.7" step="0.05" data-video-osc value="${f.oscurecer || 0}"></div></div>` : ''}
+      <h4>✨ Fondos</h4>
+      <div class="chips fondo-cats">${[...CATEGORIAS_FONDO.map(k => [k, k]), ['mis', '⭐ Mis fondos']].map(([k, t]) => `<button type="button" class="chip ${catFondo === k ? 'sel' : ''}" data-cat-fondo="${esc(k)}">${esc(t)}</button>`).join('')}</div>
+      <div class="fondos-anim" data-anim></div>
       ${pa ? `<p class="hint" style="margin:8px 0 4px;">Colores de “${esc(FONDOS[f.valor]?.nombre || '')}”</p>
-        <div class="colores-fondo"><span class="small muted">Fondo</span>${pa.base.map((k, i) => `<input type="color" data-fa="base:${i}" value="${k}" aria-label="Fondo ${i + 1}">`).join('')}</div>
-        <div class="colores-fondo" style="margin-top:4px;"><span class="small muted">Luces</span>${pa.colores.map((k, i) => `<input type="color" data-fa="colores:${i}" value="${k}" aria-label="Luz ${i + 1}">`).join('')}</div>
+        ${colores.map(([k, v]) => `<div class="colores-fondo" style="margin-top:4px;"><span class="small muted">${esc(NOMBRES_COLOR[k] || k.charAt(0).toUpperCase() + k.slice(1))}</span>${(Array.isArray(v) ? v : [v]).map((x, i) => `<input type="color" data-fa="${k}${Array.isArray(v) ? ':' + i : ''}" value="${x}" aria-label="${esc(k)} ${i + 1}">`).join('')}</div>`).join('')}
         <button class="btn btn-sm btn-ghost" data-fa-reset>↺ Colores originales</button>
         <p class="hint">Se mueven solos; se detienen cuando no se ven y si el equipo pide menos movimiento.</p>` : ''}
       <h4>Color</h4><div class="muestras">${COLORES.map(k => `<button class="muestra ${f.tipo === 'color' && f.valor === k ? 'sel' : ''}" data-color="${k}" style="background:${k}" aria-label="Color ${k}"></button>`).join('')}</div>
@@ -1327,24 +1362,67 @@ const PANELES = {
       <h4>Patrones</h4><div class="muestras anchas">${Object.entries(PATRONES).map(([k, p]) => `<button class="muestra ${f.tipo === 'patron' && f.valor === k ? 'sel' : ''}" data-pat="${k}"><span class="etq">${esc(p.nombre)}</span></button>`).join('')}</div>
       ${f.tipo === 'patron' ? `<div class="prop-fila" style="margin-top:8px;"><label>Base</label><input type="color" data-pat-base value="${colorValido(f.color, PATRONES[f.valor]?.base)}">
         <label style="min-width:0;">Dibujo</label><input type="color" data-pat-tinta value="${colorValido(f.tinta, PATRONES[f.valor]?.tinta)}"></div>` : ''}
-      <h4>Imagen propia</h4>
-      <label class="btn btn-block btn-outline" style="cursor:pointer;">📁 ${f.tipo === 'imagen' ? 'Cambiar' : 'Subir'} imagen de fondo<input type="file" accept="image/*" hidden data-fondo-img></label>
-      ${f.tipo === 'imagen' ? '<p class="hint">Ajusta el modo, el zoom, la posición y el oscurecido en el panel de la derecha.</p>' : ''}
-      <button class="btn btn-block btn-sm" style="margin-top:14px;" data-todas>Aplicar este fondo a todas las hojas</button>`;
+      ${f.tipo === 'imagen' ? '<p class="hint" style="margin-top:12px;">Ajusta el modo, el zoom, la posición y el oscurecido de la imagen en el panel de la derecha.</p>' : ''}
+      <button class="btn btn-block btn-sm" style="margin-top:14px;" data-todas>Aplicar este fondo a todas las hojas</button></div>`;
     $$('[data-pat]', c).forEach(b => Object.assign(b.style, estiloFondo({ tipo: 'patron', valor: b.dataset.pat })));
     const poner = (nuevo) => { hoja().diseno.fondo = nuevo; confirmarCambio(); PANELES.fondo(c); };
     const anim = $('[data-anim]', c);
-    for (const [k, F] of Object.entries(FONDOS)) {
-      const b = document.createElement('button');
-      b.type = 'button'; b.title = F.nombre; b.className = f.tipo === 'animado' && f.valor === k ? 'sel' : '';
-      b.innerHTML = `<div class="fondo-capa"></div><span>${esc(F.nombre)}</span>`;
-      montarFondoAnimado($('.fondo-capa', b), { tipo: 'animado', valor: k }, { calidad: 'baja' });
-      b.onclick = () => poner({ tipo: 'animado', valor: k });
-      anim.appendChild(b);
+    const pintarCategoria = async () => {
+      anim.innerHTML = '';
+      if (catFondo !== 'mis') {
+        for (const [k, F] of Object.entries(FONDOS).filter(([, F]) => (F.cat || 'Abstractos') === catFondo)) {
+          const b = document.createElement('button');
+          b.type = 'button'; b.title = F.nombre; b.className = f.tipo === 'animado' && f.valor === k ? 'sel' : '';
+          b.innerHTML = `<div class="fondo-capa"></div><span>${esc(F.nombre)}</span>`;
+          montarFondoAnimado($('.fondo-capa', b), { tipo: 'animado', valor: k }, { calidad: 'baja' });
+          b.onclick = () => poner({ tipo: 'animado', valor: k });
+          anim.appendChild(b);
+        }
+        return;
+      }
+      // ⭐ Mis fondos: los subidos (imágenes, GIF y videos con su portada)
+      anim.innerHTML = '<div class="center" style="grid-column:1/-1; padding:10px;"><div class="spinner"></div></div>';
+      let lista = [];
+      try { lista = await misFondos(); } catch (e) { anim.innerHTML = `<p class="hint" style="grid-column:1/-1;">${esc(mensajeError(e))}</p>`; return; }
+      if (!anim.isConnected || catFondo !== 'mis') return;
+      anim.innerHTML = lista.length ? '' : '<p class="hint" style="grid-column:1/-1;">Todavía no subiste fondos. Toca <b>⬆ Subir fondo</b> o arrastra una imagen o un video aquí.</p>';
+      for (const a of lista) {
+        const usado = (f.tipo === 'video' || f.tipo === 'imagen') && f.valor === a.url;
+        const b = document.createElement('button');
+        b.type = 'button'; b.title = a.nombre; b.className = usado ? 'sel' : '';
+        const img = a.tipo === 'video' ? a.portada : a.url;
+        b.innerHTML = `<div class="fondo-capa">${img ? `<img src="${esc(img)}" alt="" loading="lazy" draggable="false">` : ''}${a.tipo === 'video' ? '<i class="fondo-play">▶</i>' : ''}</div><span>${esc(a.nombre)}</span>`;
+        b.onclick = () => (a.tipo === 'video' ? ponerFondoVideo(a) : ponerImagen(a, { comoFondo: true }));
+        anim.appendChild(b);
+      }
+    };
+    $$('[data-cat-fondo]', c).forEach(b => b.onclick = () => { catFondo = b.dataset.catFondo; $$('[data-cat-fondo]', c).forEach(x => x.classList.toggle('sel', x === b)); pintarCategoria(); });
+    pintarCategoria();
+    // ⬆ subir: con el botón, arrastrando sobre el panel o pegando (Ctrl+V, ver conectarPegar)
+    $('[data-subir-fondo]', c).onchange = (e) => { const a = e.target.files[0]; e.target.value = ''; if (a) subirFondoArchivo(a); };
+    const zona = $('[data-panel-fondo]', c);
+    const conArchivos = (e) => e.dataTransfer?.types?.includes('Files');
+    zona.addEventListener('dragover', (e) => { if (conArchivos(e)) { e.preventDefault(); zona.classList.add('soltar'); } });
+    zona.addEventListener('dragleave', (e) => { if (!zona.contains(e.relatedTarget)) zona.classList.remove('soltar'); });
+    zona.addEventListener('drop', (e) => {
+      zona.classList.remove('soltar');
+      const a = [...(e.dataTransfer?.files || [])][0];
+      if (!a) return;
+      e.preventDefault();
+      subirFondoArchivo(a);
+    });
+    const osc = $('[data-video-osc]', c);
+    if (osc) {
+      osc.oninput = () => { hoja().diseno.fondo.oscurecer = Number(osc.value); refrescarFondo(); };
+      osc.onchange = () => { hoja().diseno.fondo.oscurecer = Number(osc.value); confirmarCambio({ repintar: 'mini' }); };
     }
     $$('[data-fa]', c).forEach(inp => {
       const [lista, i] = inp.dataset.fa.split(':');
-      const aplicar = () => { const fa = hoja().diseno.fondo; const q = parametros(fa); fa.p = { ...(fa.p || {}), base: q.base, colores: q.colores }; fa.p[lista][Number(i)] = inp.value; };
+      const aplicar = () => {
+        const fa = hoja().diseno.fondo;
+        fa.p = structuredClone(parametros(fa));
+        if (i === undefined) fa.p[lista] = inp.value; else fa.p[lista][Number(i)] = inp.value;
+      };
       inp.oninput = () => { aplicar(); refrescarFondo(); };
       inp.onchange = () => { aplicar(); confirmarCambio({ repintar: 'mini' }); };
     });
@@ -1362,7 +1440,6 @@ const PANELES = {
       inp.oninput = () => { hoja().diseno.fondo[campo] = inp.value; refrescarFondo(); };
       inp.onchange = () => { hoja().diseno.fondo[campo] = inp.value; confirmarCambio(); };
     }
-    $('[data-fondo-img]', c).onchange = (e) => { if (e.target.files[0]) subirImagen(e.target.files[0], { comoFondo: true }); e.target.value = ''; };
     $('[data-todas]', c).onclick = async () => {
       if (!await confirmar('Todas las hojas del proyecto tendrán este mismo fondo.', { titulo: '¿Aplicar a todas?', boton: 'Aplicar', peligro: false })) return;
       const fondo = hoja().diseno.fondo;

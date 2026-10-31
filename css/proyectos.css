@@ -5,7 +5,8 @@
 /* ---------- Lienzo 16:9 (todo se mide en % y cqw para escalar igual en cualquier pantalla) ---------- */
 .lienzo { position: relative; width: 100%; aspect-ratio: 16 / 9; container-type: inline-size; overflow: hidden; background: #fff; user-select: none; -webkit-user-select: none; }
 .lienzo-fondo { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }   /* siempre detrás y sin capturar clics */
-.fondo-img, .fondo-velo { position: absolute; inset: 0; }
+.fondo-img, .fondo-velo, .fondo-video { position: absolute; inset: 0; }
+.fondo-video { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
 .pe-recorte { width: 100%; height: 100%; overflow: hidden; }
 .pe { position: absolute; transform-origin: 50% 50%; }
 .pe-txt { width: 100%; height: 100%; display: grid; align-content: center; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.15; padding: 0 .4cqw; outline: none; }
@@ -768,3 +769,13 @@ textarea.pl-area { min-height: 220px; font-size: 13px; line-height: 1.45; }
 .ml-cartel input[type="range"] { flex: 1; min-width: 80px; }
 .rs-barra .ml-grid { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); max-height: 220px; overflow-y: auto; }
 .rs-barra .ml-abc { font-size: 24px; }
+
+/* ---------- Panel Fondo: categorías, ⬆ Subir fondo y Mis fondos (js/proyectos/subir-fondo.js) ---------- */
+.fondo-panel { border: 2px dashed transparent; border-radius: 12px; margin: -4px; padding: 4px; transition: border-color .15s, background .15s; }
+.fondo-panel.soltar { border-color: var(--primary); background: rgba(124, 111, 240, .06); }
+.fondo-cats { margin-bottom: 8px; }
+.fondo-cats .chip { padding: 4px 10px; font-size: 12px; border-radius: 20px; }
+.fondo-cats .chip.sel { background: var(--primary); border-color: var(--primary); color: #fff; }
+.fondos-anim .fondo-capa img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fondos-anim .fondo-play { position: absolute; top: 4px; right: 4px; font-style: normal; font-size: 10px; color: #fff; background: rgba(0,0,0,.55); border-radius: 6px; padding: 1px 5px; }
+.fondo-video-info { display: flex; flex-direction: column; gap: 2px; padding: 10px; margin-bottom: 4px; }

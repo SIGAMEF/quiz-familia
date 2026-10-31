@@ -5,7 +5,7 @@
 //   { id, tipo: 'versiculo', cita, texto, ref, version, numeros, plantilla }   el texto ya viene de la Biblia (js/cultos/biblia.js) o pegado
 //   { id, tipo: 'texto', titulo, texto, portada, plantilla }  portada: primero la portada de la plantilla
 //   { id, tipo: 'anuncio', url, nombre, plantilla }           sin imagen: la portada de la plantilla
-//   { id, tipo: 'video', url, nombre }                        YouTube, Vimeo o un video de Mis archivos
+//   { id, tipo: 'video', url, nombre, portada }               YouTube, Vimeo o un video de Mis archivos (portada: su primer cuadro)
 //   { id, tipo: 'regresiva', minutos, texto, plantilla }
 //   { id, tipo: 'diseno', plantilla }                          la portada de una plantilla (prediseñada o mía) como pantalla
 // Cada elemento se convierte en hojas del lienzo de Proyectos (una por pantalla). Las hojas son datos
@@ -140,11 +140,11 @@ function hojaDeImagen(url) {
     fondo: { tipo: 'imagen', valor: url, modo: 'cubrir', desenfoque: 20, oscurecer: 0.45, color: '#000000' },
     elementos: [{ id: 'img', contenido: true, tipo: 'imagen', url, ajuste: 'contain', x: 0, y: 0, w: 100, h: 100, rot: 0 }] } };
 }
-function hojaDeVideo(url) {
+function hojaDeVideo(url, portada) {
   const v = leerVideo(url);
   return { tipo: 'contenido', video: !!v, diseno: {
     fondo: { tipo: 'color', valor: '#000000' },
-    elementos: v ? [{ id: 'video', contenido: true, tipo: 'video', ...v, auto: true, x: 0, y: 0, w: 100, h: 100, rot: 0 }]
+    elementos: v ? [{ id: 'video', contenido: true, tipo: 'video', ...v, ...(portada ? { portada } : {}), auto: true, x: 0, y: 0, w: 100, h: 100, rot: 0 }]
       : [{ id: 'video', contenido: true, tipo: 'texto', texto: '▶ Falta el enlace del video', x: 10, y: 40, w: 80, h: 20, rot: 0, tam: 4, color: '#FFFFFF' }] } };
 }
 
@@ -177,7 +177,7 @@ export function hojasDeElemento(it, culto, canciones = new Map()) {
     return hojas.map((h, i) => ({ ...h, id: `${it.id}-${i}` }));
   }
   if (it.tipo === 'anuncio') return con([it.url ? hojaDeImagen(it.url) : hojaDePortada(pid)], it.url ? 'Imagen' : 'Portada');
-  if (it.tipo === 'video') return con([hojaDeVideo(it.url)], 'Video');
+  if (it.tipo === 'video') return con([hojaDeVideo(it.url, it.portada)], 'Video');
   if (it.tipo === 'diseno') return con([hojaDePortada(pid)], 'Diseño');
   if (it.tipo === 'regresiva') return con([hojaDeRegresiva(it, it.plantilla && existePlantilla(it.plantilla) ? it.plantilla : pid)], 'Reloj');
   return [];

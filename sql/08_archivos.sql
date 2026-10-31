@@ -22,6 +22,10 @@ create table if not exists public.archivos (
 );
 create index if not exists archivos_profesor_idx on public.archivos (profesor_id, created_at desc);
 create unique index if not exists archivos_hash_idx on public.archivos (profesor_id, hash) where hash is not null;
+-- Fondos subidos desde el panel Fondo ("Mis fondos"): fondo = true; los videos guardan la URL de su portada
+-- (una imagen del primer cuadro, también en Mis archivos) para las miniaturas, sin descargar el video
+alter table public.archivos add column if not exists fondo boolean not null default false;
+alter table public.archivos add column if not exists portada text;
 
 -- Límite de espacio por profesor (MB). Sin fila: 200 MB (el admin, sin límite).
 create table if not exists public.archivos_limites (
@@ -58,7 +62,7 @@ $$;
 create or replace function public._archivo_json(a public.archivos) returns jsonb
 language sql stable as $$
   select jsonb_build_object('id', a.id, 'url', a.url, 'ruta', a.ruta, 'tipo', a.tipo, 'nombre', a.nombre, 'tamano', a.tamano,
-    'ancho', a.ancho, 'alto', a.alto, 'created_at', a.created_at);
+    'ancho', a.ancho, 'alto', a.alto, 'created_at', a.created_at, 'fondo', a.fondo, 'portada', a.portada);
 $$;
 
 -- Dónde se usa un archivo: proyectos (con el número de hoja), juegos y preguntas/opciones de quizzes
@@ -132,7 +136,7 @@ begin
   begin
     insert into archivos (profesor_id, ruta, url, tipo, nombre, tamano, mime, created_at)
     select auth.uid(), o.name, _archivo_url(o.name),
-           case when coalesce(o.metadata->>'mimetype', '') like 'video/%' or o.name ~* '\.(mp4|webm)$' then 'video' else 'imagen' end,
+           case when coalesce(o.metadata->>'mimetype', '') like 'video/%' or o.name ~* '\.(mp4|webm|mov)$' then 'video' else 'imagen' end,
            regexp_replace(o.name, '^.*/', ''), coalesce((o.metadata->>'size')::bigint, 0), o.metadata->>'mimetype', coalesce(o.created_at, now())
     from storage.objects o
     where o.bucket_id = 'preguntas-imagenes' and left(o.name, length(v_pref)) = v_pref
@@ -200,6 +204,21 @@ begin
   on conflict (ruta) do update set hash = coalesce(archivos.hash, excluded.hash), ancho = coalesce(archivos.ancho, excluded.ancho),
          alto = coalesce(archivos.alto, excluded.alto), nombre = excluded.nombre
   returning * into a;
+  return _archivo_json(a);
+end $$;
+
+-- Marca un archivo como fondo ("Mis fondos") y guarda la portada de un video (una imagen de mi carpeta, o null)
+create or replace function public.archivo_fondo(p_id uuid, p_portada text default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare a archivos%rowtype;
+begin
+  if auth.uid() is null then raise exception 'Tu sesión expiró. Vuelve a iniciar sesión.'; end if;
+  if p_portada is not null and left(p_portada, length(_archivo_url('proyectos/' || auth.uid() || '/'))) <> _archivo_url('proyectos/' || auth.uid() || '/') then
+    raise exception 'Portada no válida.';
+  end if;
+  update archivos set fondo = true, portada = coalesce(p_portada, portada)
+  where id = p_id and profesor_id = auth.uid() returning * into a;
+  if not found then raise exception 'Ese archivo ya no existe.'; end if;
   return _archivo_json(a);
 end $$;
 
@@ -301,7 +320,7 @@ declare n int;
 begin
   insert into public.archivos (profesor_id, ruta, url, tipo, nombre, tamano, mime, created_at)
   select p.id, o.name, public._archivo_url(o.name),
-         case when coalesce(o.metadata->>'mimetype', '') like 'video/%' or o.name ~* '\.(mp4|webm)$' then 'video' else 'imagen' end,
+         case when coalesce(o.metadata->>'mimetype', '') like 'video/%' or o.name ~* '\.(mp4|webm|mov)$' then 'video' else 'imagen' end,
          regexp_replace(o.name, '^.*/', ''), coalesce((o.metadata->>'size')::bigint, 0), o.metadata->>'mimetype', coalesce(o.created_at, now())
   from storage.objects o join public.perfiles p on p.id::text = split_part(o.name, '/', 2)
   where o.bucket_id = 'preguntas-imagenes' and split_part(o.name, '/', 1) = 'proyectos' and o.name !~ '/\.emptyFolderPlaceholder$'

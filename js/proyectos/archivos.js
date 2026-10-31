@@ -67,6 +67,16 @@ export async function guardarArchivo({ profesorId, original, blob, tipo, ext, no
   return { archivo, reutilizado: !!archivo.duplicado };
 }
 
+// ---------- Mis fondos (los subidos desde el panel Fondo) ----------
+// Marca el archivo como fondo y guarda la portada de un video. Si la base todavía no tiene "Mis fondos"
+// (falta ejecutar 08_archivos.sql), el fondo igual se usa: solo no queda en la lista.
+export async function marcarFondo(archivo, portada = null) {
+  try { const a = await rpc('archivo_fondo', { p_id: archivo.id, p_portada: portada }); cambio(); return a; }
+  catch (e) { console.warn('No se pudo marcar como fondo (¿falta ejecutar 08_archivos.sql?)', e); return { ...archivo, fondo: true, portada: portada || archivo.portada || null }; }
+}
+export async function misFondos() { return (await cargar()).filter(a => a.fondo); }
+export const alCambiarArchivos = (f) => { avisos.add(f); return () => avisos.delete(f); };
+
 // Ancho y alto de un archivo (los subidos antes no los tienen): se miden y se guardan
 export async function medidas(a) {
   if (a.ancho && a.alto) return { ancho: a.ancho, alto: a.alto };
@@ -168,8 +178,9 @@ export async function limpiarNoUsados({ antesDeUsos } = {}) {
   contar();
 }
 
+// los videos con portada muestran la imagen (no se descarga el video)
 const miniatura = (a) => a.tipo === 'video'
-  ? `<span class="arch-mini"><video src="${esc(a.url)}#t=0.5" preload="metadata" muted playsinline></video><i>▶</i></span>`
+  ? `<span class="arch-mini">${a.portada ? `<img src="${esc(a.portada)}" alt="" loading="lazy" draggable="false">` : `<video src="${esc(a.url)}#t=0.5" preload="metadata" muted playsinline></video>`}<i>▶</i></span>`
   : `<span class="arch-mini"><img src="${esc(a.url)}" alt="" loading="lazy" draggable="false"></span>`;
 
 // Barra "Usas 45 MB de 200 MB"

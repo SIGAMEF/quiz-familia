@@ -35,7 +35,13 @@ export function montarEscena(enviar) {
     const capa = document.createElement('div');
     capa.className = 'cu-capa';
     if (hoja) montarReloj(pintarHoja(capa, hoja, { modo: 'ver' }), hoja, inicio);
-    capa.querySelectorAll('video').forEach(v => { v.autoplay = false; reproducir(v); });
+    capa.querySelectorAll('video:not(.fondo-video)').forEach(v => { v.autoplay = false; reproducir(v); });   // el video de fondo va solo, sin sonido
+    // el mismo video de fondo en la pantalla siguiente (otra estrofa): sigue desde donde iba, sin volver a empezar
+    const fondoNuevo = capa.querySelector('.fondo-video'), fondoViejo = escena.lastElementChild?.querySelector('.fondo-video');
+    if (fondoNuevo && fondoViejo && fondoViejo.src === fondoNuevo.src) {
+      const t = fondoViejo.currentTime;
+      fondoNuevo.addEventListener('loadedmetadata', () => { try { fondoNuevo.currentTime = t + 0.15; } catch { /* sin buscar */ } }, { once: true });
+    }
     const viejas = [...escena.children];
     escena.appendChild(capa);
     requestAnimationFrame(() => requestAnimationFrame(() => capa.classList.add('ver')));
@@ -54,7 +60,7 @@ export function montarEscena(enviar) {
   function video(a) {
     const capa = escena.lastElementChild;
     if (!capa) return;
-    const v = capa.querySelector('video');
+    const v = capa.querySelector('video:not(.fondo-video)');
     if (v) {
       if (a === 'inicio') v.currentTime = 0;
       if (a === 'pausa') v.pause(); else reproducir(v);

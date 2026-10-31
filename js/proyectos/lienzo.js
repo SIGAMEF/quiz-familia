@@ -41,6 +41,7 @@ function urlEmbed(el) {
   return null;
 }
 export function miniaturaVideo(el) {
+  if (el.fuente === 'mp4' && urlSegura(el.portada)) return el.portada;   // un video propio con portada (Mis archivos)
   return el.fuente === 'youtube' && /^[\w-]{11}$/.test(el.vid || '') ? `https://i.ytimg.com/vi/${el.vid}/hqdefault.jpg` : null;
 }
 
@@ -49,10 +50,40 @@ export function miniaturaVideo(el) {
 //           zoom:50–300, px/py: punto de enfoque en %, opacidad, oscurecer:0–0.7, desenfoque:0–20, nat:[ancho,alto] }
 export const MODOS_FONDO = { cubrir: 'Cubrir', ajustar: 'Ajustar', estirar: 'Estirar', mosaico: 'Mosaico', original: 'Tamaño original' };
 // Fondo animado: { tipo: 'animado', valor: 'aurora', p: { base: [...], colores: [...] } } (js/cultos/fondos.js)
-export function pintarFondo(capa, f = {}, { calidad = 'alta' } = {}) {
+// Fondo de video ({ tipo: 'video', valor, portada, oscurecer, color }): en bucle, sin sonido y cubriendo la pantalla.
+// El video solo se carga si video = true (la proyección y Presentar); en miniaturas, el editor y los
+// celulares se ve su portada (una imagen del primer cuadro), así no se descarga el video.
+function fondoVideo(capa, f, video) {
+  capa.style.backgroundColor = colorValido(f.color, '#000000');
+  const portada = urlSegura(f.portada) ? f.portada : null;
+  if (video && urlSegura(f.valor)) {
+    const v = document.createElement('video');
+    v.className = 'fondo-video';
+    Object.assign(v, { muted: true, defaultMuted: true, loop: true, autoplay: true, playsInline: true, preload: 'auto' });
+    v.setAttribute('muted', ''); v.setAttribute('playsinline', ''); v.setAttribute('aria-hidden', 'true');
+    if (portada) v.poster = portada;
+    v.src = f.valor;
+    capa.appendChild(v);
+    v.play?.()?.catch(() => {});
+  } else if (portada) {
+    const img = document.createElement('div');
+    img.className = 'fondo-img';
+    Object.assign(img.style, { backgroundImage: `url("${portada}")`, backgroundSize: 'cover', backgroundPosition: 'center' });
+    capa.appendChild(img);
+  }
+  const velo = num(f.oscurecer, 0, 0, 0.7);
+  if (velo) {
+    const d = document.createElement('div');
+    d.className = 'fondo-velo';
+    d.style.background = `rgba(0,0,0,${velo})`;
+    capa.appendChild(d);
+  }
+}
+export function pintarFondo(capa, f = {}, { calidad = 'alta', video = false } = {}) {
   capa.replaceChildren();
   capa.removeAttribute('style');
   if (f?.tipo === 'animado') { montarFondoAnimado(capa, f, { calidad }); return; }
+  if (f?.tipo === 'video') { fondoVideo(capa, f, video); return; }
   if (f.tipo !== 'imagen' || !urlSegura(f.valor)) { Object.assign(capa.style, estiloFondo(f)); return; }
   capa.style.backgroundColor = colorValido(f.color, '#2D2A45');
   const img = document.createElement('div');
@@ -376,7 +407,7 @@ export function pintarHoja(cont, hoja, { modo = 'ver', res = null, ver = hoja?.v
   lienzo.className = 'lienzo' + (modo !== 'ver' ? ' estatico' : '');
   const fondo = document.createElement('div');
   fondo.className = 'lienzo-fondo';
-  pintarFondo(fondo, hoja?.diseno?.fondo, { calidad: calidad || (modo === 'miniatura' ? 'baja' : 'alta') });
+  pintarFondo(fondo, hoja?.diseno?.fondo, { calidad: calidad || (modo === 'miniatura' ? 'baja' : 'alta'), video: modo === 'ver' });
   lienzo.appendChild(fondo);
   const ctx = { hoja, res, fmt: 'web', ver, textos, resaltados, animar, marcar };
   for (const el of (hoja?.diseno?.elementos || [])) {
