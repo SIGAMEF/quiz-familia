@@ -19,7 +19,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const num = (v, d, min = -1000, max = 1000) => { const n = Number(v); return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : d; };
 
 export function asegurarFuentes() {
-  if (document.querySelector('link[data-fuentes-proyectos]')) return;
+  if (globalThis.__CULTO_SIN_RED__ || document.querySelector('link[data-fuentes-proyectos]')) return;   // un culto descargado ya trae sus fuentes
   const l = document.createElement('link');
   l.rel = 'stylesheet'; l.href = URL_FUENTES; l.dataset.fuentesProyectos = '';
   document.head.appendChild(l);

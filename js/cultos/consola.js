@@ -55,23 +55,46 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
   await Promise.all(plantillasDeCulto(culto, canciones).map(prepararFuente));
   if (!cuerpo.isConnected) return;
 
-  const elementos = (culto.items || []).map(it => ({ it, titulo: tituloDeElemento(it, canciones), hojas: hojasDeElemento(it, culto, canciones) }))
-    .filter(e => e.hojas.length);
-  const logo = hojaLogo(culto);
-  // pos: lo que está en pantalla; ver: el elemento que se mira en el centro
-  // al abrir se ve el logo; con "Siguiente" (o un clic en una pantalla) empieza el culto.
   // Una proyección suelta (canción, plantilla o Biblia) empieza directo en la primera pantalla.
   const suelto = culto.id === 'suelto';
   const volver = suelto ? (culto.volver || 'cultos') : 'cultos';
-  const est = { i: 0, j: 0, modo: suelto && elementos.length ? 'normal' : 'logo', inicio: null, ver: 0, conectada: false, enAire: suelto };
+  montarConsola(cuerpo, {
+    culto, elementos: armarElementos(culto, canciones), logo: hojaLogo(culto), datos, local: canalLocal(culto.id), directo: suelto, remoto: !suelto,
+    atras: suelto ? { href: volver, texto: '← Volver' } : { href: 'cultos/culto-' + culto.id, texto: '← Editar' },
+    alFinalizar: () => { location.hash = volver; }
+  });
+}
+
+// Las pantallas de cada elemento, ya armadas: [{ it, titulo, hojas }] (también las usa el culto descargado, js/cultos/sin-red.js)
+export function armarElementos(culto, canciones) {
+  return (culto.items || []).map(it => ({ it, titulo: tituloDeElemento(it, canciones), hojas: hojasDeElemento(it, culto, canciones) }))
+    .filter(e => e.hojas.length);
+}
+
+// El canal con la pantalla del mismo equipo: { ok, enviar(m), alMensaje, abrir(), cerrar() }
+function canalLocal(id) {
+  const bc = 'BroadcastChannel' in window ? new BroadcastChannel(canalCulto(id)) : null;
+  const c = { ok: !!bc, alMensaje: null, enviar: (m) => bc?.postMessage(m), abrir: () => abrirPantalla(id), cerrar: () => { if (bc) { bc.onmessage = null; bc.close(); } } };
+  if (bc) bc.onmessage = (e) => c.alMensaje?.(e.data || {});
+  return c;
+}
+
+// La consola ya con las pantallas armadas.
+//   local: el canal con la pantalla de este equipo (canalLocal, o postMessage en el culto descargado)
+//   directo: empieza en la primera pantalla (si no, en el logo) · remoto: botón 📱 Control remoto
+//   atras: { href, texto } el enlace de arriba (null = sin enlace) · alFinalizar: después de "⏹ Finalizar"
+export function montarConsola(cuerpo, { culto, elementos, logo, datos = {}, local, directo = false, remoto = true, atras = null, alFinalizar = () => {} }) {
+  // pos: lo que está en pantalla; ver: el elemento que se mira en el centro
+  // al abrir se ve el logo; con "Siguiente" (o un clic en una pantalla) empieza el culto.
+  const est = { i: 0, j: 0, modo: directo && elementos.length ? 'normal' : 'logo', inicio: null, ver: 0, conectada: false, enAire: directo };
 
   cuerpo.innerHTML = `<div class="cu-consola">
     <div class="row cu-con-cab">
-      <a class="btn btn-sm btn-ghost" href="#${suelto ? esc(volver) : 'cultos/culto-' + esc(culto.id)}">${suelto ? '← Volver' : '← Editar'}</a>
+      ${atras ? `<a class="btn btn-sm btn-ghost" href="#${esc(atras.href)}">${esc(atras.texto)}</a>` : ''}
       <h2 class="grow" title="${esc(culto.nombre)}">${esc(culto.nombre)}</h2>
       <span class="badge gray" data-conexion>🖥 Pantalla sin abrir</span>
       <span class="badge green" data-remota hidden></span>
-      ${suelto ? '' : '<button class="btn btn-sm" data-remoto>📱 Control remoto</button>'}
+      ${remoto ? '<button class="btn btn-sm" data-remoto>📱 Control remoto</button>' : ''}
       <button class="btn btn-sm btn-primary" data-abrir>🖥 Abrir pantalla</button></div>
     <div class="cu-con">
       <aside class="cu-con-lista" data-lista aria-label="Elementos del culto"></aside>
@@ -102,8 +125,7 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
   </div>`;
 
   // ---------- conexión con la pantalla ----------
-  const bc = 'BroadcastChannel' in window ? new BroadcastChannel(canalCulto(culto.id)) : null;
-  if (!bc) toast('Este navegador no puede conectar la consola con la pantalla. Usa Chrome, Edge o Firefox actualizados.', 'error');
+  if (!local.ok) toast('Este navegador no puede conectar la consola con la pantalla. Usa Chrome, Edge o Firefox actualizados.', 'error');
   const hojaActual = () => {
     if (est.modo === 'negro') return null;
     if (est.modo === 'logo' || !elementos.length) return logo;
@@ -163,7 +185,7 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
   function video(a) {
     if (!hayVideo()) return;
     const msg = { t: 'video', a };
-    try { bc?.postMessage(msg); } catch { /* la pantalla está cerrada */ }
+    try { local.enviar(msg); } catch { /* la pantalla está cerrada */ }
     rem.cp?.enviar(msg);
   }
   const avisoMudo = debounce(() => toast('El video empezó sin sonido: el navegador de la pantalla pide un clic. Haz un clic en la ventana de la pantalla.', 'error'), 300);
@@ -175,7 +197,7 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
   }, 600);
   const enviar = () => {
     const msg = mensajeHoja();
-    try { bc?.postMessage(msg); } catch (e) { console.warn('No se pudo enviar a la pantalla', e); }
+    try { local.enviar(msg); } catch (e) { console.warn('No se pudo enviar a la pantalla', e); }
     rem.cp?.enviar(msg);
     enviarEstado();
     enviarVivo();
@@ -187,14 +209,13 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
     b.className = 'badge ' + (est.conectada ? 'green' : 'gray');
     b.textContent = est.conectada ? '🖥 Pantalla conectada' : '🖥 Pantalla sin abrir';
   };
-  if (bc) bc.onmessage = (e) => {
-    const m = e.data || {};
+  local.alMensaje = (m) => {
     if (m.t === 'hola') { est.conectada = true; pintarConexion(); enviar(); }
     else if (m.t === 'adios') { est.conectada = false; pintarConexion(); }
     else if (m.t === 'tecla') tecla({ key: m.k, preventDefault() {} });
     else if (m.t === 'video-mudo') avisoMudo();
   };
-  bc?.postMessage({ t: 'quien' });   // si la pantalla ya estaba abierta, responde "hola"
+  try { local.enviar({ t: 'quien' }); } catch { /* sin pantalla */ }   // si la pantalla ya estaba abierta, responde "hola"
 
   // ---------- dibujo ----------
   function pintarLista() {
@@ -268,15 +289,15 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
   $('[data-sigte]', cuerpo).onclick = () => avanzar(1);
   $$('[data-modo]', cuerpo).forEach(b => b.onclick = () => modo(b.dataset.modo));
   $$('[data-v]', cuerpo).forEach(b => b.onclick = () => video(b.dataset.v));
-  $('[data-abrir]', cuerpo).onclick = () => abrirPantalla(culto.id);
+  $('[data-abrir]', cuerpo).onclick = () => local.abrir();
   $('[data-fin]', cuerpo).onclick = async () => {
     if (!await confirmar('La pantalla se pondrá en negro y se cerrará.', { titulo: '¿Finalizar la proyección?', boton: '⏹ Finalizar', peligro: false })) return;
-    try { bc?.postMessage({ t: 'fin' }); } catch { /* la pantalla ya estaba cerrada */ }
+    try { local.enviar({ t: 'fin' }); } catch { /* la pantalla ya estaba cerrada */ }
     rem.cp?.enviar({ t: 'fin' }); rem.cc?.enviar({ t: 'fin' }); rem.cv?.enviar({ t: 'vivo', id: null });
     guardarVivo({ t: 'fin', id: null });
     callar();
     toast('Proyección finalizada');
-    location.hash = volver;
+    alFinalizar();
   };
 
   function tecla(e) {
@@ -295,7 +316,7 @@ export async function pintarConsola(cuerpo, id, { datos = datosCultos, canciones
   function limpiar() {
     document.removeEventListener('keydown', tecla);
     removeEventListener('hashchange', limpiar);
-    if (bc) { bc.onmessage = null; bc.close(); }
+    local.alMensaje = null; local.cerrar();
     // los canales se cierran un momento después, para que alcancen a salir los últimos mensajes ("fin")
     setTimeout(() => ['cc', 'cp', 'cv'].forEach(k => rem[k]?.cerrar()), 800);
     callar();

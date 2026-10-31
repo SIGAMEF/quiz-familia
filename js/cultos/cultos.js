@@ -15,6 +15,7 @@ import { letraCoristas } from './resaltar.js';
 import { urlLetras, enlaceWhatsApp } from './remoto.js';
 import { TIPOS_ELEMENTO, MAX_ELEMENTOS, nuevoIdElemento, hojasDeElemento, tituloDeElemento, plantillaDeElemento, plantillasDeCulto, montarReloj, hojaDePortada } from './elementos.js';
 import { abrirPantalla } from './consola.js';
+import { descargarCulto } from './sin-red.js';
 import { formVersiculo } from './panel-biblia.js';
 import { datosCanciones, datosCultos, datosPlantillas } from './datos.js';
 
@@ -59,7 +60,7 @@ export async function pintarCultos(cuerpo, { perfil, datos = datosCultos, cancio
   const futuros = cultos.filter(c => c.fecha && c.fecha >= hoy()).sort((a, b) => a.fecha.localeCompare(b.fecha));
   const proximo = futuros[0] || cultos[0];
   const otros = cultos.filter(c => c !== proximo);
-  const menu = htmlMenuMas([['data-duplicar', '📄', 'Duplicar (para otro día)'], 'sep', ['data-borrar', '🗑', 'Eliminar', true]]);
+  const menu = htmlMenuMas([['data-descargar', '💾', 'Descargar (proyectar sin internet)'], ['data-duplicar', '📄', 'Duplicar (para otro día)'], 'sep', ['data-borrar', '🗑', 'Eliminar', true]]);
   cuerpo.innerHTML = `
     <div class="card cu-proximo" data-culto="${proximo.id}">
       <button class="cu-mini" data-editar title="Editar"><div data-mini></div></button>
@@ -86,6 +87,7 @@ export async function pintarCultos(cuerpo, { perfil, datos = datosCultos, cancio
     $$('[data-editar]', t).forEach(b => b.onclick = () => { location.hash = 'cultos/culto-' + c.id; });
     $('[data-proyectar]', t).onclick = () => proyectar(c.id);
     $('[data-duplicar]', t).onclick = () => duplicarCulto(c, { datos });
+    $('[data-descargar]', t).onclick = () => descargarCulto(c.id, { datos, canciones: datosCanc });
     $('[data-coristas]', t)?.addEventListener('click', () => mostrarEnlaceCoristas(c));
     $('[data-borrar]', t).onclick = async () => {
       if (!await confirmar(`“${c.nombre}” se borrará. Las canciones y las imágenes que usa no se borran.`, { titulo: '¿Eliminar el culto?', boton: 'Eliminar' })) return;
@@ -186,6 +188,7 @@ export async function pintarEditorCulto(cuerpo, id, { perfil, datos = datosCulto
       <span class="cu-guardado" data-estado>Guardado ✓</span>
       <span class="grow"></span>
       <span class="row" style="gap:6px;" data-publicar></span>
+      <button class="btn" data-descargar title="Un archivo para proyectar sin internet">💾 Descargar</button>
       <button class="btn btn-primary" data-proyectar>▶ Proyectar</button></div>
     <div class="card cu-culto-datos">
       <div><label class="lbl">Nombre del culto</label><input class="input" data-nombre maxlength="120" value="${esc(culto.nombre)}"></div>
@@ -200,6 +203,7 @@ export async function pintarEditorCulto(cuerpo, id, { perfil, datos = datosCulto
   $('[data-fecha]', cuerpo).onchange = (e) => { culto.fecha = e.target.value || null; cambio(); };
   $('[data-base]', cuerpo).onchange = async (e) => { culto.plantilla_base = e.target.value; await prepararFuente(e.target.value); cambio(); pintarItems(); };
   $('[data-proyectar]', cuerpo).onclick = async () => { await guardar(); proyectar(culto.id); };
+  $('[data-descargar]', cuerpo).onclick = async () => { await guardar(); descargarCulto(culto.id, { datos, canciones: datosCanc }); };
 
   // ---------- 📤 Publicar para coristas (una copia fija; el enlace no cambia al publicar cambios) ----------
   let pendiente = !!culto.publicado_en && new Date(culto.updated_at) - new Date(culto.publicado_en) > 2000;

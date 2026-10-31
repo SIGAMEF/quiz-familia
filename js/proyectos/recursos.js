@@ -19,7 +19,7 @@ export const FUENTES_EXTRA = ['Outfit', 'Lobster', 'Righteous', 'Bangers', 'Perm
   'Lilita One', 'Sacramento', 'Kaushan Script', 'Fjalla One', 'Rubik', 'Quicksand', 'Abril Fatface', 'Shadows Into Light'];
 export function fuenteValida(f) { return FUENTES.includes(f) || FUENTES_EXTRA.includes(f) ? f : 'Nunito'; }
 export function cargarFuente(f) {
-  if (!FUENTES_EXTRA.includes(f) || document.querySelector(`link[data-fuente="${CSS.escape(f)}"]`)) return;
+  if (!FUENTES_EXTRA.includes(f) || globalThis.__CULTO_SIN_RED__ || document.querySelector(`link[data-fuente="${CSS.escape(f)}"]`)) return;
   const l = document.createElement('link');
   l.rel = 'stylesheet'; l.dataset.fuente = f;
   const pesos = ['Outfit', 'Raleway', 'Rubik', 'Quicksand', 'Dancing Script'].includes(f) ? ':wght@400;500;700' : '';   // las demás tienen un solo grosor
@@ -90,8 +90,12 @@ export function estiloFondo(f = {}) {
   return { backgroundColor: colorValido(f.valor, '#FFFFFF') };
 }
 
-// Solo https sin caracteres que puedan romper un atributo o un url() de CSS
-export function urlSegura(u) { return typeof u === 'string' && /^https:\/\/[^\s"'()<>\\]+$/.test(u) && u.length < 2000; }
+// Solo https sin caracteres que puedan romper un atributo o un url() de CSS.
+// En un culto descargado (js/cultos/sin-red.js) las imágenes y videos van dentro del archivo y se abren como blob:
+export function urlSegura(u) {
+  if (typeof u !== 'string' || u.length >= 2000) return false;
+  return /^https:\/\/[^\s"'()<>\\]+$/.test(u) || (!!globalThis.__CULTO_SIN_RED__ && /^blob:[^\s"'()<>\\]+$/.test(u));
+}
 
 // ---------- Formas (viewBox 0 0 100 100, se estiran al tamaño del elemento) ----------
 export const FORMAS = {
