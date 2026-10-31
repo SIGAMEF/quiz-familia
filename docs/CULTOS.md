@@ -200,7 +200,7 @@ cultos           (id, profesor_id, nombre, fecha, plantilla_base, items jsonb,  
 - [ ] **El control remoto sin Realtime:** la pantalla remota y los coristas tienen respaldo por sondeo; el celular de control no (necesita Realtime).
 - [ ] **Sonido por plantilla:** hoy el ambiente es uno para toda la proyección y suena en la consola; la especificación pedía un sonido opcional por plantilla.
 - [x] **Videos:** ▶/⏸/⏮ en la consola y en el control remoto; aviso si el video empezó sin sonido. (La pantalla remota que funciona por sondeo, sin Realtime, no recibe estas órdenes.)
-- [ ] **Coristas:** versículos y canciones se publican; los demás elementos (avisos, textos) no salen en `letras.html`.
+- [x] **Coristas:** además de canciones y versículos, salen los textos, los anuncios con imagen y los videos (como enlace). Los cultos ya publicados los muestran después de "Publicar cambios". Cuentas regresivas y diseños no salen.
 - [ ] **Palabras botón en las canciones desde el formulario rápido:** en las canciones se aplican con la barra "✨ Resaltar" del editor (preset 🔘 Botón); el movimiento se elige solo al proyectar la Biblia (en canciones queda "flotar").
 
 Al cerrar cada fase:

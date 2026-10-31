@@ -2,13 +2,15 @@
 // Cultos: letras para los coristas (letras.html?c=<código de coristas>)
 // - Sin sesión: lee la copia publicada con culto_letras(código). Se guarda en el celular (localStorage),
 //   así funciona aunque falle la señal; al abrir se busca la versión nueva.
-// - Lista de canciones (y versículos) en orden; al tocar una, la letra completa en vertical, con
-//   estrofas y coro marcados, tamaño de letra, modo oscuro y pantalla siempre encendida.
+// - Lista de canciones, versículos, textos, anuncios con imagen y videos (como enlace) en orden; al tocar
+//   una canción, la letra completa en vertical, con estrofas y coro marcados, tamaño de letra, modo oscuro
+//   y pantalla siempre encendida.
 // - "📡 Seguir proyección": salta a lo que se está proyectando (canal cv-<código>, js/cultos/remoto.js).
 //   Lo que hace el corista nunca cambia la proyección.
 // ============================================================
 import { supabase, esc } from '../comun.js';
 import { htmlDeLetra } from './resaltar.js';
+import { urlSegura } from '../proyectos/recursos.js';
 import { abrirCanal, pantallaEncendida, sondeo, conRespaldo } from './remoto.js';
 
 const raiz = document.getElementById('raiz');
@@ -22,7 +24,17 @@ let culto = null, abierto = null, enVivo = null, sinConexion = false;
 document.body.classList.toggle('oscuro', pref.oscuro);
 
 const fechaBonita = (f) => f ? new Date(f + 'T12:00:00').toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
-const items = () => (culto?.items || []).filter(x => x.tipo === 'cancion' || x.tipo === 'versiculo');
+const TIPOS = { versiculo: '📖 Versículo', texto: '👋 Texto', anuncio: '📢 Anuncio', video: '▶️ Video' };
+const items = () => (culto?.items || []).filter(x => x.tipo === 'cancion' || TIPOS[x.tipo]);
+const subtitulo = (x) => TIPOS[x.tipo] || [x.autor, x.tono ? 'Tono ' + x.tono : ''].filter(Boolean).join(' · ');
+const lineas = (t) => `<div class="cu-letra-bloque">${String(t || '').split('\n').map(l => `<div>${esc(l) || '&nbsp;'}</div>`).join('')}</div>`;
+function cuerpo(x) {
+  if (x.tipo === 'versiculo') return lineas(x.texto);
+  if (x.tipo === 'texto') return x.texto ? lineas(x.texto) : '';
+  if (x.tipo === 'anuncio') return urlSegura(x.url) ? `<img class="le-img" src="${esc(x.url)}" alt="${esc(x.titulo || 'Anuncio')}">` : '<p>Sin imagen.</p>';
+  if (x.tipo === 'video') return urlSegura(x.url) ? `<a class="le-enlace" href="${esc(x.url)}" target="_blank" rel="noopener">▶ Ver el video</a>` : '<p>Sin enlace.</p>';
+  return htmlDeLetra(x.bloques) || '<p>Sin letra.</p>';
+}
 
 function aviso(titulo, txt) {
   raiz.innerHTML = `<div class="le-aviso"><b>${esc(titulo)}</b><span>${esc(txt)}</span></div>`;
@@ -59,8 +71,8 @@ function pintar() {
     <header class="le-cab"><div><b>${esc(culto.nombre || 'Culto')}</b><small>${esc(fechaBonita(culto.fecha))}</small></div>${barra()}</header>
     ${sinConexion ? '<p class="le-nota">📶 Sin conexión: ves la última versión guardada.</p>' : ''}
     <main class="le-lista">${lista.map((x, k) => `<button class="le-item ${x.id === enVivo ? 'vivo' : ''}" data-k="${k}">
-        <span class="le-n">${k + 1}</span><span class="le-t"><b>${esc(x.titulo || '')}</b><small>${esc(x.tipo === 'versiculo' ? '📖 Versículo' : [x.autor, x.tono ? 'Tono ' + x.tono : ''].filter(Boolean).join(' · '))}</small></span>
-        ${x.id === enVivo ? '<span class="le-vivo">● En pantalla</span>' : ''}</button>`).join('') || '<p class="le-nota">Este culto todavía no tiene canciones.</p>'}</main>`;
+        <span class="le-n">${k + 1}</span><span class="le-t"><b>${esc(x.titulo || '')}</b><small>${esc(subtitulo(x))}</small></span>
+        ${x.id === enVivo ? '<span class="le-vivo">● En pantalla</span>' : ''}</button>`).join('') || '<p class="le-nota">Este culto todavía no tiene canciones ni avisos.</p>'}</main>`;
   raiz.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { abierto = Number(b.dataset.k); pintar(); scrollTo(0, 0); });
   enlazarBarra();
 }
@@ -69,11 +81,9 @@ function pintarLetra() {
   const lista = items(), x = lista[abierto];
   if (!x) { abierto = null; return pintar(); }
   raiz.innerHTML = `
-    <header class="le-cab"><button class="le-volver" data-volver aria-label="Volver a la lista">←</button><div><b>${esc(x.titulo || '')}</b><small>${esc(x.tipo === 'versiculo' ? 'Versículo' : [x.autor, x.tono ? 'Tono ' + x.tono : ''].filter(Boolean).join(' · '))}</small></div>${barra()}</header>
-    ${x.id === enVivo ? '<p class="le-nota vivo">● Esta se está proyectando</p>' : ''}
-    <main class="le-letra" style="font-size:${pref.tam}px;">${x.tipo === 'versiculo'
-      ? `<div class="cu-letra-bloque">${String(x.texto || '').split('\n').map(l => `<div>${esc(l)}</div>`).join('')}</div>`
-      : htmlDeLetra(x.bloques) || '<p>Sin letra.</p>'}</main>
+    <header class="le-cab"><button class="le-volver" data-volver aria-label="Volver a la lista">←</button><div><b>${esc(x.titulo || '')}</b><small>${esc(subtitulo(x))}</small></div>${barra()}</header>
+    ${x.id === enVivo ? '<p class="le-nota vivo">● Esto se está proyectando</p>' : ''}
+    <main class="le-letra" style="font-size:${pref.tam}px;">${cuerpo(x)}</main>
     <nav class="le-pie">
       <button data-mover="-1" ${abierto === 0 ? 'disabled' : ''}>◀ Anterior</button>
       <button data-mover="1" ${abierto >= lista.length - 1 ? 'disabled' : ''}>Siguiente ▶</button></nav>`;

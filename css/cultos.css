@@ -297,6 +297,8 @@ body.le.oscuro { --le-fondo: #14121F; --le-tinta: #F4F2FF; --le-suave: #A9A3C7; 
 .le-letra .cu-letra-bloque > b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--le-suave); margin-bottom: 2px; }
 .le-letra .cu-letra-bloque.coro { border-left: 4px solid #8B7CF6; padding-left: 12px; font-weight: 800; }
 .le-letra .cu-letra-bloque div b { color: #8B7CF6; }
+.le-img { display: block; width: 100%; height: auto; border-radius: 12px; }
+.le-enlace { display: block; padding: 14px; border-radius: 12px; background: var(--le-caja); color: var(--le-tinta); font-weight: 800; text-align: center; text-decoration: none; }
 .le-pie { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 8px; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); background: var(--le-fondo); border-top: 1px solid var(--le-linea); }
 .le-pie button { flex: 1; padding: 12px; border: none; border-radius: 12px; background: var(--le-caja); color: var(--le-tinta); font: 800 15px 'Nunito', sans-serif; cursor: pointer; }
 .le-pie button:disabled { opacity: .4; }

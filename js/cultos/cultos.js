@@ -461,7 +461,8 @@ function editarElemento(original, { culto, canciones, perfil, recargar, recargar
 }
 
 // ---------- Coristas ----------
-// Lo que se publica: las canciones (letra por bloques, con los resaltados) y los versículos, en orden
+// Lo que se publica: las canciones (letra por bloques, con los resaltados), los versículos, los textos,
+// los anuncios con imagen y los videos (como enlace), en orden. Cuentas regresivas y diseños no salen.
 export function datosCoristas(culto, canciones) {
   return (culto.items || []).flatMap(it => {
     if (it.tipo === 'cancion') {
@@ -469,6 +470,12 @@ export function datosCoristas(culto, canciones) {
       return c ? [{ id: it.id, tipo: 'cancion', titulo: c.titulo, autor: c.autor || '', tono: c.tono || '', bloques: letraCoristas(c) }] : [];
     }
     if (it.tipo === 'versiculo') return [{ id: it.id, tipo: 'versiculo', titulo: it.cita || 'Versículo', texto: String(it.texto || '') }];
+    if (it.tipo === 'texto') {
+      const titulo = String(it.titulo || '').trim(), texto = String(it.texto || '').trim();
+      return titulo || texto ? [{ id: it.id, tipo: 'texto', titulo: titulo || 'Aviso', texto }] : [];
+    }
+    if (it.tipo === 'anuncio') return it.url ? [{ id: it.id, tipo: 'anuncio', titulo: it.nombre || 'Anuncio', url: it.url }] : [];
+    if (it.tipo === 'video') return it.url ? [{ id: it.id, tipo: 'video', titulo: it.nombre || 'Video', url: it.url }] : [];
     return [];
   });
 }
