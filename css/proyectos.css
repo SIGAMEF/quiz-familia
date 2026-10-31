@@ -809,3 +809,25 @@ textarea.pl-area { min-height: 220px; font-size: 13px; line-height: 1.45; }
 .pl-estrofa { margin-top: 6px; flex-wrap: wrap; }
 .pl-estrofa label { min-width: 0; }
 .pl-estrofa select { flex: 1; min-width: 150px; }
+
+/* ---------- Canción: mover la letra y las líneas separadas en el lienzo ---------- */
+.ed-cancion .marco .lienzo .pe[data-vinculo="linea"] { outline: .22cqw dashed rgba(255,255,255,.75); box-shadow: 0 0 0 .22cqw rgba(0,0,0,.35); }
+.ed-cancion .lienzo .pe[data-vinculo="linea"], .ed-cancion .lienzo .pe[data-vinculo="linea"] * { pointer-events: auto; user-select: text; -webkit-user-select: text; cursor: text; }
+.ed-cancion .marco .lienzo .pe[data-vinculo="linea"] .w:hover { background: rgba(255,255,255,.14); border-radius: .2em; }
+/* el borde punteado y el asa ✥ eligen el recuadro (las palabras siguen sirviendo para resaltar) */
+.ed-cancion .lienzo .pe .pe-agarre { position: absolute; z-index: 2; pointer-events: auto; cursor: move; user-select: none; -webkit-user-select: none; touch-action: none; }
+.ed-cancion .lienzo .pe .pe-borde.b-n { left: 0; right: 0; top: -6px; height: 12px; }
+.ed-cancion .lienzo .pe .pe-borde.b-s { left: 0; right: 0; bottom: -6px; height: 12px; }
+.ed-cancion .lienzo .pe .pe-borde.b-e { top: 0; bottom: 0; right: -6px; width: 12px; }
+.ed-cancion .lienzo .pe .pe-borde.b-w { top: 0; bottom: 0; left: -6px; width: 12px; }
+.ed-cancion .lienzo .pe .pe-mover { left: 6px; top: 6px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 15px; line-height: 1;
+  background: #fff; color: var(--primary-dark); border: 2px solid var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,.3); opacity: 0; transition: opacity .15s; }
+.ed-cancion .lienzo .pe:hover > .pe-mover, .ed-cancion .lienzo .pe.elegida > .pe-mover { opacity: 1; }
+.ed-cancion .lienzo .pe[data-vinculo]:has(> .pe-borde:hover) { outline-color: var(--primary); }
+/* elegida: se arrastra desde cualquier parte */
+.ed-cancion .lienzo .pe.elegida, .ed-cancion .lienzo .pe.elegida * { cursor: move; user-select: none; -webkit-user-select: none; }
+.guia.borde { background: #F59E0B; }
+@media (pointer: coarse) {
+  .ed-cancion .lienzo .pe .pe-mover { opacity: .9; width: 32px; height: 32px; }
+  .ed-centro .pe[data-vinculo="linea"] .pe-txt { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+}

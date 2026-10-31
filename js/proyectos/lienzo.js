@@ -140,10 +140,12 @@ export function posMovil(hoja, el) {
 // ctx: { hoja, res (respuestas para la zona), fmt: 'web' | 'auto' | 'manual' }
 function crearElemento(el, modo, ctx) {
   const fmt = ctx.fmt || 'web';
+  // una línea de canción separada en su propio cuadro: en el celular vertical vuelve a la letra (acomodo automático)
+  if (el.vinculo === 'linea' && fmt !== 'web') return null;
   const d = document.createElement('div');
   d.className = 'pe pe-' + el.tipo;
   d.dataset.id = el.id;
-  if (el.vinculo === 'letra' || el.vinculo === 'pie') d.dataset.vinculo = el.vinculo;
+  if (el.vinculo === 'letra' || el.vinculo === 'pie' || el.vinculo === 'linea') d.dataset.vinculo = el.vinculo;
   if (el.bloqueado) d.classList.add('bloq');   // de la plantilla: en el editor de canciones no se elige ni se mueve
   let altoCqw;   // alto del elemento en cqw (para el tamaño de los emojis)
   if (fmt === 'web') { colocar(d, el); altoCqw = num(el.h, 20, 1, 300) * 0.5625; }
@@ -181,11 +183,14 @@ function crearElemento(el, modo, ctx) {
     }
     if (el.sombra) t.style.textShadow = '0 0.25cqw 0.6cqw rgba(0,0,0,.35)';
     const coloresLetra = efectoTexto(t, el.efecto);
-    if (el.vinculo === 'letra' && Array.isArray(ctx.textos?.fuente)) {
-      pintarLetraRica(t, ctx.textos.fuente, ctx.resaltados, { animar: animar(ctx), marcar: !!ctx.marcar });
+    // la letra (con sus resaltados): la de la zona o la de una línea separada (el.lineas)
+    const linea = el.vinculo === 'linea';
+    const rica = linea ? el.lineas : el.vinculo === 'letra' ? (fmt !== 'web' && ctx.textos?.todas) || ctx.textos?.fuente : null;
+    if (Array.isArray(rica)) {
+      pintarLetraRica(t, rica, ctx.resaltados, { animar: animar(ctx), marcar: !!ctx.marcar });
       if (coloresLetra) colorearPalabras(t, coloresLetra);
-      t.style.whiteSpace = ctx.textos.partir ? 'pre-wrap' : 'pre';
-      t.style.overflowWrap = ctx.textos.chico ? 'anywhere' : 'normal';
+      t.style.whiteSpace = (linea ? el.partir : ctx.textos.partir) ? 'pre-wrap' : 'pre';
+      t.style.overflowWrap = (linea ? el.chico : ctx.textos.chico) ? 'anywhere' : 'normal';
     }
     if (el.anim === 'marquesina' && animar(ctx)) {
       // el texto corre dentro de su caja: dos copias seguidas que se desplazan la mitad
@@ -432,7 +437,7 @@ export function pintarHojaMovil(cont, hoja, { modo = 'ver', res = null } = {}) {
   scroll.className = 'movil-scroll';
   const lienzo = document.createElement('div');
   lienzo.className = `lienzo movil ${manual ? 'manual' : 'auto'}${modo !== 'ver' ? ' estatico' : ''}`;
-  const ctx = { hoja, res, fmt: manual ? 'manual' : 'auto', animar: modo !== 'editor' };
+  const ctx = { hoja, res, fmt: manual ? 'manual' : 'auto', animar: modo !== 'editor', textos: hoja?.textos ?? null, resaltados: hoja?.resaltados ?? null };
   const els = hoja?.diseno?.elementos || [];
   let fondoY = 0;
   for (const el of manual ? els : ordenAuto(els)) {

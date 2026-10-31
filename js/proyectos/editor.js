@@ -31,7 +31,8 @@ import { colorBase, FONDOS, CATEGORIAS_FONDO, parametros, montarFondoAnimado } f
 import { ACEPTA_FONDO, subirFondo, tipoDeFondo } from './subir-fondo.js';
 import { datosCanciones } from '../cultos/datos.js';
 import { OPCIONES_DEFECTO, ordenNormal, ubicarResaltados, lineasDeContenido, palabras, etiquetas } from '../cultos/letra.js';
-import { hojasDeCancion, plantillaDeCancion, plantillaDeEstrofa, plantillaDe, registrarMisPlantillas, misPlantillas, prepararFuente, pintarPantalla, existePlantilla, zonaConLetra, letraDePantalla } from '../cultos/diapositivas.js';
+import { hojasDeCancion, plantillaDeCancion, plantillaDeEstrofa, plantillaDe, registrarMisPlantillas, misPlantillas, prepararFuente, pintarPantalla, existePlantilla, zonaConLetra, letraDePantalla,
+  geoValida, geoDeZona, geoDePlantilla, idLinea } from '../cultos/diapositivas.js';
 import { PLANTILLAS as PLANTILLAS_CULTO, PLANTILLA_DEFECTO } from '../cultos/plantillas.js';
 import { montarPanelLetra } from '../cultos/panel-letra.js';
 import { montarResaltar, abrirMenuResaltar, cerrarMenuResaltar } from '../cultos/resaltar.js';
@@ -89,6 +90,9 @@ async function rpc(nombre, args) {
 // ======================= ESTADO, HISTORIAL Y GUARDADO =======================
 const hoja = () => hojas[actual];
 const elSel = () => hoja()?.diseno.elementos.find(e => e.id === selId) || null;
+// Canción: la zona de la letra y las líneas separadas se eligen y se mueven, pero su texto viene de la canción
+const SEL_LETRA = '.pe[data-vinculo="letra"], .pe[data-vinculo="linea"]';
+function esLetraMovible(el) { return MODO_CAN && (el?.vinculo === 'letra' || el?.vinculo === 'linea'); }
 
 // En la vista Celular solo se edita si la hoja (de contenido) está "ajustada a mano"
 const enCelular = () => vista === 'celular';
@@ -826,8 +830,8 @@ function pintarLienzo() {
     const capa = document.createElement('div');
     capa.className = 'capa-sel';
     marco.appendChild(capa);
+    if (MODO_CAN) { ponerAgarres(); marcarPalabras(); }   // asas para mover la letra; las palabras elegidas para resaltar
     pintarSeleccion();
-    if (MODO_CAN) marcarPalabras();   // las palabras elegidas para resaltar
     return;
   }
   // Celular: el teléfono y, al lado, un aviso grande que explica qué se puede hacer aquí
@@ -903,6 +907,7 @@ function pintarSeleccion() {
   if (!capa) return;
   const el = elSel();
   capa.innerHTML = '';
+  if (MODO_CAN) lienzo.querySelectorAll(SEL_LETRA).forEach(n => n.classList.toggle('elegida', n.dataset.id === el?.id && editableAqui()));
   if (!el || !editableAqui()) return;
   const c = document.createElement('div');
   c.className = 'sel-caja';
@@ -923,8 +928,10 @@ function conectarLienzo() {
   let op = null;   // operación en curso: mover, redimensionar o girar
   escn.addEventListener('pointerdown', (e) => {
     if (!lienzo || !editableAqui() || e.button > 0) return;
-    // canción: en la letra se eligen palabras (para resaltarlas), no se mueve nada
-    if (MODO_CAN && e.target.closest('.pe[data-vinculo="letra"]') && lienzo.contains(e.target)) {
+    // canción: en la letra se eligen palabras (para resaltarlas). El recuadro se elige desde su borde o el asa ✥;
+    // ya elegido, se arrastra desde cualquier parte (un clic sin mover en una palabra sigue sirviendo para resaltar)
+    const zonaLetra = MODO_CAN && lienzo.contains(e.target) ? e.target.closest(SEL_LETRA) : null;
+    if (zonaLetra && zonaLetra.dataset.id !== selId && !e.target.closest('.pe-agarre')) {
       if (selId) { selId = null; pintarSeleccion(); pintarPropiedades(); }
       return;
     }
@@ -938,10 +945,10 @@ function conectarLienzo() {
     const activo = document.activeElement;
     if (activo && activo !== document.body && !lienzo.contains(activo)) activo.blur();
     const asa = e.target.closest('[data-h]');
-    let nodo = e.target.closest('.pe:not(.bloq)');
+    let nodo = zonaLetra || e.target.closest('.pe:not(.bloq)');
     terminarEdicionTexto();
     // Alt+clic: elige el elemento que está debajo del elegido
-    if (nodo && !asa && e.altKey) {
+    if (nodo && !asa && e.altKey && !zonaLetra) {
       const pila = [...new Set(document.elementsFromPoint(e.clientX, e.clientY).map(n => n.closest('.pe:not(.bloq)')).filter(n => n && lienzo.contains(n)))];
       const i = pila.findIndex(n => n.dataset.id === selId);
       nodo = pila[(i + 1) % pila.length] || nodo;
@@ -970,12 +977,12 @@ function conectarLienzo() {
     const g = geo(el);
     if (op.tipo === 'mover') {
       let x = ini.x + dx / ux, y = ini.y + dy / uy;
-      // imán al centro (en el celular solo el vertical)
-      const iv = Math.abs(x + g.w / 2 - 50) < 1.2 && !e.altKey, ih = !enCelular() && Math.abs(y + g.h / 2 - 50) < 1.6 && !e.altKey;
-      if (iv) x = 50 - g.w / 2;
-      if (ih) y = 50 - g.h / 2;
+      // imán al centro y a los márgenes (en el celular solo el horizontal; Alt lo suelta)
+      const iv = e.altKey ? null : iman(x, g.w, 1.2), ih = e.altKey || enCelular() ? null : iman(y, g.h, 1.6);
+      if (iv) x = iv.pos;
+      if (ih) y = ih.pos;
       g.x = r1(x); g.y = r1(y);
-      guias(iv, ih);
+      guias(iv?.linea, ih?.linea);
     } else if (op.tipo === 'girar') {
       const cx = r.left + (g.x + g.w / 2) * ux, cy = r.top + (g.y + g.h / 2) * uy;
       let a = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI + 90;
@@ -991,10 +998,12 @@ function conectarLienzo() {
   });
   const fin = () => {
     if (!op) return;
-    const movido = op.movido;
+    const { movido, el } = op;
     op = null;
-    guias(false, false);
-    if (movido) { confirmarCambio({ repintar: 'mini' }); pintarPropiedades(); }
+    guias(null, null);
+    if (!movido) return;
+    if (esLetraMovible(el)) guardarGeoLetra(el);   // la letra se reacomoda al nuevo tamaño
+    else { confirmarCambio({ repintar: 'mini' }); pintarPropiedades(); }
   };
   escn.addEventListener('pointerup', fin);
   escn.addEventListener('pointercancel', fin);
@@ -1021,12 +1030,21 @@ function redimensionar(op, g, dx, dy, shift) {
   g.x = r1((cx - w / 2) / ux); g.y = r1((cy - hh / 2) / uy);
 }
 
+// Imán: el centro o un borde cerca del centro de la hoja o de un margen. Devuelve { pos, linea } o null
+const MARGEN = 5;
+function iman(p, tam, dist) {
+  if (Math.abs(p + tam / 2 - 50) < dist) return { pos: 50 - tam / 2, linea: 50 };
+  if (Math.abs(p - MARGEN) < dist) return { pos: MARGEN, linea: MARGEN };
+  if (Math.abs(p + tam - (100 - MARGEN)) < dist) return { pos: 100 - MARGEN - tam, linea: 100 - MARGEN };
+  return null;
+}
+// Las guías (en % de la hoja): v vertical, h horizontal; null = sin guía
 function guias(v, h) {
   const cont = enCelular() ? lienzo : lienzo?.parentElement;   // en Web, el marco del lienzo
   if (!cont) return;
   cont.querySelectorAll(':scope > .guia').forEach(g => g.remove());
-  if (v) cont.insertAdjacentHTML('beforeend', '<div class="guia v"></div>');
-  if (h) cont.insertAdjacentHTML('beforeend', '<div class="guia h"></div>');
+  if (v != null) cont.insertAdjacentHTML('beforeend', `<div class="guia v${v === 50 ? '' : ' borde'}" style="left:${v}%"></div>`);
+  if (h != null) cont.insertAdjacentHTML('beforeend', `<div class="guia h${h === 50 ? '' : ' borde'}" style="top:${h}%"></div>`);
 }
 
 // ---------- Texto: el enunciado de las preguntas vive en la configuración de la hoja ----------
@@ -1040,7 +1058,7 @@ function ponerTexto(el, t) {
 
 function editarTexto(id) {
   const el = hoja().diseno.elementos.find(e => e.id === id);
-  if (el?.vinculo === 'letra' || el?.vinculo === 'pie') return toast('Aquí va la letra de cada canción: cambia su fuente, color y tamaño en el panel de la derecha');
+  if (el?.vinculo === 'letra' || el?.vinculo === 'linea' || el?.vinculo === 'pie') return toast('Aquí va la letra de cada canción: cambia su fuente, color y tamaño en el panel de la derecha');
   const nodo = lienzo?.querySelector(`.pe[data-id="${CSS.escape(id)}"] .pe-txt`);
   if (!el || !nodo) return;
   selId = id; pintarSeleccion();
@@ -1078,15 +1096,16 @@ function conectarTeclado() {
     if (ctrl && !enCampo && e.key.toLowerCase() === 'y') { e.preventDefault(); moverHist(1); return; }
     if (enCampo) return;
     const el = editableAqui() ? elSel() : null;
-    if (ctrl && e.key.toLowerCase() === 'd' && el) { e.preventDefault(); duplicarElemento(); return; }
+    if (ctrl && e.key.toLowerCase() === 'd' && el && !esLetraMovible(el)) { e.preventDefault(); duplicarElemento(); return; }
     if (!el) {
       if (e.key === 'ArrowRight' || e.key === 'PageDown') { if (actual < hojas.length - 1) irAHoja(actual + 1); }
       else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { if (actual > 0) irAHoja(actual - 1); }
       return;
     }
-    if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); eliminarElemento(); }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && esLetraMovible(el)) { e.preventDefault(); if (el.vinculo === 'linea') unirLinea(el.suelta); }
+    else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); eliminarElemento(); }
     else if (e.key === 'Escape') { selId = null; pintarSeleccion(); pintarPropiedades(); }
-    else if (e.key === 'Enter' && el.tipo === 'texto') { e.preventDefault(); editarTexto(el.id); }
+    else if (e.key === 'Enter' && el.tipo === 'texto' && !esLetraMovible(el)) { e.preventDefault(); editarTexto(el.id); }
     else if (e.key.startsWith('Arrow')) {
       e.preventDefault();
       const p = e.shiftKey ? 5 : 0.5, g = geo(el);
@@ -1096,7 +1115,7 @@ function conectarTeclado() {
       if (e.key === 'ArrowDown') g.y = r1(g.y + p);
       colocarNodo(el);
       clearTimeout(tFlechas);
-      tFlechas = setTimeout(() => confirmarCambio({ repintar: 'mini' }), 400);
+      tFlechas = setTimeout(() => esLetraMovible(el) ? guardarGeoLetra(el) : confirmarCambio({ repintar: 'mini' }), 400);
     }
   });
   // Pegar: una imagen se sube; un texto se agrega como texto nuevo
@@ -1728,7 +1747,7 @@ function pintarPropiedades() {
   if (MODO_CAN) {
     if (el) resaltando = null;
     $('.ed')?.classList.toggle('resaltando', !!resaltando);
-    return el ? pintarPropsElemento(p, el) : pintarPropsCancion(p);
+    return el ? (esLetraMovible(el) ? pintarPropsZona(p, el) : pintarPropsElemento(p, el)) : pintarPropsCancion(p);
   }
   if (!interactiva(h.tipo)) return el ? pintarPropsElemento(p, el) : pintarPropsHoja(p);
   const nombre = esPregunta(h.tipo) ? '❓ Pregunta' : { agrupar: '👥 Agrupar', unirse: '📲 Unirse', ruleta: '🎡 Ruleta', juego: '🎮 Juego' }[h.tipo];
@@ -2409,7 +2428,7 @@ function reconstruir() {
   if (!hojas.length) hojas = [hojaVacia()];
   const i = hojas.findIndex(h => h.id === clave);
   actual = i >= 0 ? i : Math.min(actual, hojas.length - 1);
-  if (selId && !hoja().diseno.elementos.some(e => e.id === selId && !e.bloqueado)) selId = null;
+  if (selId && !hoja().diseno.elementos.some(e => e.id === selId && (!e.bloqueado || esLetraMovible(e)))) selId = null;
 }
 // Los detalles de cada pantalla (lo que no es de la plantilla) vuelven a la canción
 function sincronizarDetalles() {
@@ -2418,7 +2437,8 @@ function sincronizarDetalles() {
     if (!h.info) continue;
     const el = h.diseno.elementos.filter(e => !e.bloqueado);
     const fondo = JSON.stringify(h.diseno.fondo) !== fondoPlantilla(h.info.bloque) ? h.diseno.fondo : null;
-    if (el.length || fondo) det[h.id] = { el, ...(fondo ? { fondo } : {}) };
+    const zona = geoValida(cancion.detalles?.[h.id]?.zona);
+    if (el.length || fondo || zona) det[h.id] = { el, ...(fondo ? { fondo } : {}), ...(zona ? { zona } : {}) };
   }
   // los de pantallas que ahora no salen (p. ej. se quitó un coro del orden) se guardan por si vuelven
   for (const [k, v] of Object.entries(cancion.detalles || {})) if (!hojas.some(h => h.id === k)) det[k] = v;
@@ -2737,15 +2757,20 @@ function cambiosPropios() {
   if (letra?.fuente) partes.push(['Fuente propia', `fuente ${letra.fuente}`]);
   else if (letra) partes.push(['Letra propia', 'estilo de letra propio']);
   if (estrofas) partes.push([`Letra propia en ${n(estrofas, 'estrofa', 'estrofas')}`, `letra propia en ${n(estrofas, 'estrofa', 'estrofas')}`]);
+  const o = cancion.opciones;
+  const movida = !!o.zona || Object.keys(o.zonaEstrofas || {}).length > 0 || det.some(x => x.zona), sueltas = Object.keys(o.lineasSueltas || {}).length;
+  if (movida) partes.push(['Letra movida', 'posición propia de la letra']);
+  if (sueltas) partes.push([n(sueltas, 'línea separada', 'líneas separadas'), n(sueltas, 'línea separada', 'líneas separadas')]);
   if (detalles) partes.push([`Detalles en ${n(detalles, 'pantalla', 'pantallas')}`, `detalles en ${n(detalles, 'pantalla', 'pantallas')}`]);
-  return { hay: partes.length > 0, quitables: fondos > 0 || !!letra || estrofas > 0, corto: partes.map(p => p[0]).join(' · '), largo: partes.map(p => p[1]).join(', ') };
+  return { hay: partes.length > 0, quitables: fondos > 0 || !!letra || estrofas > 0 || movida || sueltas > 0, corto: partes.map(p => p[0]).join(' · '), largo: partes.map(p => p[1]).join(', ') };
 }
-// Quita lo que tapa a la plantilla: los fondos propios y el estilo de letra (los detalles agregados se quedan)
+// Quita lo que tapa a la plantilla: los fondos propios, el estilo y la posición de la letra (los detalles agregados se quedan)
 function quitarCambiosPropios({ resaltados = false } = {}) {
   const det = {};
   for (const [k, v] of Object.entries(cancion.detalles || {})) if (v.el?.length) det[k] = { el: v.el };
   cancion.detalles = det;
   delete cancion.opciones.letra; delete cancion.opciones.letraEstrofas;
+  delete cancion.opciones.zona; delete cancion.opciones.zonaEstrofas; delete cancion.opciones.lineasSueltas;
   if (resaltados) cancion.resaltados = [];
 }
 // Cambia la plantilla de una vez (un solo paso para Deshacer). modo: 'completa' | 'parcial'
@@ -2809,40 +2834,175 @@ async function plantillaDeEstaEstrofa(bloque, id) {
   cambioCancion({ sincronizar: false });
 }
 
-// 💾 Guardar en mi plantilla: la letra que se ve (la de la canción y la de esta estrofa) pasa a la zona de la letra
-// de la plantilla. Si la plantilla es prediseñada, se crea una copia mía y la canción la usa.
-async function guardarLetraEnPlantilla(d) {
-  const letra = letraDePantalla(cancion, d?.bloque);
-  if (!letra) return toast('Primero cambia la fuente, el color u otro estilo de la letra.', 'error');
-  const pl = plantillaDe(plantillaDeCancion(cancion));
-  if (pl.mia && !await confirmar(`La letra de “${pl.nombre}” cambiará en todas las canciones y cultos que usan esta plantilla.`,
-    { titulo: '¿Guardar en tu plantilla?', boton: '💾 Guardar', peligro: false })) return;
+// 💾 Guarda en mi plantilla la zona de la letra cambiada con cambiar(zona). Si la plantilla es prediseñada, se crea
+// una copia mía y la canción (o la estrofa, con estrofa: true y su propia plantilla) la usa. Devuelve true si se guardó.
+async function guardarEnPlantilla(cambiar, { d = null, estrofa = false, sufijo = 'mi letra', que = 'La letra' } = {}) {
+  const pl = plantillaDe(estrofa ? plantillaDeEstrofa(cancion, d?.bloque) : plantillaDeCancion(cancion));
+  if (pl.mia && !await confirmar(`${que} de “${pl.nombre}” cambiará en todas las canciones y cultos que usan esta plantilla.`,
+    { titulo: '¿Guardar en tu plantilla?', boton: '💾 Guardar', peligro: false })) return false;
   const base = hojaDePlantillaCulto(pl).diseno;
-  const diseno = { fondo: clonar(base.fondo), elementos: base.elementos.map(e => {
-    if (e.vinculo !== 'letra') return clonar(e);
-    const z = zonaConLetra(clonar(e), letra);
-    for (const k of Object.keys(z)) if (z[k] === null) delete z[k];
-    return z;
-  }) };
+  const diseno = { fondo: clonar(base.fondo), elementos: base.elementos.map(e => e.vinculo === 'letra' ? cambiar(clonar(e)) : clonar(e)) };
   estado('guardando', 'Guardando la plantilla…');
   try {
     let id;
     if (pl.mia) { await datosPlantillas.guardar(pl.idBase, { diseno }); id = pl.idBase; }
     else {
-      const nueva = await datosPlantillas.crear({ nombre: `${pl.nombre} (mi letra)`.slice(0, 80), categoria: pl.categoria || 'Mis plantillas', base: pl.id, diseno, profesor_id: perfil.id });
+      const nueva = await datosPlantillas.crear({ nombre: `${pl.nombre} (${sufijo})`.slice(0, 80), categoria: pl.categoria || 'Mis plantillas', base: pl.id, diseno, profesor_id: perfil.id });
       id = nueva.id;
-      cancion.opciones.plantilla = 'mi:' + id;
+      if (estrofa && d) cancion.opciones.plantillasEstrofas = { ...(cancion.opciones.plantillasEstrofas || {}), [d.bloque]: 'mi:' + id };
+      else cancion.opciones.plantilla = 'mi:' + id;
     }
     registrarMisPlantillas(await datosPlantillas.listar());
     avisarPlantilla(pl.mia ? 'cambio' : 'nueva', id);
-    // la letra ya está en la plantilla: la canción (y esta estrofa) quedan sin estilo propio
-    delete cancion.opciones.letra;
-    if (d && cancion.opciones.letraEstrofas) { delete cancion.opciones.letraEstrofas[d.bloque]; if (!Object.keys(cancion.opciones.letraEstrofas).length) delete cancion.opciones.letraEstrofas; }
-    await prepararFuente(cancion.opciones.plantilla);
-    cambioCancion();
-    toast(pl.mia ? `Guardado en tu plantilla “${pl.nombre}”` : `Se creó tu plantilla “${pl.nombre} (mi letra)” y esta canción la usa`);
-  } catch (e) { toast(mensajeError(e), 'error'); }
+    await prepararFuente('mi:' + id);
+    toast(pl.mia ? `Guardado en tu plantilla “${pl.nombre}”` : `Se creó tu plantilla “${pl.nombre} (${sufijo})” y ${estrofa ? 'esta estrofa' : 'esta canción'} la usa`);
+    return true;
+  } catch (e) { toast(mensajeError(e), 'error'); return false; }
   finally { if (!sucio && !guardando) estado('ok', 'Guardado ✓'); }
+}
+// La letra que se ve (la de la canción y la de esta estrofa) pasa a la zona de la letra de la plantilla
+async function guardarLetraEnPlantilla(d) {
+  const letra = letraDePantalla(cancion, d?.bloque);
+  if (!letra) return toast('Primero cambia la fuente, el color u otro estilo de la letra.', 'error');
+  const ok = await guardarEnPlantilla(e => {
+    const z = zonaConLetra(e, letra);
+    for (const k of Object.keys(z)) if (z[k] === null) delete z[k];
+    return z;
+  }, { d });
+  if (!ok) return;
+  // la letra ya está en la plantilla: la canción (y esta estrofa) quedan sin estilo propio
+  delete cancion.opciones.letra;
+  if (d && cancion.opciones.letraEstrofas) { delete cancion.opciones.letraEstrofas[d.bloque]; if (!Object.keys(cancion.opciones.letraEstrofas).length) delete cancion.opciones.letraEstrofas; }
+  cambioCancion();
+}
+
+// ---------- 📐 Mover la letra en el lienzo ----------
+// La zona de la letra se elige desde su borde punteado o el asa ✥ (el clic en las palabras sigue sirviendo para resaltar).
+// Su posición se guarda en la canción: opciones.zona (toda la canción), opciones.zonaEstrofas[bloque] (una estrofa) o
+// detalles[pantalla].zona (una pantalla). Una línea separada (opciones.lineasSueltas['b:l']) es su propio cuadro.
+let zonaDestino = 'cancion';   // a qué se aplica lo que se mueve: 'pantalla' | 'estrofa' | 'cancion'
+function ponerAgarres() {
+  if (!editableAqui()) return;
+  for (const n of lienzo?.querySelectorAll(SEL_LETRA) || []) {
+    n.insertAdjacentHTML('beforeend', '<i class="pe-agarre pe-borde b-n"></i><i class="pe-agarre pe-borde b-s"></i><i class="pe-agarre pe-borde b-e"></i><i class="pe-agarre pe-borde b-w"></i>'
+      + `<span class="pe-agarre pe-mover" title="${n.dataset.vinculo === 'linea' ? 'Mover esta línea' : 'Mover la letra'} (o clic en el borde punteado)">✥</span>`);
+  }
+}
+// Quita la posición propia en ese alcance y en los de abajo (la canción incluye estrofas y pantallas)
+function limpiarZona(nivel, d) {
+  const o = cancion.opciones, det = cancion.detalles || {};
+  const claves = nivel === 'cancion' || !d ? Object.keys(det) : nivel === 'estrofa' ? hojas.filter(x => x.info?.bloque === d.bloque).map(x => x.id) : [d.clave];
+  for (const k of claves) {
+    if (!det[k]) continue;
+    delete det[k].zona;
+    if (!det[k].el?.length && !det[k].fondo) delete det[k];
+  }
+  if (nivel === 'cancion' || !d) { delete o.zona; delete o.zonaEstrofas; }
+  else if (nivel === 'estrofa' && o.zonaEstrofas) { delete o.zonaEstrofas[d.bloque]; if (!Object.keys(o.zonaEstrofas).length) delete o.zonaEstrofas; }
+}
+function ponerZona(g, nivel, d) {
+  limpiarZona(nivel, d);
+  if (nivel === 'cancion' || !d) cancion.opciones.zona = g;
+  else if (nivel === 'estrofa') cancion.opciones.zonaEstrofas = { ...(cancion.opciones.zonaEstrofas || {}), [d.bloque]: g };
+  else cancion.detalles[d.clave] = { el: [], ...(cancion.detalles[d.clave] || {}), zona: g };
+}
+// Después de mover, cambiar el tamaño o girar: guarda la posición y rearma (la letra se ajusta al nuevo tamaño)
+function guardarGeoLetra(el) {
+  const g = geoValida(el), d = hoja().info;
+  if (!g) return;
+  sincronizarDetalles();
+  if (el.vinculo === 'linea') cancion.opciones.lineasSueltas = { ...(cancion.opciones.lineasSueltas || {}), [el.suelta]: g };
+  else ponerZona(g, zonaDestino, d);
+  cambioCancion({ sincronizar: false });
+}
+// ↺ Vuelve a la zona de la plantilla en el alcance elegido
+function restablecerZona() {
+  const d = hoja().info, nivel = d ? zonaDestino : 'cancion';
+  sincronizarDetalles();
+  limpiarZona(nivel, d);
+  // si la pantalla sigue tomando la posición de su estrofa o de la canción, se le pone la de la plantilla encima
+  if (d && geoDeZona(cancion, d)) ponerZona(geoDePlantilla(cancion, d.bloque), nivel, d);
+  cambioCancion({ sincronizar: false });
+  toast('La letra volvió a la posición de la plantilla');
+}
+// "Separar esta línea": la línea pasa a ser su propio cuadro, en el mismo lugar donde se veía
+function separarLinea(b, l) {
+  const r = lienzo?.getBoundingClientRect();
+  const ws = [...(lienzo?.querySelectorAll(`.pe[data-vinculo="letra"] .w[data-b="${b}"][data-l="${l}"]`) || [])].map(w => w.getBoundingClientRect());
+  let g = { x: 20, y: 72, w: 60, h: 14, rot: 0 };
+  if (r?.width && ws.length) {
+    const px = (v) => (v - r.left) / r.width * 100, py = (v) => (v - r.top) / r.height * 100;
+    const x0 = px(Math.min(...ws.map(x => x.left))), x1 = px(Math.max(...ws.map(x => x.right)));
+    const y0 = py(Math.min(...ws.map(x => x.top))), y1 = py(Math.max(...ws.map(x => x.bottom)));
+    const w = Math.min(96, Math.max(12, x1 - x0 + 4)), h = Math.min(60, Math.max(7, y1 - y0 + 3));
+    g = { x: (x0 + x1 - w) / 2, y: (y0 + y1 - h) / 2, w, h, rot: 0 };
+  }
+  sincronizarDetalles();
+  cancion.opciones.lineasSueltas = { ...(cancion.opciones.lineasSueltas || {}), [`${b}:${l}`]: geoValida(g) };
+  selId = idLinea({ b, l });
+  resaltando = null;
+  cambioCancion({ sincronizar: false });
+  toast('La línea es ahora su propio cuadro: arrástrala a donde quieras');
+}
+// "Volver a unir": la línea regresa a la letra
+function unirLinea(clave) {
+  sincronizarDetalles();
+  const m = { ...(cancion.opciones.lineasSueltas || {}) };
+  delete m[clave];
+  if (Object.keys(m).length) cancion.opciones.lineasSueltas = m; else delete cancion.opciones.lineasSueltas;
+  selId = null;
+  cambioCancion({ sincronizar: false });
+}
+// Panel derecho con la letra (o una línea separada) elegida
+function pintarPropsZona(p, el) {
+  const d = hoja().info, linea = el.vinculo === 'linea';
+  if (!d) zonaDestino = 'cancion';
+  const propia = !linea && (d ? !!geoDeZona(cancion, d) : !!geoValida(cancion.opciones.zona));
+  const n = (k) => r1(Number(el[k]) || 0);
+  const alcance = { pantalla: 'esta pantalla', estrofa: `todas las pantallas de ${d?.nombre || 'la estrofa'}`, cancion: 'todas las pantallas de la canción' }[zonaDestino];
+  p.innerHTML = `<div class="panel-cab"><b>${linea ? '↗ Línea separada' : '📐 Posición de la letra'}</b><span class="grow"></span>
+      <button type="button" class="btn btn-sm btn-ghost" data-zona-listo title="Listo (Esc)">✓ Listo</button></div>
+    ${linea ? `<p class="hint" style="margin-top:0;">«${esc(el.lineas?.[0]?.t || '')}» es su propio cuadro en todas las pantallas donde sale. Arrástralo, cambia su tamaño con las asas o gíralo: la letra se ajusta sola.</p>`
+      : `<p class="hint" style="margin-top:0;">Arrastra el recuadro, cambia su ancho y alto con las asas o gíralo. Con las flechas se mueve fino (con Shift, más rápido). La letra se reacomoda sola, con el tamaño más grande que quepa.</p>
+      ${d ? `<div class="lt-destino"><span class="small muted">Aplicar a:</span><div class="grupo-btn">${[['pantalla', 'Esta pantalla'], ['estrofa', 'Esta estrofa'], ['cancion', 'Toda la canción']]
+        .map(([k, t]) => `<button type="button" class="btn btn-sm btn-outline ${zonaDestino === k ? 'activo' : ''}" data-zona-destino="${k}">${t}</button>`).join('')}</div></div>
+      <p class="hint" style="margin-top:2px;">Lo que muevas cambia en ${esc(alcance)}.</p>` : ''}`}
+    <div class="prop-num">${[['x', 'X'], ['y', 'Y'], ['w', 'Ancho'], ['h', 'Alto']].map(([k, t]) => `<div><label>${t} %</label><input type="number" step="0.5" data-zg="${k}" value="${n(k)}"></div>`).join('')}</div>
+    <div style="margin-top:10px;">${fila('Giro', `<input type="range" min="-180" max="180" step="1" data-zg="rot" value="${n('rot')}"><b data-ver-giro>${n('rot')}°</b>`)}</div>
+    ${linea ? '<button type="button" class="btn btn-sm btn-block" data-unir style="margin-top:10px;">↩ Volver a unir a la letra</button>'
+      : `<button type="button" class="btn btn-sm btn-block" data-zona-pl style="margin-top:10px;">💾 Guardar posición en mi plantilla</button>
+      ${propia ? '<button type="button" class="btn btn-sm btn-block btn-ghost" data-zona-reset style="margin-top:4px;">↺ Restablecer posición</button>' : ''}`}
+    <p class="hint">${linea ? '' : 'Clic derecho sobre una línea → <b>Separar esta línea</b> para moverla sola. '}En el celular vertical la letra se acomoda sola.</p>`;
+  $('[data-zona-listo]', p).onclick = () => { selId = null; pintarSeleccion(); pintarPropiedades(); };
+  $$('[data-zona-destino]', p).forEach(b => b.onclick = () => {
+    zonaDestino = b.dataset.zonaDestino;
+    // la posición que se ve pasa a ese alcance (p. ej. "Toda la canción" la lleva a todas las pantallas)
+    const g = d && geoDeZona(cancion, d);
+    if (g) { sincronizarDetalles(); ponerZona(g, zonaDestino, d); cambioCancion({ sincronizar: false }); }
+    else pintarPropiedades();
+  });
+  $$('[data-zg]', p).forEach(inp => {
+    const k = inp.dataset.zg;
+    if (k === 'rot') inp.oninput = () => { $('[data-ver-giro]', p).textContent = inp.value + '°'; el.rot = Number(inp.value); colocarNodo(el); };
+    inp.onchange = () => {
+      const v = Number(inp.value);
+      if (!Number.isFinite(v)) return;
+      el[k] = k === 'w' || k === 'h' ? Math.max(3, v) : v;
+      guardarGeoLetra(el);
+    };
+  });
+  const un = $('[data-unir]', p);
+  if (un) un.onclick = () => unirLinea(el.suelta);
+  const rs = $('[data-zona-reset]', p);
+  if (rs) rs.onclick = restablecerZona;
+  const zp = $('[data-zona-pl]', p);
+  if (zp) zp.onclick = async () => {
+    const g = geoValida(el), estrofa = !!(d && cancion.opciones.plantillasEstrofas?.[d.bloque]);
+    if (!g || !await guardarEnPlantilla(z => ({ ...z, ...g }), { d, estrofa, sufijo: 'mi posición', que: 'La posición de la letra' })) return;
+    sincronizarDetalles();
+    limpiarZona(estrofa ? 'estrofa' : 'cancion', d);   // ya está en la plantilla
+    cambioCancion({ sincronizar: false });
+  };
 }
 
 // ---------- ✨ Resaltar: elegir palabras en la letra ----------
@@ -2850,16 +3010,16 @@ async function guardarLetraEnPlantilla(d) {
 // El clic derecho (o el toque largo en el celular) abre un menú corto. Al soltar, el panel vuelve a la canción.
 // resaltando: { anclas: [{ b, l, p, n, texto }], actual: el resaltado que se edita (o null), ids }
 let resaltando = null, scrollCancion = 0;
-const zonaLetraLienzo = () => lienzo?.querySelector('.pe[data-vinculo="letra"]');
+const zonasLetra = () => [...(lienzo?.querySelectorAll(SEL_LETRA) || [])];   // la letra y las líneas separadas
 const anclaDePalabra = (w) => {
   const b = +w.dataset.b, l = +w.dataset.l, p = +w.dataset.w;
   return { b, l, p, n: 1, texto: palabras(lineasDeContenido(cancion.bloques[b]?.texto)[l])[p] || w.textContent };
 };
 // Las palabras de la selección del navegador, agrupadas por línea
 function anclasDeSeleccion() {
-  const sel = getSelection(), zona = zonaLetraLienzo();
-  if (!zona || !sel || sel.isCollapsed || !sel.rangeCount || !zona.contains(sel.anchorNode)) return null;
-  const ws = [...zona.querySelectorAll('.w[data-w]')].filter(w => sel.containsNode(w, true));
+  const sel = getSelection(), zonas = zonasLetra();
+  if (!sel || sel.isCollapsed || !sel.rangeCount || !zonas.some(z => z.contains(sel.anchorNode))) return null;
+  const ws = zonas.flatMap(z => [...z.querySelectorAll('.w[data-w]')]).filter(w => sel.containsNode(w, true));
   if (!ws.length) return null;
   const grupos = [];
   for (const w of ws) {
@@ -2877,11 +3037,10 @@ function anclasDeSeleccion() {
 const textoAnclas = (anclas) => anclas.map(a => a.texto).join(' / ');
 // Las palabras elegidas se marcan en el lienzo (la selección del navegador se quita al cambiar)
 function marcarPalabras() {
-  const zona = zonaLetraLienzo();
-  if (!zona) return;
-  zona.querySelectorAll('.w-sel').forEach(w => w.classList.remove('w-sel'));
+  const zonas = zonasLetra();
+  zonas.forEach(z => z.querySelectorAll('.w-sel').forEach(w => w.classList.remove('w-sel')));
   for (const a of resaltando?.anclas || []) {
-    for (let k = a.p; k < a.p + a.n; k++) zona.querySelector(`.w[data-b="${a.b}"][data-l="${a.l}"][data-w="${k}"]`)?.classList.add('w-sel');
+    for (let k = a.p; k < a.p + a.n; k++) for (const z of zonas) z.querySelector(`.w[data-b="${a.b}"][data-l="${a.l}"][data-w="${k}"]`)?.classList.add('w-sel');
   }
 }
 function elegirResaltar(anclas, actual = null) {
@@ -2948,7 +3107,15 @@ function menuResaltar(w, x, y) {
   const anclas = dentro ? resaltando.anclas : r ? [r] : w.dataset.w != null ? [anclaDePalabra(w)] : null;
   if (!anclas) return;
   const actual = dentro ? resaltando.actual : r;
-  abrirMenuResaltar({
+  // la línea: separarla de la letra o volver a unirla
+  const caja = w.closest(SEL_LETRA), pw = w.closest('.w[data-l]') || w.querySelector?.('.w[data-l]');
+  const extra = [];
+  if (caja?.dataset.vinculo === 'linea') {
+    const el = hoja().diseno.elementos.find(e => e.id === caja.dataset.id);
+    if (el?.suelta) extra.push({ t: '↩ Volver a unir esta línea', fn: () => unirLinea(el.suelta) }, { t: '✥ Mover esta línea', fn: () => { selId = el.id; soltarResaltar(); pintarSeleccion(); pintarPropiedades(); } });
+  } else if (caja && pw) extra.push({ t: '↗ Separar esta línea', fn: () => separarLinea(+pw.dataset.b, +pw.dataset.l) },
+    { t: '✥ Mover la letra', fn: () => { selId = caja.dataset.id; soltarResaltar(); pintarSeleccion(); pintarPropiedades(); } });
+  abrirMenuResaltar({ extra,
     x, y, texto: textoAnclas(anclas), hay: !!actual, todas: !!actual?.todas,
     alResaltar: () => elegirResaltar(anclas, actual),
     alEstilo: (estilo) => aplicarResaltado(anclas, actual, estilo, !!actual?.todas, { mezclar: true }),
@@ -2958,7 +3125,7 @@ function menuResaltar(w, x, y) {
 }
 function conectarResaltar() {
   const escn = $('[data-escenario]');
-  const palabraEn = (t) => t?.closest?.('.pe[data-vinculo="letra"] .w[data-w], .pe[data-vinculo="letra"] .rs');
+  const palabraEn = (t) => t?.closest?.('.pe[data-vinculo="letra"] .w[data-w], .pe[data-vinculo="letra"] .rs, .pe[data-vinculo="linea"] .w[data-w], .pe[data-vinculo="linea"] .rs');
   let toque = null, largo = 0;
   // ratón: al soltar, lo seleccionado; un clic en una palabra la elige; un clic fuera de la letra suelta
   escn.addEventListener('pointerup', (e) => {

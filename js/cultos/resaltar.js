@@ -254,7 +254,8 @@ export function montarResaltar(cont, { texto, actual = null, fuentePlantilla = '
 const MENU_RAPIDO = [['grande', '🔠 Más grande'], ['latido', '❤️ Latido'], ['multicolor', '🌈 Multicolor']];
 let menuAbierto = null;
 export function cerrarMenuResaltar() { menuAbierto?.cerrar(); }
-export function abrirMenuResaltar({ x, y, texto = '', hay = false, todas = false, alResaltar, alEstilo, alQuitar, alTodas }) {
+// extra: más opciones al final ([{ t, fn }], p. ej. separar la línea)
+export function abrirMenuResaltar({ x, y, texto = '', hay = false, todas = false, alResaltar, alEstilo, alQuitar, alTodas, extra = [] }) {
   cerrarMenuResaltar();
   const m = document.createElement('div');
   m.className = 'rs-menu';
@@ -264,6 +265,7 @@ export function abrirMenuResaltar({ x, y, texto = '', hay = false, todas = false
     <button type="button" role="menuitem" data-m="resaltar">✨ Resaltar…</button>
     ${MENU_RAPIDO.map(([k, t]) => `<button type="button" role="menuitem" data-m="${k}">${t}</button>`).join('')}
     ${hay ? '<button type="button" role="menuitem" data-m="quitar" class="peligro">🧹 Quitar resaltado</button>' : ''}
+    ${extra.length ? '<hr>' + extra.map((o, i) => `<button type="button" role="menuitem" data-x="${i}">${esc(o.t)}</button>`).join('') : ''}
     <hr><label class="rs-menu-todas"><input type="checkbox" data-todas ${todas ? 'checked' : ''}> Aplicar en todas las repeticiones</label>`;
   document.body.appendChild(m);
   // dentro de la ventana
@@ -290,6 +292,7 @@ export function abrirMenuResaltar({ x, y, texto = '', hay = false, todas = false
     else if (k === 'quitar') alQuitar?.();
     else alEstilo?.({ ...PRESETS.find(p => p[0] === k)[2] });
   });
+  $$('[data-x]', m).forEach(b => b.onclick = () => { cerrar(); extra[+b.dataset.x]?.fn?.(); });
   $('[data-todas]', m).onchange = (e) => alTodas?.(e.target.checked);
   $('[data-m]', m).focus();
   menuAbierto = { cerrar, el: m };

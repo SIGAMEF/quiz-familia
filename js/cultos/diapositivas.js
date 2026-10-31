@@ -76,12 +76,13 @@ function mayorQueCabe(txt, pe, max) {
 }
 // Devuelve { tam, partir, chico } para unas líneas en una plantilla.
 // lineas: textos o { t, b, l } (con resaltados, que pueden agrandar algunas palabras)
-export function ajustar(id, lineas, resaltados = null, letra = null) {
-  const p = plantillaDe(id), z = zonaConLetra(zonaLetra(p), letra);
+// geo: otra posición o tamaño de la zona ({ x, y, w, h, rot }: la letra movida en el editor o una línea separada)
+export function ajustar(id, lineas, resaltados = null, letra = null, geo = null) {
+  const p = plantillaDe(id), z0 = zonaConLetra(zonaLetra(p), letra), z = z0 && geo ? { ...z0, ...geo } : z0;
   if (!z) return { tam: 5, partir: true, chico: false };
   const max = Number(z.tam) || 5.4;
   const fuente = (lineas || []).map(x => typeof x === 'string' ? { t: x } : x);
-  const clave = `${p.id}|${p.updated_at || ''}|${JSON.stringify(fuente)}|${resaltados?.length ? JSON.stringify(resaltados) : ''}|${letra ? JSON.stringify(letra) : ''}`;
+  const clave = `${p.id}|${p.updated_at || ''}|${JSON.stringify(fuente)}|${resaltados?.length ? JSON.stringify(resaltados) : ''}|${letra ? JSON.stringify(letra) : ''}|${geo ? JSON.stringify(geo) : ''}`;
   if (cache.has(clave)) return cache.get(clave);
   // se mide solo la zona de la letra, sobre un fondo liso y sin animaciones
   const lienzo = pintarHoja(caja(), { diseno: { fondo: { tipo: 'color', valor: '#000000' }, elementos: [z] } },
@@ -122,23 +123,53 @@ export function plantillaDeEstrofa(c, bloque) {
   const e = c?.opciones?.plantillasEstrofas?.[bloque];
   return e && existePlantilla(e) ? plantillaDe(e).id : plantillaDeCancion(c);
 }
+// ---------- La letra movida en el editor ----------
+// La posición de la zona de la letra: la de esta pantalla (cancion.detalles[clave].zona), la de su estrofa
+// (opciones.zonaEstrofas[bloque]) o la de toda la canción (opciones.zona); sin ninguna, la de la plantilla.
+// Las líneas separadas (opciones.lineasSueltas['estrofa:línea'] = { x, y, w, h, rot }) son su propio cuadro.
+export const CAMPOS_GEO = ['x', 'y', 'w', 'h', 'rot'];
+export function geoValida(g) {
+  if (!g || typeof g !== 'object') return null;
+  const r = {};
+  for (const k of CAMPOS_GEO) { const n = Number(g[k]); if (Number.isFinite(n)) r[k] = Math.round(n * 10) / 10; }
+  return r.w > 0 && r.h > 0 ? r : null;
+}
+// La posición de la zona de la letra en la plantilla de una estrofa (sin cambios de la canción)
+export function geoDePlantilla(c, bloque) {
+  const z = zonaLetra(plantillaDe(plantillaDeEstrofa(c, bloque)));
+  return z ? geoValida({ rot: 0, ...z }) : null;
+}
+export const geoDeZona = (c, d) => geoValida(c?.detalles?.[d.clave]?.zona) || geoValida(c?.opciones?.zonaEstrofas?.[d.bloque]) || geoValida(c?.opciones?.zona);
+export const claveLinea = (f) => `${f.b}:${f.l}`;
+export const idLinea = (f) => `suelta-${f.b}-${f.l}`;
 export function hojasDeCancion(c) {
   const bases = new Map();
   const baseDe = (id) => { if (!bases.has(id)) bases.set(id, hojaDePlantilla(plantillaDe(id)).diseno); return bases.get(id); };
+  const sueltas = c.opciones?.lineasSueltas || {};
+  const esSuelta = (f) => f.l != null && geoValida(sueltas[claveLinea(f)]);
   return diapositivas(c).map(d => {
     const id = plantillaDeEstrofa(c, d.bloque), base = baseDe(id);
     const det = c.detalles?.[d.clave] || {};
     const letra = letraDePantalla(c, d.bloque);
-    const a = ajustar(id, d.fuente, c.resaltados, letra);
+    const geo = geoDeZona(c, d);
+    const enZona = d.fuente.filter(f => !esSuelta(f)), aparte = d.fuente.filter(esSuelta);
+    const a = ajustar(id, enZona, c.resaltados, letra, geo);
+    const zona = base.elementos.find(e => e.vinculo === 'letra');
+    const elementos = base.elementos.filter(e => !e.en || e.en === 'letra')
+      .map(e => e.vinculo === 'letra' ? { ...zonaConLetra(e, letra), ...(geo || {}), bloqueado: true, tam: a.tam } : { ...e, bloqueado: true });
+    // cada línea separada: un cuadro con el estilo de la letra, con la letra más grande que quepa
+    const lineas = zona ? aparte.map(f => {
+      const g = geoValida(sueltas[claveLinea(f)]), aj = ajustar(id, [f], c.resaltados, letra, g);
+      return { ...zonaConLetra(zona, letra), ...g, id: idLinea(f), vinculo: 'linea', suelta: claveLinea(f), lineas: [f],
+        tam: aj.tam, partir: aj.partir, chico: aj.chico, bloqueado: true };
+    }) : [];
     return {
       id: d.clave, tipo: 'contenido', config: {}, info: d, ver: 'letra', resaltados: c.resaltados || [], chico: a.chico,
-      textos: { fuente: d.fuente, pie: `${c.titulo || 'Canción'} · ${d.nombre}`, partir: a.partir, chico: a.chico },
+      // todas: la letra completa, para el celular vertical (acomodo automático, sin cuadros separados)
+      textos: { fuente: enZona, pie: `${c.titulo || 'Canción'} · ${d.nombre}`, partir: a.partir, chico: a.chico, ...(aparte.length ? { todas: d.fuente } : {}) },
       diseno: {
         fondo: det.fondo || base.fondo,
-        elementos: [
-          ...base.elementos.filter(e => !e.en || e.en === 'letra').map(e => ({ ...e, bloqueado: true, ...(e.vinculo === 'letra' ? { ...zonaConLetra(e, letra), tam: a.tam } : {}) })),
-          ...(Array.isArray(det.el) ? det.el : [])
-        ]
+        elementos: [...elementos, ...lineas, ...(Array.isArray(det.el) ? det.el : [])]
       }
     };
   });

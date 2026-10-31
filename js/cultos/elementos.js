@@ -188,7 +188,7 @@ export const hojaLogo = (culto) => ({ ...hojaDePortada(plantillaDe(culto?.planti
 export function sinTexto(h) {
   if (!h) return h;
   return { ...h, id: h.id + '-limpio', regresiva: null, textos: null,
-    diseno: { ...h.diseno, elementos: (h.diseno?.elementos || []).filter(e => !e.contenido && e.vinculo !== 'letra' && e.vinculo !== 'pie' && (h.ver !== 'portada' || e.tipo !== 'texto')) } };
+    diseno: { ...h.diseno, elementos: (h.diseno?.elementos || []).filter(e => !e.contenido && e.vinculo !== 'letra' && e.vinculo !== 'linea' && e.vinculo !== 'pie' && (h.ver !== 'portada' || e.tipo !== 'texto')) } };
 }
 
 // El reloj de una cuenta regresiva dibujada en `lienzo`: cuenta desde `inicio` (ms) o se queda en el total.
