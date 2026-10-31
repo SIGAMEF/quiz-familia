@@ -161,11 +161,11 @@ export function letraCoristas(cancion) {
     })
   }));
 }
-// La misma letra en HTML (bloques con su nombre y los resaltados en negrita, sin animación)
+// La misma letra en HTML (bloques con su nombre y los resaltados en negrita y color, dentro de la misma línea, sin animación)
 export function htmlDeLetra(bloques) {
   return (bloques || []).map(b => `<div class="cu-letra-bloque ${b.coro ? 'coro' : ''}"><b>${esc(b.n)}</b>${(b.l || []).map(x => {
     const w = palabras(x.t);
-    return `<div>${w.map((p, j) => (x.r || []).some(([d, h]) => j >= d && j < h) ? `<b>${esc(p)}</b>` : esc(p)).join(' ')}</div>`;
+    return `<div>${w.map((p, j) => (x.r || []).some(([d, h]) => j >= d && j < h) ? `<strong class="le-rs">${esc(p)}</strong>` : esc(p)).join(' ')}</div>`;
   }).join('')}</div>`).join('');
 }
 export const htmlLetraCoristas = (cancion) => htmlDeLetra(letraCoristas(cancion));

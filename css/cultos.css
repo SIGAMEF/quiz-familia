@@ -271,11 +271,13 @@ body.cr { background: #14121F; color: #F4F2FF; min-height: 100vh; margin: 0; pad
 /* ---------- Letras para coristas (letras.html) ---------- */
 body.le { --le-fondo: #FFFFFF; --le-tinta: #1E1B2E; --le-suave: #6E6890; --le-caja: #F3F1FB; --le-linea: #E6E2F5;
   margin: 0; background: var(--le-fondo); color: var(--le-tinta); min-height: 100vh; font-family: 'Nunito', system-ui, sans-serif; }
-body.le.oscuro { --le-fondo: #14121F; --le-tinta: #F4F2FF; --le-suave: #A9A3C7; --le-caja: #221F33; --le-linea: #2E2A45; }
+body.le.oscuro, body.le.tema-oscuro { --le-fondo: #14121F; --le-tinta: #F4F2FF; --le-suave: #A9A3C7; --le-caja: #221F33; --le-linea: #2E2A45; --le-acento: #C4B5FD; }
+body.le.tema-claro { --le-fondo: #FFFFFF; --le-tinta: #111111; --le-suave: #5F5A78; --le-caja: #F1EFF8; --le-linea: #E3E0EF; --le-acento: #6D28D9; }
+body.le.tema-sepia { --le-fondo: #F4ECD8; --le-tinta: #3B2F1E; --le-suave: #7A6A50; --le-caja: #E9DEC3; --le-linea: #D9CBA8; --le-acento: #9A3412; }
 .le-aviso { min-height: 80vh; display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; text-align: center; padding: 24px; color: var(--le-suave); }
 .le-aviso b { font-size: 22px; color: var(--le-tinta); }
 .le-cab { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--le-fondo); border-bottom: 1px solid var(--le-linea); }
-.le-cab > div:first-of-type { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.le-cab > div:first-of-type:not(.le-barra) { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .le-cab b { font-size: 17px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .le-cab small { color: var(--le-suave); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .le-volver { border: none; background: var(--le-caja); color: var(--le-tinta); width: 38px; height: 38px; border-radius: 10px; font-size: 18px; cursor: pointer; flex: none; }
@@ -296,7 +298,9 @@ body.le.oscuro { --le-fondo: #14121F; --le-tinta: #F4F2FF; --le-suave: #A9A3C7; 
 .le-letra .cu-letra-bloque { margin-bottom: 1.1em; font-weight: 600; }
 .le-letra .cu-letra-bloque > b { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--le-suave); margin-bottom: 2px; }
 .le-letra .cu-letra-bloque.coro { border-left: 4px solid #8B7CF6; padding-left: 12px; font-weight: 800; }
-.le-letra .cu-letra-bloque div b { color: #8B7CF6; }
+/* las palabras resaltadas: dentro de la misma línea, solo en negrita y color */
+.cu-letra-bloque strong.le-rs { display: inline; font-weight: 900; color: var(--primary); }
+.le-letra .cu-letra-bloque strong.le-rs { color: var(--le-acento, #8B7CF6); font-size: inherit; text-transform: none; letter-spacing: 0; }
 .le-img { display: block; width: 100%; height: auto; border-radius: 12px; }
 .le-enlace { display: block; padding: 14px; border-radius: 12px; background: var(--le-caja); color: var(--le-tinta); font-weight: 800; text-align: center; text-decoration: none; }
 .le-pie { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 8px; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); background: var(--le-fondo); border-top: 1px solid var(--le-linea); }
@@ -454,3 +458,42 @@ body.le.oscuro { --le-fondo: #14121F; --le-tinta: #F4F2FF; --le-suave: #A9A3C7; 
   .bb-btn { padding: 8px 10px; font-size: 13px; }
   .bb-btn.bb-prim { margin-left: 0; }
 }
+
+/* ---------- Coristas: 📜 Letra · 🎞 Como en pantalla ---------- */
+.le-modos { display: flex; gap: 6px; padding: 8px 14px 0; background: var(--le-fondo); }
+.le-modos button { flex: 1; padding: 9px 6px; border: 2px solid var(--le-linea); border-radius: 12px; background: var(--le-caja); color: var(--le-suave);
+  font: 800 14px 'Nunito', sans-serif; cursor: pointer; white-space: nowrap; }
+.le-modos button.activo { border-color: #8B7CF6; background: #8B7CF6; color: #fff; }
+.le-menu { flex: 1; min-width: 0; height: 38px; border: none; border-radius: 10px; padding: 0 8px; background: var(--le-caja); color: var(--le-tinta);
+  font: 800 14px 'Nunito', sans-serif; text-overflow: ellipsis; }
+.le-titulo { margin: 0 0 .7em; font: 800 1.15em/1.2 'Nunito', sans-serif; }
+.le-titulo small { display: block; margin-top: 2px; font-size: 12px; font-weight: 700; color: var(--le-suave); }
+.le-nuevo { position: fixed; z-index: 40; left: 50%; top: calc(8px + env(safe-area-inset-top)); transform: translateX(-50%); display: flex; align-items: center; gap: 10px;
+  padding: 8px 8px 8px 14px; border-radius: 999px; background: #1E1B2E; color: #fff; font: 800 14px 'Nunito', sans-serif; box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  white-space: nowrap; max-width: calc(100vw - 16px); }
+.le-nuevo button { border: none; border-radius: 999px; padding: 7px 14px; background: #8B7CF6; color: #fff; font: inherit; cursor: pointer; }
+
+/* 🎞 Como en pantalla: una pantalla a la vez, sin scroll */
+body.le.le-cine { background: #000; overflow: hidden; }
+.lp { position: fixed; inset: 0; display: flex; flex-direction: column; background: #000; color: #fff; }
+.lp .le-modos { background: transparent; padding: 8px 10px 0; }
+.lp .le-modos button { background: #1C1A27; border-color: #2E2A45; color: #C9C4E5; }
+.lp .le-modos button.activo { background: #8B7CF6; border-color: #8B7CF6; color: #fff; }
+.lp-cab { flex: none; padding-top: env(safe-area-inset-top); }
+.lp-fila { display: flex; gap: 6px; padding: 6px 10px; }
+.lp .le-volver, .lp .le-menu { background: #1C1A27; color: #fff; }
+.lp-esc { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.lp-marco { max-width: 100%; max-height: 100%; }
+.lp-marco .lienzo { width: 100%; }
+.lp-sin { width: min(92vw, 520px); }
+.lp-video { display: flex; flex-direction: column; gap: 10px; padding: 16px; text-align: center; color: #E9E6F8; }
+.lp-video b { font-size: 18px; }
+.lp-video .le-enlace { background: #1C1A27; color: #fff; border: none; font: 800 15px 'Nunito', sans-serif; cursor: pointer; }
+.lp-pie { flex: none; display: flex; align-items: center; gap: 4px; padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); background: #0E0D15; border-top: 1px solid #23202F; }
+.lp-pie button { flex: none; min-width: 38px; height: 38px; border: none; border-radius: 10px; background: #1C1A27; color: #fff; font: 800 14px 'Nunito', sans-serif; cursor: pointer; padding: 0 6px; }
+.lp-pie button.activo { background: #E5484D; }
+.lp-pie button[data-quieto].activo { background: #8B7CF6; }
+.lp-pos { min-width: 72px; text-align: center; font: 800 13px 'Nunito', sans-serif; color: #C9C4E5; white-space: nowrap; }
+.lp-sep { flex: 1; }
+.lp-h .lp-pie { padding-left: calc(8px + env(safe-area-inset-left)); padding-right: calc(8px + env(safe-area-inset-right)); }
+@media (max-width: 360px) { .lp-pie button { min-width: 34px; padding: 0 4px; } .lp-pos { min-width: 60px; } }

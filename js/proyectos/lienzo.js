@@ -148,7 +148,7 @@ function crearElemento(el, modo, ctx) {
   if (el.vinculo === 'letra' || el.vinculo === 'pie' || el.vinculo === 'linea') d.dataset.vinculo = el.vinculo;
   if (el.bloqueado) d.classList.add('bloq');   // de la plantilla: en el editor de canciones no se elige ni se mueve
   let altoCqw;   // alto del elemento en cqw (para el tamaño de los emojis)
-  if (fmt === 'web') { colocar(d, el); altoCqw = num(el.h, 20, 1, 300) * 0.5625; }
+  if (fmt === 'web') { colocar(d, el); altoCqw = num(el.h, 20, 1, 300) * (ctx.alto || 0.5625); }
   else if (fmt === 'manual') { const p = posMovil(ctx.hoja, el); colocar(d, p, 'manual'); altoCqw = num(p.h, 20, 1, 2000); }
   else {
     // acomodo automático: columna a todo el ancho (88cqw útiles), con la proporción que tenía en Web
@@ -406,15 +406,17 @@ export function ordenAuto(elementos) {
 // textos: { letra, pie } para la zona de la letra; animar: false deja todo quieto (así lo usa el editor)
 export const seVe = (el, ver) => !ver || !el.en || el.en === ver;
 export function pintarHoja(cont, hoja, { modo = 'ver', res = null, ver = hoja?.ver ?? null, textos = hoja?.textos ?? null, resaltados = hoja?.resaltados ?? null,
-  animar = modo !== 'editor', calidad, marcar = false } = {}) {
+  animar = modo !== 'editor', calidad, marcar = false, alto = 0.5625, video = modo === 'ver' } = {}) {
   asegurarFuentes();
   const lienzo = document.createElement('div');
   lienzo.className = 'lienzo' + (modo !== 'ver' ? ' estatico' : '');
+  // alto: el alto entre el ancho (0.5625 = 16:9; 16/9 = la pantalla vertical de un celular)
+  if (alto !== 0.5625) lienzo.style.aspectRatio = `1 / ${alto}`;
   const fondo = document.createElement('div');
   fondo.className = 'lienzo-fondo';
-  pintarFondo(fondo, hoja?.diseno?.fondo, { calidad: calidad || (modo === 'miniatura' ? 'baja' : 'alta'), video: modo === 'ver' });
+  pintarFondo(fondo, hoja?.diseno?.fondo, { calidad: calidad || (modo === 'miniatura' ? 'baja' : 'alta'), video });
   lienzo.appendChild(fondo);
-  const ctx = { hoja, res, fmt: 'web', ver, textos, resaltados, animar, marcar };
+  const ctx = { hoja, res, fmt: 'web', ver, textos, resaltados, animar, marcar, alto };
   for (const el of (hoja?.diseno?.elementos || [])) {
     if (!seVe(el, ver)) continue;
     const n = crearElemento(el, modo, ctx);

@@ -646,7 +646,7 @@ body.ritmo-pag { background: linear-gradient(160deg, #8B7EF7, #6C5CE7); min-heig
 /* ---------- Cultos: palabras resaltadas de la letra ---------- */
 .rs { white-space: nowrap; }
 .rs .l { display: inline-block; }
-.rs-latido, .rs-rebote, .rs-retumbar { display: inline-block; }
+.rs-latido, .rs-rebote, .rs-retumbar { display: inline-block; margin: 0 .22em; }   /* al agrandarse no tapan el espacio de al lado */
 /* palabras "botón": cápsula de color que entra con un salto y luego se mueve (solo al proyectar) */
 .rs-boton { display: inline-block; position: relative; overflow: hidden; vertical-align: baseline; }
 .rs-anim.rs-boton { animation: rs-boton-entra .7s cubic-bezier(.2, 1.6, .4, 1) both; }

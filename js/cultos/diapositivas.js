@@ -48,7 +48,7 @@ export function letraDePantalla(c, bloque) {
 // La hoja de una pantalla de letra, con el tamaño de letra ajustado
 export function hojaDePantalla(id, tam) {
   const h = hojaDePlantilla(plantillaDe(id));
-  return { tipo: 'contenido', diseno: { ...h.diseno, elementos: h.diseno.elementos.map(e => e.vinculo === 'letra' && tam ? { ...e, tam } : e) } };
+  return { tipo: 'contenido', diseno: { ...h.diseno, elementos: h.diseno.elementos.map(e => e.vinculo === 'letra' && tam ? { ...e, tam, tamMax: Number(e.tam) || 5.4 } : e) } };
 }
 
 // ---------- Ajuste del texto ----------
@@ -80,18 +80,23 @@ function mayorQueCabe(txt, pe, max) {
 export function ajustar(id, lineas, resaltados = null, letra = null, geo = null) {
   const p = plantillaDe(id), z0 = zonaConLetra(zonaLetra(p), letra), z = z0 && geo ? { ...z0, ...geo } : z0;
   if (!z) return { tam: 5, partir: true, chico: false };
-  const max = Number(z.tam) || 5.4;
   const fuente = (lineas || []).map(x => typeof x === 'string' ? { t: x } : x);
-  const clave = `${p.id}|${p.updated_at || ''}|${JSON.stringify(fuente)}|${resaltados?.length ? JSON.stringify(resaltados) : ''}|${letra ? JSON.stringify(letra) : ''}|${geo ? JSON.stringify(geo) : ''}`;
+  return medirZona(z, fuente, resaltados, { clave: `${p.id}|${p.updated_at || ''}|${letra ? JSON.stringify(letra) : ''}|${geo ? JSON.stringify(geo) : ''}` });
+}
+// El tamaño más grande que quepa para unas líneas { t, b, l } en la zona z (un elemento de texto del lienzo).
+// alto: la proporción del lienzo (16/9 = celular vertical); max: el tamaño máximo (cqw; sin él, z.tam);
+// umbral: si sin partir las líneas cabe a este tamaño o más, no se parten (Infinity: lo que deje la letra más grande)
+export function medirZona(z, fuente, resaltados = null, { alto = 0.5625, max = Number(z?.tam) || 5.4, umbral = SIN_PARTIR, clave = JSON.stringify(z) } = {}) {
+  clave = `${clave}|${alto}|${max}|${umbral}|${JSON.stringify(fuente)}|${resaltados?.length ? JSON.stringify(resaltados) : ''}`;
   if (cache.has(clave)) return cache.get(clave);
   // se mide solo la zona de la letra, sobre un fondo liso y sin animaciones
-  const lienzo = pintarHoja(caja(), { diseno: { fondo: { tipo: 'color', valor: '#000000' }, elementos: [z] } },
-    { modo: 'miniatura', ver: 'letra', textos: { fuente }, resaltados, animar: false });
+  const lienzo = pintarHoja(caja(), { diseno: { fondo: { tipo: 'color', valor: '#000000' }, elementos: [{ ...z, tam: max }] } },
+    { modo: 'miniatura', ver: 'letra', textos: { fuente }, resaltados, animar: false, alto });
   const pe = lienzo.querySelector('.pe-texto'), txt = pe?.querySelector('.pe-txt');
   if (!txt) return { tam: max, partir: true, chico: false };
   Object.assign(txt.style, { display: 'block', height: 'auto', overflowWrap: 'normal', wordBreak: 'normal', whiteSpace: 'pre' });
   let tam = mayorQueCabe(txt, pe, max), partir = false;
-  if (tam < SIN_PARTIR) {
+  if (tam < umbral) {
     txt.style.whiteSpace = 'pre-wrap';
     const conPartir = mayorQueCabe(txt, pe, max);
     if (conPartir > tam) { tam = conPartir; partir = true; }
@@ -101,6 +106,9 @@ export function ajustar(id, lineas, resaltados = null, letra = null, geo = null)
   cache.set(clave, r);
   return r;
 }
+
+// Olvida las medidas guardadas (p. ej. cuando termina de cargar una fuente)
+export function olvidarMedidas() { cache.clear(); }
 
 // Espera la fuente de la letra de la plantilla (para medir con la letra real), como máximo ~1,5 s.
 // id: una plantilla, o 'fuente:<nombre>' para la letra elegida de una canción
@@ -156,12 +164,12 @@ export function hojasDeCancion(c) {
     const a = ajustar(id, enZona, c.resaltados, letra, geo);
     const zona = base.elementos.find(e => e.vinculo === 'letra');
     const elementos = base.elementos.filter(e => !e.en || e.en === 'letra')
-      .map(e => e.vinculo === 'letra' ? { ...zonaConLetra(e, letra), ...(geo || {}), bloqueado: true, tam: a.tam } : { ...e, bloqueado: true });
+      .map(e => e.vinculo === 'letra' ? { ...zonaConLetra(e, letra), ...(geo || {}), bloqueado: true, tam: a.tam, tamMax: Number(zonaConLetra(e, letra).tam) || 5.4 } : { ...e, bloqueado: true });
     // cada línea separada: un cuadro con el estilo de la letra, con la letra más grande que quepa
     const lineas = zona ? aparte.map(f => {
       const g = geoValida(sueltas[claveLinea(f)]), aj = ajustar(id, [f], c.resaltados, letra, g);
       return { ...zonaConLetra(zona, letra), ...g, id: idLinea(f), vinculo: 'linea', suelta: claveLinea(f), lineas: [f],
-        tam: aj.tam, partir: aj.partir, chico: aj.chico, bloqueado: true };
+        tam: aj.tam, tamMax: Number(zonaConLetra(zona, letra).tam) || 5.4, partir: aj.partir, chico: aj.chico, bloqueado: true };
     }) : [];
     return {
       id: d.clave, tipo: 'contenido', config: {}, info: d, ver: 'letra', resaltados: c.resaltados || [], chico: a.chico,

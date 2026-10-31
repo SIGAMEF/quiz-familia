@@ -12,7 +12,7 @@ import { PLANTILLAS } from './plantillas.js';
 import { textoBuscable } from './letra.js';
 import { plantillaVista, urlEditorCancion } from './canciones.js';
 import { letraCoristas } from './resaltar.js';
-import { urlLetras, enlaceWhatsApp } from './remoto.js';
+import { urlLetras, enlaceWhatsApp, abrirCanal } from './remoto.js';
 import { TIPOS_ELEMENTO, MAX_ELEMENTOS, nuevoIdElemento, hojasDeElemento, tituloDeElemento, plantillaDeElemento, plantillasDeCulto, montarReloj, hojaDePortada } from './elementos.js';
 import { abrirPantalla } from './consola.js';
 import { descargarCulto } from './sin-red.js';
@@ -231,11 +231,19 @@ export async function pintarEditorCulto(cuerpo, id, { perfil, datos = datosCulto
     const items = datosCoristas(culto, canciones);
     if (!items.length && !await confirmar('Este culto no tiene canciones ni versículos: los coristas verán la lista vacía.', { titulo: '¿Publicar igual?', boton: 'Publicar', peligro: false })) return;
     try {
-      const r = await datos.publicar(culto.id, items);
+      let r;
+      try { r = await datos.publicar(culto.id, items); }
+      catch (e) {
+        // muy grande para guardarlo: se publica solo la letra para leer (sin el modo "Como en pantalla")
+        if (!/publicado_check/.test(e?.message || '')) throw e;
+        r = await datos.publicar(culto.id, items.map(({ it, src, pantalla, ...x }) => x));
+        toast('El culto es muy grande: los coristas verán solo la letra (sin “Como en pantalla”).', 'error');
+      }
       const primera = !culto.publicado_en;
       culto.codigo_coristas = r.codigo; culto.publicado_en = r.publicado_en; pendiente = false;
       pintarPublicar();
-      if (primera) mostrarEnlaceCoristas(culto); else toast('Cambios publicados: los coristas los verán al abrir el enlace');
+      avisarPublicado(r.codigo, r.publicado_en);
+      if (primera) mostrarEnlaceCoristas(culto); else toast('Cambios publicados: los celulares con el enlace abierto verán “Hay cambios nuevos”');
     } catch (e) { toast(mensajeError(e), 'error'); }
   }
   pintarPublicar();
@@ -472,11 +480,16 @@ function editarElemento(original, { culto, canciones, perfil, recargar, recargar
 // ---------- Coristas ----------
 // Lo que se publica: las canciones (letra por bloques, con los resaltados), los versículos, los textos,
 // los anuncios con imagen y los videos (como enlace), en orden. Cuentas regresivas y diseños no salen.
+// Lo que se publica para los coristas (letras.html). Además de la letra para leer, cada elemento lleva "it" (el
+// elemento del culto) y cada canción "src" (lo que hace falta para armar sus pantallas como en la proyección, modo
+// "🎞 Como en pantalla"); el primero lleva "pantalla": la plantilla base y mis plantillas que se usan.
 export function datosCoristas(culto, canciones) {
-  return (culto.items || []).flatMap(it => {
+  const items = (culto.items || []).flatMap(it => {
     if (it.tipo === 'cancion') {
       const c = canciones.get(it.cancion);
-      return c ? [{ id: it.id, tipo: 'cancion', titulo: c.titulo, autor: c.autor || '', tono: c.tono || '', bloques: letraCoristas(c) }] : [];
+      return c ? [{ id: it.id, tipo: 'cancion', titulo: c.titulo, autor: c.autor || '', tono: c.tono || '', bloques: letraCoristas(c),
+        it: { id: it.id, tipo: 'cancion', cancion: c.id, plantilla: it.plantilla || '' },
+        src: { titulo: c.titulo, bloques: c.bloques || [], orden_canto: c.orden_canto || null, opciones: c.opciones || {}, resaltados: c.resaltados || [], detalles: c.detalles || {} } }] : [];
     }
     if (it.tipo === 'versiculo') return [{ id: it.id, tipo: 'versiculo', titulo: it.cita || 'Versículo', texto: String(it.texto || '') }];
     if (it.tipo === 'texto') {
@@ -486,7 +499,19 @@ export function datosCoristas(culto, canciones) {
     if (it.tipo === 'anuncio') return it.url ? [{ id: it.id, tipo: 'anuncio', titulo: it.nombre || 'Anuncio', url: it.url }] : [];
     if (it.tipo === 'video') return it.url ? [{ id: it.id, tipo: 'video', titulo: it.nombre || 'Video', url: it.url, ...(it.portada ? { portada: it.portada } : {}) }] : [];
     return [];
-  });
+  }).map(x => x.it || x.tipo === 'video' ? x : { ...x, it: (culto.items || []).find(i => i.id === x.id) });
+  if (items.length) {
+    const mias = plantillasDeCulto(culto, canciones).filter(id => String(id).startsWith('mi:')).map(id => plantillaDe(id)).filter(p => p.mia)
+      .map(p => ({ id: p.idBase, nombre: p.nombre, diseno: p.diseno }));
+    items[0] = { ...items[0], pantalla: { base: plantillaDe(culto.plantilla_base).id, plantillas: mias } };
+  }
+  return items;
+}
+// Avisa a los celulares que tienen abierto el enlace de coristas que hay una versión nueva
+function avisarPublicado(codigo, en) {
+  if (!codigo) return;
+  const c = abrirCanal('cv-' + codigo, { alEstado: (e) => { if (e === 'SUBSCRIBED') { c.enviar({ t: 'publicado', en }); setTimeout(() => c.cerrar(), 1500); } } });
+  setTimeout(() => c.cerrar(), 15000);
 }
 export function mostrarEnlaceCoristas(culto) {
   if (!culto.codigo_coristas) return toast('Primero publica el culto (📤 Publicar para coristas).', 'error');

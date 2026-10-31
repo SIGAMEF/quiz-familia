@@ -218,7 +218,10 @@ export function colorBase(f) {
 }
 
 // ---------- Motor ----------
-const reducido = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+// quietos: "Menos movimiento" (p. ej. en el celular de los coristas); también el ajuste del sistema
+let quietos = false;
+export function fondosQuietos(v) { quietos = !!v; }
+const reducido = () => quietos || matchMedia('(prefers-reduced-motion: reduce)').matches;
 const vivos = new Set();
 let rafId = 0;
 const io = typeof IntersectionObserver === 'function'
